@@ -36,8 +36,9 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { apiFetch, queryKeys } from '@/lib/api-client'
 import { RoleGuard } from '@/components/shared/RoleGuard'
+import { ModuleSurface } from '@/components/shared/ModuleSurface'
 import { useClasses } from '@/hooks/useClasses'
-import { usePublicSchoolInfo } from '@/hooks/usePublic'
+import { useEffectiveViewingPeriod } from '@/hooks/useViewingPeriod'
 import type { ApiTimetableSlot, ApiClass } from '@shared/types/api'
 
 const DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'] as const
@@ -48,10 +49,6 @@ const DAY_LABELS = {
   THURSDAY: 'Thu',
   FRIDAY: 'Fri',
 }
-
-// Fallback used only while usePublicSchoolInfo() is still loading — matches
-// the same constant name/value already used for this in (auth)/exams/page.tsx.
-const FALLBACK_YEAR = '2025/2026'
 
 export default function TimetablePage() {
   return (
@@ -64,10 +61,14 @@ export default function TimetablePage() {
 }
 
 function TimetableContent() {
-  const { data: schoolInfo } = usePublicSchoolInfo()
-  const { data: classes = [] } = useClasses(schoolInfo?.currentYear ?? FALLBACK_YEAR)
-  const [selectedClassId, setSelectedClassId] = useState('')
-  const [term, setTerm] = useState(1)
+  // Year AND term come only from the universal header filter (the page's own
+  // term select was a second control for the same value and has been removed).
+  const { academicYear: currentYear, term } = useEffectiveViewingPeriod()
+  const { data: classes = [] } = useClasses(currentYear)
+  const [pickedClassId, setSelectedClassId] = useState('')
+  // A class picked under another year is not in this year's list — fall back
+  // to "nothing selected" instead of querying a stale class id.
+  const selectedClassId = (classes as ApiClass[]).some((c: ApiClass) => c.id === pickedClassId) ? pickedClassId : ''
 
   const { data: slots = [], isLoading } = useQuery<ApiTimetableSlot[]>({
     queryKey: queryKeys.classes.timetable(selectedClassId, undefined, term),
@@ -90,6 +91,7 @@ function TimetableContent() {
         <h1 className="font-heading text-2xl font-bold text-brand-navy">Timetable</h1>
       </div>
 
+      <ModuleSurface>
       {/* Filters */}
       <div className="flex flex-wrap gap-3">
         <select
@@ -105,27 +107,20 @@ function TimetableContent() {
             </option>
           ))}
         </select>
-        <select
-          value={term}
-          onChange={(e) => setTerm(Number(e.target.value))}
-          className="border border-base rounded-lg px-3 py-2 text-sm bg-surface"
-          aria-label="Select term"
-        >
-          <option value={1}>Term 1</option>
-          <option value={2}>Term 2</option>
-          <option value={3}>Term 3</option>
-        </select>
+        <span className="self-center text-xs text-muted" aria-label="Period shown">
+          Term {term} · {currentYear}
+        </span>
       </div>
 
       {!selectedClassId ? (
-        <div className="bg-surface border border-base rounded-xl p-12 text-center text-muted text-sm">
+        <div className="py-12 text-center text-muted text-sm">
           Select a class above to view its timetable
         </div>
       ) : isLoading ? (
         <div className="skeleton h-64 rounded-xl" />
       ) : (
-        <div className="bg-surface border border-base rounded-xl overflow-auto">
-          <table className="w-full min-w-[640px] text-sm">
+        <div className="overflow-auto">
+          <table className="w-full min-w-160 text-sm">
             <thead>
               <tr className="border-b border-base bg-page">
                 <th className="text-left px-4 py-3 font-heading font-semibold text-xs uppercase tracking-wide text-muted w-24">
@@ -184,6 +179,7 @@ function TimetableContent() {
           </table>
         </div>
       )}
+      </ModuleSurface>
     </div>
   )
 }

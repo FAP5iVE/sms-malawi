@@ -2,9 +2,8 @@
  * [CHANGE TYPE]: TARGETED EDIT (OVERHAUL — added search/filter, richer columns)
  * [FILE]: apps/web/src/components/placements/PlacementRegistryPanel.tsx
  * [PURPOSE]: The "Placement Registry & Analytics" tab from the reference
- *   module — open to EVERY role (placement.view / placement.viewAnalytics
- *   are universal; placement outcomes are culturally public at Malawian
- *   schools). Shows the cohort-wide analytics cards, then the list of
+ *   module — open to every STAFF role (placement.viewAnalytics) but never the
+ *   student role — it lists other students' names, candidate numbers and points. Shows the cohort-wide analytics cards, then the list of
  *   CONFIRMED placements only, with the reference module's search-by-name/
  *   MSCE-number/course + University + Gender filters (all client-side over
  *   the already-fetched confirmed list — the dataset is small by nature,
@@ -17,15 +16,14 @@
 
 import { useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
-import { usePublicSchoolInfo } from '@/hooks/usePublic'
+import { useEffectiveViewingPeriod } from '@/hooks/useViewingPeriod'
 import { usePlacementRegistry, usePlacementCatalogue } from '@/hooks/usePlacements'
-import { AcademicYearSelect } from '@/components/shared/AcademicYearSelect'
 import { DataTable, type DataColumn } from '@/components/shared/DataTable'
 import { PlacementAnalyticsPanel } from '@/components/placements/PlacementAnalyticsPanel'
 import { PlacementStatusBadge } from '@/components/placements/PlacementStatusBadge'
+import { ListPager } from '@/components/shared/ListPager'
+import { usePagedRows } from '@/lib/hills/usePagedRows'
 import type { ApiUniversityPlacement } from '@shared/types/api'
-
-const FALLBACK_YEAR = '2025/2026'
 
 function studentName(row: ApiUniversityPlacement): string {
   if (!row.student) return row.studentId
@@ -33,15 +31,18 @@ function studentName(row: ApiUniversityPlacement): string {
 }
 
 const ENTRY_SOURCE_LABEL: Record<string, string> = {
-  STAFF_OFFICIAL: 'Staff Official List',
-  STUDENT_CLAIM: 'Student Claim',
+  STAFF_OFFICIAL: 'Staff official list',
+  STUDENT_CLAIM: 'Student claim',
 }
 
 export function PlacementRegistryPanel() {
-  const { data: schoolInfo } = usePublicSchoolInfo()
+  // The school's stored current year (SystemSettings), never a literal.
+  // [UNIVERSAL PERIOD FILTER] The year comes ONLY from the app-wide header
+  // filter. The year select this panel used to carry wrote through to it (picking
+  // a year here already moved the whole app), so it was a second control for one
+  // value; it is now a read-only label.
+  const { academicYear: effectiveYear } = useEffectiveViewingPeriod()
   const { data: catalogue = [] } = usePlacementCatalogue()
-  const [academicYear, setAcademicYear] = useState<string>('')
-  const effectiveYear = academicYear || schoolInfo?.currentYear || FALLBACK_YEAR
 
   const { data: placements = [], isLoading, isError, error } = usePlacementRegistry(effectiveYear)
 
@@ -72,9 +73,12 @@ export function PlacementRegistryPanel() {
     })
   }, [placements, search, universityFilter, genderFilter])
 
+  // Hills 8b-1 (R7): client-side paging of the already-loaded, already-filtered list.
+  const paging = usePagedRows(filtered, { resetKey: `${effectiveYear}|${search}|${universityFilter}|${genderFilter}` })
+
   const columns: DataColumn<ApiUniversityPlacement>[] = [
     {
-      key: 'student', label: 'Student & Exam ID', priority: 'critical',
+      key: 'student', label: 'Student and exam ID', priority: 'critical',
       render: (row) => (
         <div>
           <p className="font-medium">{studentName(row)}</p>
@@ -84,26 +88,26 @@ export function PlacementRegistryPanel() {
     },
     {
       key: 'sex', label: 'Gender', priority: 'optional',
-      render: (row) => row.student?.sex === 'FEMALE' ? 'Female' : row.student?.sex === 'MALE' ? 'Male' : '\u2014',
+      render: (row) => row.student?.sex === 'FEMALE' ? 'Female' : row.student?.sex === 'MALE' ? 'Male' : '-',
     },
     {
       key: 'placedUniversityId', label: 'Institution', priority: 'critical',
-      render: (row) => row.placedUniversityName ?? row.placedUniversityId ?? '\u2014',
+      render: (row) => row.placedUniversityName ?? row.placedUniversityId ?? '-',
     },
     {
-      key: 'placedProgrammeId', label: 'Faculty & Selected Course', priority: 'important',
+      key: 'placedProgrammeId', label: 'Faculty and course', priority: 'important',
       render: (row) => (
         <div>
-          <p>{row.placedProgrammeName ?? row.placedProgrammeId ?? '\u2014'}</p>
+          <p>{row.placedProgrammeName ?? row.placedProgrammeId ?? '-'}</p>
           {facultyFor(row) && <p className="text-xs text-muted">{facultyFor(row)}</p>}
         </div>
       ),
     },
-    { key: 'ncheBatchRef', label: 'NCHE Batch Ref', priority: 'optional', render: (row) => row.ncheBatchRef ?? '\u2014' },
+    { key: 'ncheBatchRef', label: 'NCHE batch reference', priority: 'optional', render: (row) => row.ncheBatchRef ?? '-' },
     {
-      key: 'entrySource', label: 'Entry Source', priority: 'optional',
+      key: 'entrySource', label: 'Entry source', priority: 'optional',
       render: (row) => (
-        <span className="inline-flex items-center rounded-full bg-page border border-base px-2 py-0.5 text-xs">
+        <span className="inline-flex items-center text-xs">
           {ENTRY_SOURCE_LABEL[row.entrySource] ?? row.entrySource}
         </span>
       ),
@@ -115,11 +119,9 @@ export function PlacementRegistryPanel() {
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h3 className="font-heading font-semibold text-base">Cohort placement outcomes</h3>
-        <AcademicYearSelect
-          value={effectiveYear}
-          onChange={(e) => setAcademicYear(e.target.value)}
-          className="border border-base rounded-xl px-3 py-2 text-sm bg-surface"
-        />
+        <span className="text-sm text-muted" aria-label="Academic year shown">
+              Intake {effectiveYear}
+            </span>
       </div>
 
       <PlacementAnalyticsPanel academicYear={effectiveYear} />
@@ -158,27 +160,29 @@ export function PlacementRegistryPanel() {
 
       <div>
         <div className="flex items-center justify-between mb-2">
-          <h4 className="font-heading font-semibold text-sm">Confirmed NCHE Placement List ({placements.length})</h4>
+          <h4 className="font-heading font-semibold text-sm">Confirmed NCHE placement list</h4>
           <span className="text-xs text-muted">Showing {filtered.length} of {placements.length} confirmed</span>
         </div>
         {isError ? (
-          <div className="text-sm text-brand-coral py-6 text-center px-4 border border-base rounded-xl">
+          <div className="text-sm text-tone-coral py-6 text-center px-4">
             <p className="font-medium">Could not load the registry.</p>
-            <p className="text-xs text-muted mt-1">{(error as Error)?.message ?? 'Unknown error — check your connection and try again.'}</p>
+            <p className="text-xs text-muted mt-1">{(error as Error)?.message ?? 'Unknown error. Check your connection and try again.'}</p>
           </div>
         ) : (
           <DataTable
-            data={filtered}
+            data={paging.visible}
             isLoading={isLoading}
             columns={columns}
             rowKey="id"
             emptyMessage={
               placements.length === 0
                 ? `No confirmed placements recorded for ${effectiveYear} yet.`
-                : 'No placements match your search/filters.'
+                : 'No placements match your search or filters.'
             }
+            bordered={false}
           />
         )}
+        {!isError && <ListPager paging={paging} />}
       </div>
     </div>
   )

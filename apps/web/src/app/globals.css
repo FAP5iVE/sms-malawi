@@ -13,8 +13,6 @@
 
 /* ─────────────────────────────────────────────────────────
    FONT FACES
-   Self-hosted for zero network dependency — critical for
-   Malawi where CDN latency can be high.
    ───────────────────────────────────────────────────────── */
 
 @font-face {
@@ -73,6 +71,18 @@
   font-weight: 700;
   font-display: swap;
   src: url('/fonts/dmsans-bold.woff2') format('woff2');
+}
+
+/* Hanken Grotesk, variable (weights 100-900). Used ONLY inside a .hills scope
+   (the public site and sign-in family); the signed-in app keeps DM Sans and
+   Inter. Browsers fetch this file lazily, only when a .hills element renders
+   text, so signed-in pages never download it. SIL Open Font License 1.1. */
+@font-face {
+  font-family: 'Hanken Grotesk';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/hanken-grotesk-variable.woff2') format('woff2');
 }
 
 /* ─────────────────────────────────────────────────────────
@@ -147,6 +157,45 @@
   --color-brand-coral:      hsl(var(--brand-coral));
   --color-brand-purple:     hsl(var(--brand-purple));
 
+  /* ── Section surface for the public site's blue bands (hero, performance,
+        footer…). --brand-navy flips to a bright #4a9bd4 in dark mode so it
+        can work as TEXT on dark pages, which made every `bg-brand-navy`
+        band a dull, washed-out light blue when used as a BACKGROUND. This
+        is the dedicated background token: a rich mid-navy in dark mode —
+        clearly lighter than the near-black page so it never gets swallowed,
+        but deep enough that white text stays crisp. */
+  --color-brand-deep:       hsl(var(--brand-deep));
+
+  /* ── Status text colours
+        Status / category / schedule labels are plain coloured TEXT — no
+        pill background, no border (the old filled pills were removed
+        system-wide). Because they now sit directly on the page or card,
+        each tone has a strong shade for light surfaces and a bright shade
+        for dark surfaces (both ≥ 4.5:1 contrast on their surface). Use
+        e.g. `text-status-success`; the dark-mode swap is automatic. */
+  --color-status-success:   hsl(var(--status-success));
+  --color-status-warning:   hsl(var(--status-warning));
+  --color-status-danger:    hsl(var(--status-danger));
+  --color-status-info:      hsl(var(--status-info));
+  --color-status-accent:    hsl(var(--status-accent));
+  --color-status-cyan:      hsl(var(--status-cyan));
+  --color-status-neutral:   hsl(var(--status-neutral));
+
+  /* ── Text-use tones and button fills (Phase 8b-0, RULEBOOK R3).
+        The brand teal / coral / amber are fine as FILLS, icons and bars, but too
+        light to read as TEXT on white (4.38 / 4.19 / 3.19 : 1). Use
+        `text-tone-teal`, `text-tone-coral`, `text-tone-amber` for words and links;
+        `bg-btn-brand text-btn-brand-fg` for filled buttons. */
+  --color-tone-teal:        hsl(var(--tone-teal));
+  --color-tone-coral:       hsl(var(--tone-coral));
+  --color-tone-amber:       hsl(var(--tone-amber));
+  --color-btn-brand:        hsl(var(--btn-brand));
+  --color-btn-brand-hover:  hsl(var(--btn-brand-hover));
+  --color-btn-brand-fg:     hsl(var(--btn-brand-fg));
+  --color-btn-danger:       hsl(var(--btn-danger));
+  --color-btn-danger-hover: hsl(var(--btn-danger-hover));
+  --color-btn-danger-fg:    hsl(var(--btn-danger-fg));
+
   /* ── Radius tokens */
   --radius-sm: 0.25rem;
   --radius:    0.5rem;
@@ -202,7 +251,7 @@
 
     /* Muted areas */
     --muted:                215 25% 93%;
-    --muted-foreground:     215 16% 47%;   /* #64748b — muted text */
+    --muted-foreground:     215 16% 42%;   /* was 47% (#64748b): 4.40:1 on the page and 3.99:1 on muted rows; now 5.27 / 4.78 */
 
     /* Accent (used for hover states) */
     --accent:               215 25% 93%;
@@ -248,7 +297,7 @@
     --color-page:    215 25% 97%;  /* same as --background */
     --color-surface: 0 0% 100%;   /* same as --card */
     --color-text:    222 47% 11%; /* same as --foreground */
-    --color-muted-val: 215 16% 47%;
+    --color-muted-val: 215 16% 42%;
 
     /* ── Brand palette [PRODUCTION FIX] — light-mode values, HSL
        equivalents of the previous static hex, so light mode is visually
@@ -261,6 +310,16 @@
     --brand-amber:       32  93% 44%;  /* #d97706 */
     --brand-coral:       8   68% 53%;  /* #dc4f3a */
     --brand-purple:      271 43% 43%;  /* #6b3fa0 */
+    --brand-deep:        213 51% 24%;  /* #1e3a5f — same as --brand-navy in light mode */
+
+    /* Status text colours — light surfaces (≥ 4.5:1 on white) */
+    --status-success:    162 93% 24%;  /* #047857 */
+    --status-warning:    26  90% 33%;  /* was 37% (#b45309): 4.27:1 on muted rows; now 5.11 */
+    --status-danger:     0   74% 42%;  /* #b91c1c */
+    --status-info:       224 76% 48%;  /* #1d4ed8 */
+    --status-accent:     272 72% 47%;  /* #7e22ce */
+    --status-cyan:       192 82% 31%;  /* #0e7490 */
+    --status-neutral:    215 19% 35%;  /* #475569 */
   }
 
   /* ── DARK MODE ──────────────────────────────────────── */
@@ -341,6 +400,20 @@
     --brand-amber:       38  92% 60%;
     --brand-coral:       8   85% 68%;
     --brand-purple:      258 90% 76%;
+    /* Public-site blue bands. The old dark value (--brand-navy = #4a9bd4)
+       was a dull light blue; the original deep navy before that swallowed
+       the background art. This sits between: rich, clearly blue, clearly
+       lighter than the #070e1a page. */
+    --brand-deep:        213 52% 30%;  /* #244f74 */
+
+    /* Status text colours — dark surfaces (bright, ≥ 7:1 on #111827) */
+    --status-success:    158 64% 52%;  /* #34d399 */
+    --status-warning:    43  96% 56%;  /* #fbbf24 */
+    --status-danger:     0   91% 71%;  /* #f87171 */
+    --status-info:       213 94% 68%;  /* #60a5fa */
+    --status-accent:     255 92% 76%;  /* #a78bfa-ish */
+    --status-cyan:       188 86% 53%;  /* #22d3ee */
+    --status-neutral:    213 27% 84%;  /* #cbd5e1 */
   }
 
   /* ── GLOBAL RESETS ─────────────────────────────────── */
@@ -382,13 +455,34 @@
     font-family: inherit;
   }
 
-  /* Default link colour */
+  /* Default link colour. Hover standard (R9.5): a link inside a sentence is
+     underlined all the time and gets thicker on hover; every other link or
+     action shows a soft tint on hover (.app-action or .app-hover). Nothing
+     gains an underline only when the pointer arrives, because touch and
+     keyboard users never see that. */
   a {
     color: var(--color-brand-teal);
     text-decoration: none;
   }
-  a:hover {
+  :where(p, li, dd, blockquote, figcaption) a:not([class]),
+  .prose a {
     text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+  :where(p, li, dd, blockquote, figcaption) a:not([class]):hover,
+  .prose a:hover,
+  :where(a, button).underline:hover {
+    text-decoration-thickness: 2px;
+  }
+
+  /* One pointer for anything that can be pressed. */
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']),
+  [role='menuitem']:not([aria-disabled='true']),
+  summary,
+  a[href] {
+    cursor: pointer;
   }
 
   /* Focus ring — accessible, school-branded */
@@ -854,4 +948,2517 @@
   .main-scroll-pad {
     padding-bottom: 1.5rem !important;
   }
+}
+
+
+/* ─────────────────────────────────────────────────────────
+   MOBILE UI SYSTEM  (below 768px — the same breakpoint as
+   Tailwind's `md`, which is where the shell swaps Sidebar for
+   MobileBottomNav, so there is exactly one mobile/desktop seam)
+
+   Decisions, after reviewing "8 rules for perfect mobile design"
+   and "58 rules for beautiful UI design" (neither gives numbers,
+   so the values below come from the platform guidelines they
+   point at — Material 3 compact / Apple HIG — not from the articles):
+
+   • Screen-edge gutter: 16px. This is the guideline minimum, and it
+     also covers the articles' "curved displays need extra padding"
+     rule. Space is saved INSIDE cards instead (see --space-card),
+     where nested padding was stacking up (page 16 + card 16 + cell 16).
+   • Card padding: 12px, 8px gaps between tightly related items, on the
+     4/8pt grid. Desktop (md+) is untouched.
+   • Touch targets: 44px minimum (HIG; Material says 48dp).
+   • Text inputs: 16px, below which iOS Safari zooms the page on focus
+     (the existing `.input` class and shadcn primitives already did this;
+     this extends it to the many hand-written inputs).
+   • NOT adopted from the articles: golden ratio / rule of thirds,
+     F/Z-patterns, gamification, storytelling, video, "novelty" and
+     most of the 58 rules — product/brand guidance, not layout
+     constraints for a data-dense admin app.
+
+   These rules are deliberately UNLAYERED, like .main-scroll-pad below:
+   unlayered CSS beats Tailwind's `@layer utilities`, so one rule here
+   can override a utility class on many pages without touching each one.
+   ───────────────────────────────────────────────────────── */
+
+:root {
+  --space-gutter: 1rem;      /* 16px — screen-edge margin on mobile */
+  --space-card:   0.75rem;   /* 12px — padding inside nested cards on mobile */
+  --touch-min:    2.75rem;   /* 44px — minimum interactive target */
+}
+
+@media (max-width: 767px) {
+  /* Every page repeats a `text-2xl` <h1> directly under a mobile header
+     that already shows the page title. Keep the h1 (it carries subtitle
+     context and is the page landmark) but stop it dominating the viewport. */
+  main h1 {
+    font-size: 1.25rem;
+    line-height: 1.3;
+  }
+
+  /* 16px text controls — prevents iOS focus-zoom. Checkbox/radio/range etc.
+     are excluded; they have no text to zoom. */
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='color']):not([type='button']):not([type='submit']):not([type='reset']):not([type='hidden']),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* Horizontally scrollable data region with scroll-edge shadows (a shadow
+   only appears on a side that still has content to scroll to). Replaces the
+   bare `overflow-hidden` wrappers that clipped table columns on phones, and
+   the missing wrappers that let a wide <table> stretch the whole page. */
+.table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  background:
+    linear-gradient(to right, hsl(var(--card)) 30%, transparent) left center,
+    linear-gradient(to left,  hsl(var(--card)) 30%, transparent) right center,
+    radial-gradient(farthest-side at 0 50%,    rgb(0 0 0 / 0.16), transparent) left center,
+    radial-gradient(farthest-side at 100% 50%, rgb(0 0 0 / 0.16), transparent) right center;
+  background-repeat: no-repeat;
+  background-size: 2rem 100%, 2rem 100%, 0.75rem 100%, 0.75rem 100%;
+  background-attachment: local, local, scroll, scroll;
+}
+
+/* Dialog panels: never taller than the visible viewport (dvh follows the
+   on-screen keyboard / collapsing browser bars) and scroll inside instead of
+   being cut off top and bottom by the flex-centred overlay. */
+.modal-panel {
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Minimum 44×44 hit area for icon-only buttons. */
+.touch-target {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--touch-min);
+  min-height: var(--touch-min);
+}
+
+/* ─────────────────────────────────────────────────────────
+   SHARED MODAL  (components/shared/Modal.tsx)
+   Panel height is capped to the VISIBLE viewport (dvh follows collapsing
+   mobile browser bars). Phones: bottom sheet, keeps clear of the status-bar
+   safe area at the top. sm+: centred dialog with 1.5rem breathing room top
+   and bottom. Only .app-modal-body scrolls; header and footer stay pinned.
+   Unlayered on purpose — see the note on .main-scroll-pad above.
+   ───────────────────────────────────────────────────────── */
+.app-modal-panel {
+  max-height: calc(100dvh - env(safe-area-inset-top, 0px) - 0.75rem);
+}
+
+@media (min-width: 640px) {
+  .app-modal-panel {
+    max-height: calc(100dvh - 3rem);
+  }
+}
+
+/* [MAINT 2026-10-23 — Pop-up sizing] MINIMUM heights, per Modal `size`.
+   Content-sized panels were too short to show a picker's results list or a
+   form comfortably (the list sat inside the scrolling body and got clipped).
+   Every minimum is wrapped in min(…, <the max-height above>) so it can NEVER
+   exceed the visible viewport — on a short laptop or a small phone the panel
+   simply fills the screen and the body scrolls, exactly as before.
+   `sm` (small confirm-style dialogs) and `screen` get no minimum.
+   A single dialog can ask for more with panelClassName, e.g.
+     [--modal-min-h:38rem] [--modal-sheet-min-h:75dvh]
+   --modal-min-h        → sm+ centred dialog      --modal-sheet-min-h → phone sheet
+   They are read with var(--x, default) rather than declared here on purpose:
+   this block is unlayered, so a declaration here would beat the caller's
+   Tailwind utility (layered) and the override would silently do nothing. */
+.app-modal-panel--md {
+  min-height: min(var(--modal-sheet-min-h, min(55dvh, 26rem)), calc(100dvh - env(safe-area-inset-top, 0px) - 0.75rem));
+}
+.app-modal-panel--lg {
+  min-height: min(var(--modal-sheet-min-h, min(62dvh, 30rem)), calc(100dvh - env(safe-area-inset-top, 0px) - 0.75rem));
+}
+.app-modal-panel--xl,
+.app-modal-panel--2xl {
+  min-height: min(var(--modal-sheet-min-h, min(70dvh, 34rem)), calc(100dvh - env(safe-area-inset-top, 0px) - 0.75rem));
+}
+
+@media (min-width: 640px) {
+  .app-modal-panel--md  { min-height: min(var(--modal-min-h, 28rem), calc(100dvh - 3rem)); }
+  .app-modal-panel--lg  { min-height: min(var(--modal-min-h, 32rem), calc(100dvh - 3rem)); }
+  .app-modal-panel--xl  { min-height: min(var(--modal-min-h, 36rem), calc(100dvh - 3rem)); }
+  .app-modal-panel--2xl { min-height: min(var(--modal-min-h, 40rem), calc(100dvh - 3rem)); }
+}
+
+/* Full-screen variant (size="screen"), e.g. the digital-resource reader. */
+.app-modal-panel.app-modal-panel--screen {
+  width: 100vw;
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  border-radius: 0;
+}
+
+/* Footer clears the iOS home indicator on phones. */
+.app-modal-footer {
+  padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+}
+
+@media (min-width: 640px) {
+  .app-modal-footer {
+    padding-bottom: 0.75rem;
+  }
+}
+
+/* Printing from inside a dialog (e.g. the student report card): un-clip the
+   panel, drop the backdrop and action footer so the content flows onto paper. */
+@media print {
+  .app-modal-root {
+    position: static !important;
+    display: block !important;
+    padding: 0 !important;
+  }
+  .app-modal-backdrop,
+  .app-modal-footer {
+    display: none !important;
+  }
+  .app-modal-panel {
+    max-height: none !important;
+    min-height: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+  .app-modal-body {
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+}
+
+
+/* ── Formulas in assignment text (KaTeX) ─────────────────────────────────────
+   A long formula must scroll inside its own box, never widen the page - this
+   matters most on narrow Android screens. Applies to the editor and to the
+   read-only renderer alike (both emit <span data-math data-display>). */
+span[data-math] {
+  max-width: 100%;
+}
+span[data-math][data-display="block"] {
+  display: block;
+  margin: 0.5rem 0;
+  text-align: center;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+span[data-math]:not([data-display="block"]) {
+  display: inline-block;
+  vertical-align: middle;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+span[data-math] .katex-display {
+  margin: 0;
+}
+
+
+/* ═════════════════════════════════════════════════════════════════════════
+   HILLS THEME  (Chikangawa Hills, Phase 1: tokens, font, containers)
+
+   Everything here is scoped to a `.hills` element, so nothing in the signed-in
+   app changes until a page opts in. Class names and tokens:
+
+   Sky palettes   four of them (dawn, day, dusk, night), chosen by
+                  <html data-sky="..."> (set by the inline script in
+                  app/layout.tsx and kept current by HillsSkySync), or locally
+                  by `<div class="hills" data-sky="dusk">` (Storybook uses this
+                  to show all four side by side).
+   Surface tokens reuse the app's own --background / --card / --border, so
+                  cards and inputs follow light and dark exactly as before.
+   Layout         .hills-container, .hills-split, .hills-measure
+   Glass          .hills-glass (opaque on small screens and when the visitor
+                  asks for reduced transparency)
+   Type scale     .hills-display, .hills-title, .hills-lede, .hills-body,
+                  .hills-small
+
+   Ink on each sky is checked by `pnpm hills:contrast` (4.5:1 body text, 3:1
+   large text and graphics); keep that passing when editing a palette.
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/* Registered so a change of sky eases instead of snapping. */
+@property --hills-sky-1  { syntax: '<color>'; inherits: true; initial-value: #5aa9d6; }
+@property --hills-sky-2  { syntax: '<color>'; inherits: true; initial-value: #d9f0f1; }
+@property --hills-ink    { syntax: '<color>'; inherits: true; initial-value: #0c2634; }
+@property --hills-accent { syntax: '<color>'; inherits: true; initial-value: #932e09; }
+@property --hills-accent-2 { syntax: '<color>'; inherits: true; initial-value: #ffb27a; }
+@property --hills-tint   { syntax: '<color>'; inherits: true; initial-value: rgba(255, 255, 255, 0); }
+@property --hills-on     { syntax: '<color>'; inherits: true; initial-value: #f4fafc; }
+@property --hills-danger { syntax: '<color>'; inherits: true; initial-value: #6c160d; }
+@property --hills-warn   { syntax: '<color>'; inherits: true; initial-value: #552f00; }
+@property --hills-ok     { syntax: '<color>'; inherits: true; initial-value: #0c3f31; }
+@property --hills-sunline { syntax: '<color>'; inherits: true; initial-value: #fff0b8; }
+@property --hills-star   { syntax: '<number>'; inherits: true; initial-value: 0; }
+@property --hills-moon   { syntax: '<number>'; inherits: true; initial-value: 0; }
+
+.hills {
+  /* Default sky is day. */
+  --hills-sky-1:    #5aa9d6;
+  --hills-sky-2:    #d9f0f1;
+  --hills-ink:      #0c2634;
+  --hills-accent:   #932e09;
+  --hills-accent-2: #ffb27a;
+  --hills-tint:     rgba(255, 255, 255, 0);
+  --hills-on:       #f4fafc;
+  --hills-danger:   #6c160d;
+  --hills-warn:     #552f00;
+  --hills-ok:       #0c3f31;
+  --hills-sunline:  #fff0b8;
+  --hills-star:     0;
+  --hills-moon:     0;
+
+  --hills-ink-2: color-mix(in srgb, var(--hills-ink) 93%, transparent);
+  --hills-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --hills-ease-time: 1.8s;
+
+  /* Surfaces reuse the app's own light/dark values (HSL triplets). */
+  --hills-page:       hsl(var(--background));
+  --hills-surface:    hsl(var(--card));
+  --hills-surface-fg: hsl(var(--card-foreground));
+  --hills-line:       hsl(var(--border));
+
+  --font-hills: 'Hanken Grotesk', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: var(--font-hills);
+  color: var(--hills-ink);
+  -webkit-font-smoothing: antialiased;
+
+  transition:
+    --hills-sky-1 var(--hills-ease-time) var(--hills-ease),
+    --hills-sky-2 var(--hills-ease-time) var(--hills-ease),
+    --hills-ink var(--hills-ease-time) var(--hills-ease),
+    --hills-accent var(--hills-ease-time) var(--hills-ease),
+    --hills-accent-2 var(--hills-ease-time) var(--hills-ease),
+    --hills-tint var(--hills-ease-time) var(--hills-ease),
+    --hills-on var(--hills-ease-time) var(--hills-ease),
+    --hills-danger var(--hills-ease-time) var(--hills-ease),
+    --hills-warn var(--hills-ease-time) var(--hills-ease),
+    --hills-ok var(--hills-ease-time) var(--hills-ease),
+    --hills-sunline var(--hills-ease-time) var(--hills-ease),
+    --hills-star var(--hills-ease-time) var(--hills-ease),
+    --hills-moon var(--hills-ease-time) var(--hills-ease);
+}
+
+/* The page-wide sky (html[data-sky]) is wrapped in :where() so its specificity
+   is zero and a local `.hills[data-sky]` always wins. */
+:where(:root[data-sky='dawn']) .hills,
+.hills[data-sky='dawn'] {
+  --hills-sky-1: #86a7c5;
+  --hills-sky-2: #f7c38e;
+  --hills-ink: #0c2232;
+  --hills-accent: #87290a;
+  --hills-accent-2: #ffb27a;
+  --hills-tint: rgba(255, 170, 100, 0.1);
+  --hills-on: #f6fafb;
+  --hills-danger: #661309;
+  --hills-warn: #4f2d00;
+  --hills-ok: #0c4133;
+  --hills-sunline: #b4480f;
+  --hills-star: 0.2;
+  --hills-moon: 0;
+}
+
+:where(:root[data-sky='day']) .hills,
+.hills[data-sky='day'] {
+  --hills-sky-1: #5aa9d6;
+  --hills-sky-2: #d9f0f1;
+  --hills-ink: #0c2634;
+  --hills-accent: #932e09;
+  --hills-accent-2: #ffb27a;
+  --hills-tint: rgba(255, 255, 255, 0);
+  --hills-on: #f4fafc;
+  --hills-danger: #6c160d;
+  --hills-warn: #552f00;
+  --hills-ok: #0c3f31;
+  --hills-sunline: #fff0b8;
+  --hills-star: 0;
+  --hills-moon: 0;
+}
+
+:where(:root[data-sky='dusk']) .hills,
+.hills[data-sky='dusk'] {
+  --hills-sky-1: #1f3a58;
+  --hills-sky-2: #8a3d26;
+  --hills-ink: #fff4e8;
+  --hills-accent: #ffb35e;
+  --hills-accent-2: #a8350b;
+  --hills-tint: rgba(255, 110, 60, 0.08);
+  --hills-on: #1a1a22;
+  --hills-danger: #ffc9bd;
+  --hills-warn: #ffd88a;
+  --hills-ok: #8fe3bf;
+  --hills-sunline: #ffd08a;
+  --hills-star: 0.2;
+  --hills-moon: 0;
+}
+
+:where(:root[data-sky='night']) .hills,
+.hills[data-sky='night'] {
+  --hills-sky-1: #050d18;
+  --hills-sky-2: #17364a;
+  --hills-ink: #e9f1f4;
+  --hills-accent: #f2a650;
+  --hills-accent-2: #a8350b;
+  --hills-tint: rgba(0, 8, 24, 0);
+  --hills-on: #06121b;
+  --hills-danger: #ff9c8f;
+  --hills-warn: #ffd27a;
+  --hills-ok: #8fe3bf;
+  --hills-sunline: #cfe3f3;
+  --hills-star: 1;
+  --hills-moon: 1;
+}
+
+/* The sky itself, for any page that wants the gradient behind its content. */
+.hills-sky {
+  position: relative;
+  min-height: 100svh;
+  overflow: clip;
+  color: var(--hills-ink);
+  background: linear-gradient(180deg, var(--hills-sky-1), var(--hills-sky-2));
+}
+.hills-sky::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--hills-tint);
+}
+
+.font-hills {
+  font-family: var(--font-hills, 'Hanken Grotesk', ui-sans-serif, system-ui, sans-serif);
+}
+
+/* Hanken Grotesk for everything inside a public page. The app's font-sans and
+   font-heading utilities read these two variables, so re-pointing them on one
+   wrapper switches every descendant with no per-page edits. The signed-in app
+   never has this class and keeps DM Sans and Inter. */
+.hills-type {
+  --font-sans: 'Hanken Grotesk', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-heading: 'Hanken Grotesk', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: var(--font-sans);
+}
+
+/* ── Layout ─────────────────────────────────────────────────────────────── */
+
+/* Full width, 5vw side padding, never wider than 1500px. */
+.hills-container {
+  width: 100%;
+  max-width: 1500px;
+  margin-inline: auto;
+  padding-inline: 5vw;
+}
+
+/* One column on phones; two from 900px. A page can set --hills-split-cols for
+   an uneven split, e.g. minmax(0, 1fr) clamp(340px, 34vw, 440px) on sign-in. */
+.hills-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: clamp(1.5rem, 4vw, 4rem);
+  align-items: center;
+}
+@media (min-width: 900px) {
+  .hills-split {
+    grid-template-columns: var(--hills-split-cols, minmax(0, 1fr) minmax(0, 1fr));
+  }
+}
+
+/* Comfortable reading width for long text. */
+.hills-measure {
+  max-width: 760px;
+}
+
+/* ── Glass ──────────────────────────────────────────────────────────────── */
+
+.hills-glass {
+  background: color-mix(in srgb, var(--hills-on) 34%, transparent);
+  border: 1px solid color-mix(in srgb, var(--hills-ink) 22%, transparent);
+  border-radius: 16px;
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+
+/* No blur, fully opaque: phones (cheaper to paint, easier to read) and
+   anyone who asked the system for less transparency. */
+@media (max-width: 767px) {
+  .hills-glass {
+    background: color-mix(in srgb, var(--hills-on) 92%, var(--hills-sky-2));
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .hills-glass {
+    background: color-mix(in srgb, var(--hills-on) 92%, var(--hills-sky-2));
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+/* The app's base layer gives every h1-h6 its own font and colour, which would
+   beat what a heading inherits from the sky. Inside .hills, headings inherit. */
+.hills :where(h1, h2, h3, h4, h5, h6) {
+  font-family: inherit;
+  color: inherit;
+}
+
+/* ── Type scale (Hanken Grotesk) ────────────────────────────────────────── */
+
+.hills-display {
+  font-weight: 300;
+  font-size: clamp(48px, 7vw, 124px);
+  line-height: 0.96;
+  letter-spacing: -0.05em;
+}
+.hills-title {
+  font-weight: 700;
+  font-size: 28px;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+}
+.hills-lede {
+  font-size: clamp(17px, 1.35vw, 20px);
+  line-height: 1.45;
+  color: var(--hills-ink-2);
+}
+.hills-body {
+  font-size: 17px;
+  line-height: 1.55;
+}
+.hills-small {
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--hills-ink-2);
+}
+
+
+/* ════════════════════════════════════════════════════════════════════════════
+   HILLS BACKGROUND (Phase 2), used by PublicAmbientBackground
+   Layers, bottom to top: sky gradient, interim scrim (default only), stars,
+   sun, moon, contour lines. Everything is aria-hidden and ignores the pointer.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+.hills-bg {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  contain: layout paint style;
+  container-type: size;
+
+  /* Sun and moon: wider screens get a bigger disc. */
+  --hills-cel: clamp(72px, 9vw, 130px);
+  /* How much of the contour lines show over the middle of the screen. */
+  --hills-fade-core: 0.6;
+  --hills-lines: 0.3;
+  --sunc: #fff3bf;
+  --sun-glow: rgba(255, 246, 200, 0.5);
+}
+:where(:root[data-sky='dawn'], :root[data-sky='dusk']) .hills-bg {
+  --sunc: #ffbd78;
+  --sun-glow: rgba(255, 189, 120, 0.5);
+}
+
+.hills-bg__sky {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(var(--hills-tint), var(--hills-tint)),
+    linear-gradient(180deg, var(--hills-sky-1) 0%, var(--hills-sky-1) 18%, var(--hills-sky-2) 100%);
+}
+
+/* A box that covers the screen at the artwork's 3:2 shape, centred. A position
+   inside it is the same percentage position at any window size. */
+.hills-bg__cover {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: max(100vw, 150vh);
+  height: max(66.667vw, 100vh);
+  width: max(100cqw, 150cqh);
+  height: max(66.667cqw, 100cqh);
+  transform: translate(-50%, -50%);
+}
+
+/* Interim readability scrim: the page's own background colour over the sky.
+   Existing pages colour their text for a plain page (muted text is only 4.37:1
+   there in light mode), so ANY sky showing under the text would make it harder
+   to read. The scrim is therefore fully opaque across the content column
+   (about 1120px) and relaxes to 80% only in the side margins of wide screens.
+   On phones and narrow windows pages read exactly as they do today.
+   Removed page by page in Phase 6. */
+.hills-bg__scrim {
+  position: absolute;
+  inset: 0;
+  background: hsl(var(--background));
+  -webkit-mask-image: linear-gradient(90deg, rgb(0 0 0 / 0.8) 0, #000 calc(50% - 560px), #000 calc(50% + 560px), rgb(0 0 0 / 0.8) 100%);
+  mask-image: linear-gradient(90deg, rgb(0 0 0 / 0.8) 0, #000 calc(50% - 560px), #000 calc(50% + 560px), rgb(0 0 0 / 0.8) 100%);
+}
+
+/* Stars: two layers that twinkle out of step. Visible in proportion to --hills-star. */
+.hills-bg__stars {
+  position: absolute;
+  inset: 0;
+  opacity: var(--hills-star);
+}
+.hills-bg__stars-a,
+.hills-bg__stars-b {
+  background: url('/hills/stars-a.svg') center / 100% 100% no-repeat;
+  animation: hills-twinkle 5s ease-in-out infinite;
+}
+.hills-bg__stars-b {
+  background-image: url('/hills/stars-b.svg');
+  animation-duration: 7s;
+  animation-delay: -2.5s;
+}
+@keyframes hills-twinkle {
+  50% { opacity: 0.3; }
+}
+
+/* Sun and moon. By default the sky decides which one shows (night = moon). The
+   client island overrides --sun-o/--moon-o and the positions for vivid and home. */
+.hills-bg__sun,
+.hills-bg__moon {
+  position: absolute;
+  width: var(--hills-cel);
+  height: var(--hills-cel);
+}
+.hills-bg__sun {
+  left: var(--sun-x, 86%);
+  top: var(--sun-y, 15%);
+  opacity: var(--sun-o, calc(1 - var(--hills-moon)));
+  transform: translate(-50%, -50%) scale(var(--sun-scale, 1));
+}
+.hills-bg__moon {
+  left: var(--moon-x, 86%);
+  top: var(--moon-y, 15%);
+  width: calc(var(--hills-cel) * 0.72);
+  height: calc(var(--hills-cel) * 0.72);
+  opacity: var(--moon-o, var(--hills-moon));
+  transform: translate(-50%, -50%) scale(var(--moon-scale, 1));
+}
+.hills-bg__sun::before,
+.hills-bg__moon::before {
+  content: '';
+  position: absolute;
+  inset: -100%;
+  border-radius: 50%;
+}
+.hills-bg__sun::before {
+  background: radial-gradient(circle, var(--sun-glow) 0%, transparent 62%);
+}
+.hills-bg__moon::before {
+  background: radial-gradient(circle, rgba(180, 205, 230, 0.3) 0%, transparent 62%);
+}
+.hills-bg__sun i {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--sunc);
+}
+.hills-bg__moon svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Contour lines: the ink colour painted through the SVG, so they follow the sky.
+   The fade lowers them over the middle of the screen, where text usually sits. */
+.hills-bg__fade {
+  position: absolute;
+  inset: 0;
+  -webkit-mask-image: radial-gradient(ellipse 60% 70% at 50% 50%, rgb(0 0 0 / var(--hills-fade-core)) 0%, #000 100%);
+  mask-image: radial-gradient(ellipse 60% 70% at 50% 50%, rgb(0 0 0 / var(--hills-fade-core)) 0%, #000 100%);
+}
+.hills-bg__map,
+.hills-bg__glow {
+  -webkit-mask: url('/hills/contours.svg') center / 100% 100% no-repeat;
+  mask: url('/hills/contours.svg') center / 100% 100% no-repeat;
+}
+.hills-bg__map {
+  background: var(--hills-ink);
+  opacity: var(--hills-lines);
+}
+/* The sunlit rings around the peak (the peak is at 71.7% / 36.3% of the artwork). */
+.hills-bg__glow {
+  background: radial-gradient(
+    ellipse 30% 45% at 71.7% 36.3%,
+    color-mix(in srgb, var(--hills-sunline) 85%, transparent) 0%,
+    color-mix(in srgb, var(--hills-sunline) 42%, transparent) 50%,
+    transparent 100%
+  );
+  opacity: 0.9;
+}
+
+/* ── Variants ───────────────────────────────────────────────────────────── */
+
+/* default: small sun and moon, only on wide screens where the margin is free. */
+.hills-bg--default {
+  --hills-cel: 56px;
+  --hills-fade-core: 0.35;
+  --hills-lines: 0.18;
+}
+.hills-bg--default .hills-bg__sun,
+.hills-bg--default .hills-bg__moon {
+  display: none;
+}
+@media (min-width: 1100px) {
+  .hills-bg--default .hills-bg__sun,
+  .hills-bg--default .hills-bg__moon {
+    display: block;
+  }
+}
+
+/* vivid and home: placed by the client island. Hidden until it has run, then eased. */
+.hills-bg--vivid:not([data-ready]) .hills-bg__sun,
+.hills-bg--vivid:not([data-ready]) .hills-bg__moon,
+.hills-bg--home:not([data-ready]) .hills-bg__sun,
+.hills-bg--home:not([data-ready]) .hills-bg__moon {
+  opacity: 0;
+}
+.hills-bg--vivid[data-ready] .hills-bg__sun,
+.hills-bg--vivid[data-ready] .hills-bg__moon,
+.hills-bg--home[data-ready] .hills-bg__sun,
+.hills-bg--home[data-ready] .hills-bg__moon {
+  transition:
+    left 1.2s var(--hills-ease),
+    top 1.2s var(--hills-ease),
+    opacity 1.2s var(--hills-ease);
+}
+
+/* calm: static, softened, contours only. */
+.hills-bg--calm {
+  --hills-fade-core: 0.25;
+  --hills-lines: 0.14;
+}
+.hills-bg--calm .hills-bg__sky {
+  /* A horizon glow only: plain at the top where headings and text sit, easing
+     into the sky's lower colour. Dashboards never pick up the full public look. */
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    transparent 35%,
+    color-mix(in srgb, var(--hills-sky-2) 55%, transparent) 100%
+  );
+}
+.hills-bg--calm .hills-bg__glow {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hills-bg__stars-a,
+  .hills-bg__stars-b {
+    animation: none;
+  }
+  .hills-bg--vivid[data-ready] .hills-bg__sun,
+  .hills-bg--vivid[data-ready] .hills-bg__moon,
+  .hills-bg--home[data-ready] .hills-bg__sun,
+  .hills-bg--home[data-ready] .hills-bg__moon {
+    transition: none;
+  }
+}
+
+
+/* ════════════════════════════════════════════════════════════════════════════
+   HILLS AUTH (Phase 3): the sign-in family
+   /login, /login?claim=1, /forgot-password, /reset-password, /change-password
+   all render through <AuthShell>. Left column: crest, time-aware headline,
+   authorised-access notice, all sitting on the sky. Right column: the form on a
+   surface. The surface follows the Light/Dark THEME (white or navy), never the
+   sky, so old-style children (the pages that move in Phase 7) stay readable
+   when Auto shows a dusk sky on a light-theme device.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+@keyframes hills-rise {
+  from { opacity: 0; transform: translateY(14px); }
+}
+/* Per-sky switches for the crossfading words and the crest. Same selectors as
+   the palettes above, so a local `.hills[data-sky]` (Storybook) wins here too. */
+.hills {
+  --hills-w-dawn: 0;
+  --hills-w-day: 1;
+  --hills-w-dusk: 0;
+  --hills-w-night: 0;
+  --hills-lightink: 0;
+}
+:where(:root[data-sky='dawn']) .hills,
+.hills[data-sky='dawn'] {
+  --hills-w-dawn: 1;
+  --hills-w-day: 0;
+}
+:where(:root[data-sky='dusk']) .hills,
+.hills[data-sky='dusk'] {
+  --hills-w-dusk: 1;
+  --hills-w-day: 0;
+  --hills-lightink: 1;
+}
+:where(:root[data-sky='night']) .hills,
+.hills[data-sky='night'] {
+  --hills-w-night: 1;
+  --hills-w-day: 0;
+  --hills-lightink: 1;
+}
+
+/* ── Frame ──────────────────────────────────────────────────────────────── */
+
+.hills-auth__main {
+  position: relative;
+  z-index: 10;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  padding-block: clamp(16px, 4vh, 48px);
+}
+
+.hills-auth__grid {
+  --hills-split-cols: minmax(0, 1fr) clamp(340px, 34vw, 440px);
+  grid-template-areas: 'statement' 'card' 'notice';
+  align-items: start;
+  row-gap: 24px;
+}
+@media (min-width: 900px) {
+  .hills-auth__grid {
+    grid-template-areas: 'statement card' 'notice card';
+    column-gap: clamp(48px, 11vw, 210px);
+    row-gap: 0;
+    align-content: center;
+  }
+  .hills-auth__statement { align-self: end; }
+  .hills-auth__notice { align-self: start; }
+  .hills-auth__card { align-self: center; }
+}
+
+/* ── Left column ────────────────────────────────────────────────────────── */
+
+.hills-auth__statement {
+  grid-area: statement;
+  position: relative;
+  min-width: 0;
+  animation: hills-rise 0.9s 0.08s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+}
+.hills-auth__brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: clamp(20px, 4vh, 44px);
+}
+.hills-auth__crest {
+  position: relative;
+  display: block;
+  flex: none;
+  width: clamp(64px, 6vw, 88px);
+  aspect-ratio: 1;
+}
+/* The artwork is transparent: navy for light skies, pale for dusk and night. */
+.hills-auth__crest img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transition: opacity var(--hills-ease-time) var(--hills-ease);
+}
+.hills-auth__crest-navy  { opacity: calc(1 - var(--hills-lightink)); }
+.hills-auth__crest-light { opacity: var(--hills-lightink); }
+.hills-auth__brand-name {
+  display: block;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.hills-auth__brand-sub {
+  display: block;
+  font-size: 14px;
+  color: var(--hills-ink-2);
+}
+
+.hills-auth__hd {
+  margin: 0;
+  font-weight: 300;
+  font-size: clamp(48px, 7vw, 124px);
+  line-height: 0.96;
+  letter-spacing: -0.05em;
+}
+.hills-auth__acc {
+  display: block;
+  font-weight: 700;
+  color: var(--hills-accent);
+}
+.hills-auth__sub {
+  margin: clamp(18px, 3vh, 36px) 0 0;
+  max-width: 34ch;
+  font-size: clamp(17px, 1.35vw, 20px);
+  line-height: 1.45;
+  color: var(--hills-ink-2);
+}
+
+/* Four phrases share one grid cell; the sky token decides which one is seen. */
+.hills-words {
+  display: grid;
+  justify-items: start;
+}
+.hills-words > span {
+  grid-area: 1 / 1;
+  opacity: var(--w);
+  transform: translateY(calc((1 - var(--w)) * 0.16em));
+  transition:
+    opacity 1.5s var(--hills-ease),
+    transform 1.5s var(--hills-ease);
+}
+.hills-words > [data-sky-word='dawn']  { --w: var(--hills-w-dawn); }
+.hills-words > [data-sky-word='day']   { --w: var(--hills-w-day); }
+.hills-words > [data-sky-word='dusk']  { --w: var(--hills-w-dusk); }
+.hills-words > [data-sky-word='night'] { --w: var(--hills-w-night); }
+
+.hills-auth__skyspace { display: none; }
+@media (max-width: 899px) {
+  .hills-auth__skyspace { display: block; height: clamp(84px, 22vw, 110px); }
+  /* The sun and moon ride an arc measured in % of the screen. On narrow screens
+     squeeze it into the band above the headline (just under the header bar), so
+     the disc never sits behind the headline or the crest. */
+  .hills-auth .hills-bg__sun  { top: calc(66px + var(--sun-y, 15%) * 0.2); }
+  .hills-auth .hills-bg__moon { top: calc(66px + var(--moon-y, 15%) * 0.2); }
+  .hills-auth__hd { font-size: clamp(46px, 14.5vw, 72px); }
+  .hills-auth__sub { display: none; }
+  .hills-auth__brand-sub { display: none; }
+  .hills-auth__crest { width: 56px; }
+}
+
+/* Phones: let the sun and moon scroll away WITH the page. The sky layer is fixed,
+   so without this the headline slides over a stationary disc (pale text on an
+   orange sun). Scroll-linked, 1:1 for the first 700px, so the disc stays exactly
+   where it was relative to the headline. Browsers without scroll-driven
+   animation keep the old fixed disc. */
+@keyframes hills-sky-away {
+  from { translate: 0 0; }
+  to { translate: 0 -700px; }
+}
+@supports (animation-timeline: scroll()) {
+  @media (max-width: 899px) {
+    .hills-auth .hills-bg__sun,
+    .hills-auth .hills-bg__moon {
+      animation: hills-sky-away linear both;
+      animation-timeline: scroll(root block);
+      animation-range: 0px 700px;
+    }
+  }
+}
+
+/* The Suspense fallback shows the sky without the disc. The real page mounts its
+   own sky and fades the disc in once, so the sun no longer fades in twice. */
+.hills-auth[aria-busy='true'] .hills-bg__sun,
+.hills-auth[aria-busy='true'] .hills-bg__moon { display: none; }
+
+.hills-auth__notice {
+  grid-area: notice;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  max-width: 56ch;
+  margin-top: 18px;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--hills-ink-2);
+  animation: hills-rise 0.9s 0.24s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+}
+.hills-auth__notice svg { flex: none; margin-top: 2px; width: 18px; height: 18px; color: var(--hills-ink); }
+.hills-auth__notice p { margin: 0; }
+.hills-auth__notice-title { font-weight: 700; color: var(--hills-ink); }
+@media (max-width: 899px) { .hills-auth__notice { margin-top: 0; max-width: none; } }
+
+/* ── Right column: the card ─────────────────────────────────────────────── */
+
+.hills-auth__card {
+  grid-area: card;
+  width: 100%;
+  min-width: 0;
+  padding: clamp(22px, 2.4vw, 36px);
+  border: 1px solid color-mix(in srgb, var(--hills-line) 80%, transparent);
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--hills-surface) 92%, transparent);
+  color: var(--hills-surface-fg);
+  box-shadow: 0 24px 60px -28px rgb(0 0 0 / 0.45);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  animation: hills-rise 0.9s 0.16s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+
+  /* Colours used inside the card. Light theme = the day palette, dark theme =
+     the night palette (both proven by `pnpm hills:contrast`). */
+  --c-ink: var(--hills-surface-fg);
+  --c-ink2: color-mix(in srgb, var(--hills-surface-fg) 82%, transparent);
+  /* Placeholder: clearly lighter than typed text (ink) but still above 4.5:1. */
+  --c-ph: color-mix(in srgb, var(--hills-surface-fg) 62%, transparent);
+  --c-acc: #932e09;
+  --c-acc2: #ffb27a;
+  --c-danger: #6c160d;
+  --c-warn: #552f00;
+}
+.dark .hills-auth__card {
+  --c-acc: #f2a650;
+  --c-acc2: #a8350b;
+  --c-danger: #ff9c8f;
+  --c-warn: #ffd27a;
+}
+@media (max-width: 767px), (prefers-reduced-transparency: reduce) {
+  .hills-auth__card {
+    background: var(--hills-surface);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+.hills-auth__title {
+  margin: 0 0 4px;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+}
+.hills-auth__lede {
+  margin: 0 0 24px;
+  font-size: 17px;
+  color: var(--c-ink2);
+}
+
+/* ── Underlined fields ──────────────────────────────────────────────────── */
+
+.hills-field { margin-bottom: 22px; }
+.hills-field__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+.hills-label {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--c-ink);
+}
+.hills-input { position: relative; }
+.hills-input > input {
+  width: 100%;
+  height: 56px;
+  padding: 0;
+  border: 0;
+  border-bottom: 1.5px solid var(--c-ink);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  font: inherit;
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--c-ink);
+  outline: 0;
+}
+.hills-input > input:focus { border-color: var(--c-ink); box-shadow: none; outline: 0; }
+.hills-input > input::placeholder { color: var(--c-ph); font-weight: 400; opacity: 1; }
+.hills-input > input[type='password'],
+.hills-input > input.hills-pw { padding-right: 52px; }
+/* Password managers paint their own fill; keep it on the card colour. */
+.hills-input > input:-webkit-autofill {
+  -webkit-text-fill-color: var(--c-ink);
+  box-shadow: 0 0 0 1000px hsl(var(--card)) inset;
+  caret-color: var(--c-ink);
+}
+.hills-input::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--c-acc);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.3s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.hills-input:focus-within::after { transform: scaleX(1); }
+
+.hills-eye {
+  position: absolute;
+  right: 0;
+  top: 6px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--c-ink);
+  cursor: pointer;
+}
+.hills-eye:hover { background: color-mix(in srgb, var(--c-ink) 10%, transparent); }
+.hills-eye:focus-visible { outline: 2px solid var(--c-acc); }
+.hills-eye svg { width: 20px; height: 20px; }
+
+/* ── Links, button, alerts ──────────────────────────────────────────────── */
+
+.hills-link {
+  display: inline-flex;
+  align-items: center;
+  /* 10px above and below keeps a 44px tap target; 6px at the sides gives the
+     hover pill room around the word. */
+  padding: 10px 6px;
+  margin: -10px -6px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--c-acc);
+  text-decoration: none;
+  text-underline-offset: 4px;
+  text-decoration-thickness: 1.5px;
+}
+.hills-link:focus-visible { outline: 2px solid var(--c-acc); outline-offset: 2px; border-radius: 2px; }
+
+.hills-alt {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 0.35em;
+  margin: 20px 0 0;
+  font-size: 16px;
+  color: var(--c-ink2);
+}
+.hills-alt .hills-link { font-size: 16px; }
+
+.hills-go {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 60px;
+  margin-top: 10px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--c-ink);
+  color: hsl(var(--card));
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.hills-go:hover:not(:disabled) { background: color-mix(in srgb, var(--c-ink) 86%, var(--c-acc)); }
+.hills-go:focus-visible { outline: 3px solid var(--c-acc); outline-offset: 3px; }
+.hills-go__arrow { width: 20px; height: 20px; color: var(--c-acc2); transition: transform 0.25s; }
+.hills-go:hover:not(:disabled) .hills-go__arrow { transform: translateX(4px); }
+/* Busy: the app's own skeleton sweep (same keyframes as `.skeleton`) crosses
+   the button; the label stays. No spinner. */
+.hills-go:disabled { cursor: progress; }
+.hills-go:disabled .hills-go__arrow { display: none; }
+.hills-go:disabled::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent 25%,
+    color-mix(in srgb, hsl(var(--card)) 16%, transparent) 50%,
+    transparent 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-sweep 1.5s ease-in-out infinite;
+}
+
+.hills-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 0 20px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--c-x) 40%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--c-x) 9%, transparent);
+  color: var(--c-x);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.hills-alert svg { flex: none; width: 18px; height: 18px; margin-top: 2px; }
+.hills-alert--danger { --c-x: var(--c-danger); }
+.hills-alert--warn { --c-x: var(--c-warn); }
+
+/* ── Typing response (Phase 10e) ─────────────────────────────────────────────
+   Follows the approved sign-in mockup. Every keystroke sends one contour-shaped
+   ring out from the peak; the innermost contour lines light up as the form fills
+   in; the sun's glow swells with the password.
+   The layer is the SAME 3:2 cover box as the background's contour lines
+   (.hills-bg__cover) holding an svg on the same 1200 x 800 canvas, so the lit
+   lines sit exactly on the real ones at any screen size.
+   Cheap on purpose (this ran badly on phones before): no mask, no filter, no
+   large gradient. The ring is ONE thin path whose scale and opacity change. */
+
+.hills-ripple {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  contain: paint;
+  container-type: size;
+}
+.hills-ripple__cover {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: max(100cqw, 150cqh);
+  height: max(66.667cqw, 100cqh);
+  transform: translate(-50%, -50%);
+  overflow: visible;
+}
+.hills-ripple__lit {
+  fill: none;
+  stroke: var(--hills-accent);
+  stroke-width: 1.5;
+  opacity: 0;
+  transition: opacity 0.8s ease;
+}
+.hills-ripple__lit.is-lit { opacity: 0.6; }
+.hills-ripple__ring {
+  fill: none;
+  stroke: var(--hills-accent);
+  stroke-width: 1.6;
+  vector-effect: non-scaling-stroke;
+  opacity: 0;
+  animation: hills-ripple 1.9s cubic-bezier(0.2, 0.6, 0.3, 1) forwards;
+}
+/* The ring starts inside the first lit contours and spreads past the screen edge, fading as it goes. */
+@keyframes hills-ripple {
+  from { transform: scale(0.2); opacity: 0.6; }
+  to   { transform: scale(3.4); opacity: 0; }
+}
+/* The sun's glow swells with the password (--hills-pw is 0..1, set by useTypingRipple). */
+.hills-bg__sun::before {
+  transform: scale(calc(1 + var(--hills-pw, 0) * 0.35));
+  transition: transform 0.7s ease;
+}
+
+/* ── "Signing in" scene: a dashboard-shaped skeleton replaces the headline ── */
+
+.hills-scene {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: 22% minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--hills-line) 80%, transparent);
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--hills-surface) 82%, transparent);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.6s var(--hills-ease), visibility 0s linear 0.6s;
+}
+.hills-scene__side { grid-row: 1 / 3; display: flex; flex-direction: column; gap: 10px; }
+.hills-scene__top { display: flex; gap: 10px; align-items: center; }
+.hills-scene__body { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 12px; min-height: 0; }
+.hills-scene__stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.hills-scene__rows { display: grid; gap: 8px; }
+.hills-scene .skeleton {
+  display: block;
+  border-radius: 8px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--hills-surface-fg) 10%, transparent) 25%,
+    color-mix(in srgb, var(--hills-surface-fg) 20%, transparent) 50%,
+    color-mix(in srgb, var(--hills-surface-fg) 10%, transparent) 75%
+  );
+  background-size: 200% 100%;
+}
+.hills-scene .skeleton.is-round { border-radius: 999px; }
+
+/* Shown whenever a submit button inside a scene-enabled shell is disabled,
+   which is exactly the page's own busy state, so an error or a "no role"
+   alert (button enabled again) brings the headline straight back. */
+.hills-auth[data-scene]:has(button[type='submit']:disabled) .hills-scene {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
+.hills-auth__statement-copy { transition: opacity 0.5s var(--hills-ease), visibility 0s linear 0s; }
+.hills-auth[data-scene]:has(button[type='submit']:disabled) .hills-auth__statement-copy {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.5s var(--hills-ease), visibility 0s linear 0.5s;
+}
+
+/* Suspense placeholder shapes (same grid as the real page). */
+.hills-auth__ph { display: block; border-radius: 10px; }
+.hills-auth__ph.skeleton {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--hills-ink) 12%, transparent) 25%,
+    color-mix(in srgb, var(--hills-ink) 22%, transparent) 50%,
+    color-mix(in srgb, var(--hills-ink) 12%, transparent) 75%
+  );
+  background-size: 200% 100%;
+}
+.hills-auth__card .hills-auth__ph.skeleton {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--c-ink) 10%, transparent) 25%,
+    color-mix(in srgb, var(--c-ink) 20%, transparent) 50%,
+    color-mix(in srgb, var(--c-ink) 10%, transparent) 75%
+  );
+  background-size: 200% 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hills-ripple__ring { display: none; }
+  .hills-ripple__lit { transition: none; }
+  .hills-bg__sun::before { transition: none; }
+  .hills-auth__statement,
+  .hills-auth__card,
+  .hills-auth__notice { animation: none; }
+  .hills-words > span,
+  .hills-auth__crest img,
+  .hills-scene,
+  .hills-auth__statement-copy,
+  .hills-input::after { transition: none; }
+  .hills-go:disabled::after { animation: none; }
+}
+
+
+/* ════════════════════════════════════════════════════════════════════════════
+   HILLS HOME (Phase 4)
+   The landing page uses <PublicAmbientBackground variant="home" />. The sky is
+   a fixed layer that shows through the sections with no background of their
+   own (Academic Advertisements, Stay Connected); the hero photo and the
+   coloured bands cover it. A larger disc than the other pages.
+   ════════════════════════════════════════════════════════════════════════════ */
+.hills-bg--home { --hills-cel: clamp(104px, 13vw, 190px); }
+
+
+/* ════════════════════════════════════════════════════════════════════════════
+   HILLS MOTION (Phase 4b): the landing page's scroll motion
+   Transform and opacity only. Content is visible by default: Reveal.tsx hides an
+   element only after hydration, only below the fold, and never under reduced
+   motion or when the app's motion setting is off. Keep the numbers in step with
+   src/lib/hills/motion.ts.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+[data-reveal='hidden'] {
+  opacity: 0;
+  transform: translateY(20px);
+}
+/* An animation (not a transition) so the element's own hover transform keeps
+   working once it has arrived: fill-mode `backwards` lets go at the end. */
+[data-reveal='shown'] {
+  animation: hills-reveal 0.6s cubic-bezier(0.22, 1, 0.36, 1) var(--reveal-delay, 0ms) backwards;
+}
+@keyframes hills-reveal {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Hero photo settles from a slight zoom, once. */
+.hills-hero-img { animation: hills-hero-in 1s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+@keyframes hills-hero-in {
+  from { transform: scale(1.04); }
+  to { transform: none; }
+}
+
+/* Reading progress along the top of the page. Shown only where CSS scroll-driven
+   animation exists; elsewhere it is simply absent. */
+.hills-progress {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 60;
+  display: none;
+  height: 3px;
+  background: hsl(var(--brand-teal));
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  pointer-events: none;
+}
+@supports (animation-timeline: scroll()) {
+  .hills-progress {
+    display: block;
+    animation: hills-grow linear both;
+    animation-timeline: scroll(root block);
+  }
+  @keyframes hills-grow { to { transform: scaleX(1); } }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal='hidden'] { opacity: 1; transform: none; }
+  [data-reveal='shown'] { animation: none; }
+  .hills-hero-img { animation: none; }
+  .hills-progress { display: none; }
+}
+
+/* Photo stand-in for a news or event item with no picture yet: the contour lines
+   of the sky, in the page's own colours, instead of an icon on a gradient. */
+.hills-ph {
+  position: relative;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--color-brand-teal) 9%, hsl(var(--background)));
+}
+.hills-ph::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--color-brand-teal);
+  opacity: 0.3;
+  -webkit-mask: url('/hills/contours.svg') center / cover no-repeat;
+  mask: url('/hills/contours.svg') center / cover no-repeat;
+}
+.hills-ph > * { position: relative; }
+.hills-ph--deep { background: hsl(var(--brand-deep)); }
+.hills-ph--deep::before { background: #fff; opacity: 0.16; }
+
+
+/* ════════════════════════════════════════════════════════════════════════════
+   HILLS STUDIO (Phase 4b): the 5iveStack Labs signature in the landing footer
+   A large wordmark that rises into place above the bottom bar (CSS scroll-driven,
+   in place where unsupported), and the credit line's name in the studio orange.
+   The footer is always dark, so one orange works in light and dark themes.
+   Hanken Grotesk has no old-style figures: the 5 is drawn smaller by hand so it
+   sits at x-height and the name reads "five-stack".
+   ════════════════════════════════════════════════════════════════════════════ */
+
+:root { --hills-studio: #ff8a3d; }
+
+.hills-studio {
+  container-type: inline-size;
+  overflow: hidden; /* clips the name while it rises from behind the bottom bar */
+  padding-block: 1.5rem 0.25rem;
+}
+.hills-studio__mark {
+  --studio-size: clamp(2.75rem, 16.2cqi, 15rem);
+  display: flex;
+  flex-wrap: wrap; /* on a phone "Labs" drops under "5iveStack" */
+  align-items: baseline;
+  column-gap: 0.22em;
+  margin: 0;
+  font-size: var(--studio-size);
+  font-weight: 700;
+  letter-spacing: -0.045em;
+  line-height: 0.92;
+  color: var(--hills-studio);
+  white-space: nowrap;
+}
+.hills-studio__name { display: inline-block; }
+.hills-studio__five { font-size: 0.72em; font-weight: 800; }
+.hills-studio__labs { font-weight: 500; }
+.hills-studio__credit-name { color: var(--hills-studio); font-weight: 700; }
+
+@supports (animation-timeline: view()) {
+  .hills-studio__mark {
+    animation: hills-studio-rise linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 100%;
+  }
+  @keyframes hills-studio-rise {
+    from { transform: translateY(35%); }
+    to { transform: none; }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hills-studio__mark { animation: none; }
+}
+
+/* The landing page header (logo, eight links, three buttons) is about 1243px wide.
+   With the standard 5vw side padding it overflows on 1280 and 1366px screens (the
+   Menu button was clipped). This shrinks the padding just enough, and equals 5vw
+   again from about 1400px, so the header lines up with the sections. */
+.hills-container--nav {
+  padding-inline: min(5vw, max(16px, calc((100vw - 1260px) / 2)));
+}
+
+
+/* ════════════════════════════════════════════════════════════════════════════
+   HILLS APPLY (Phase 5): /apply, the student application
+   Two columns from 900px, one below. Left: the title, the required-field note
+   and the step list, all on the sky (the interim scrim is switched off with
+   `hills-open`). Right: the form on ONE opaque surface that follows the
+   Light/Dark THEME, like the sign-in card (white or navy), never the sky.
+   Below 900px the step list becomes a strip of numbered circles.
+   Class names only; the page logic is untouched. Contrast: `pnpm hills:contrast`.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+.hills-open .hills-bg__scrim { display: none; }
+
+.hills-apply {
+  --hills-split-cols: clamp(240px, 26vw, 340px) minmax(0, 760px);
+}
+.hills-apply__wrap { padding-block: clamp(28px, 5vw, 72px); }
+@media (min-width: 900px) {
+  .hills-apply .hills-split { justify-content: center; }
+}
+.hills-apply__grid--form { align-items: start; }
+
+/* ── Left column, on the sky ────────────────────────────────────────────── */
+
+.hills-apply__side { min-width: 0; animation: hills-rise 0.9s 0.08s cubic-bezier(0.2, 0.7, 0.2, 1) backwards; }
+/* Pinned from 900px wide at ANY window height. If the column is taller than the
+   window (short laptop screens, long step list) it scrolls inside itself, and the
+   page script brings the current step into view when the step changes. */
+@media (min-width: 900px) {
+  .hills-apply__side--sticky {
+    position: sticky;
+    top: 96px;
+    max-height: calc(100svh - 112px);
+    margin: -4px;
+    padding: 4px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+}
+.hills-apply__title {
+  margin: 0 0 14px;
+  font-size: clamp(36px, 3.6vw, 54px);
+  font-weight: 300;
+  line-height: 1.04;
+  letter-spacing: -0.035em;
+  color: var(--hills-ink);
+  text-wrap: balance;
+}
+.hills-apply__note {
+  margin: 0;
+  max-width: 36ch;
+  font-size: clamp(17px, 1.3vw, 19px);
+  line-height: 1.5;
+  /* Full-strength ink, not ink-2: measured on the real day sky the 93% ink-2 fell
+     to 4.2:1 behind this paragraph (the token model said 4.5). */
+  color: var(--hills-ink);
+}
+.hills-apply__req { color: var(--hills-ink); font-weight: 800; }
+
+/* Step list. Phones: a strip of circles joined by lines (labels are visually
+   hidden but stay in the DOM, so every button has a name). 900px+: a vertical list. */
+.hills-apply__steps {
+  display: flex;
+  align-items: center;
+  margin: 26px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.hills-apply__step { position: relative; display: flex; align-items: center; flex: none; }
+.hills-apply__step:not(:last-child) { flex: 1; }
+.hills-apply__step:not(:last-child)::after {
+  content: '';
+  flex: 1;
+  height: 2px;
+  margin-inline: 6px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--hills-ink) 38%, transparent);
+}
+.hills-apply__step.is-done:not(:last-child)::after { background: var(--hills-ink); }
+.hills-apply__stepbtn {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 44px;
+  padding: 2px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--hills-ink-2);
+  font: inherit;
+  text-align: left;
+  cursor: default;
+}
+.hills-apply__step.is-done .hills-apply__stepbtn { cursor: pointer; color: var(--hills-ink); }
+.hills-apply__step.is-active .hills-apply__stepbtn { color: var(--hills-ink); }
+.hills-apply__stepbtn:focus-visible { outline: 2px solid var(--hills-ink); outline-offset: 3px; }
+.hills-apply__chip {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border: 1.5px solid var(--hills-ink-2);
+  border-radius: 50%;
+  color: var(--hills-ink-2);
+  transition: background 0.25s, color 0.25s;
+}
+.hills-apply__step.is-done .hills-apply__chip {
+  border-color: var(--hills-ink);
+  background: color-mix(in srgb, var(--hills-ink) 14%, transparent);
+  color: var(--hills-ink);
+}
+.hills-apply__step.is-active .hills-apply__chip {
+  border-color: var(--hills-ink);
+  background: var(--hills-ink);
+  color: var(--hills-on);
+}
+.hills-apply__step.is-done .hills-apply__stepbtn:hover .hills-apply__steplabel { text-decoration: underline; text-underline-offset: 4px; }
+.hills-apply__steplabel {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+}
+.hills-apply__step.is-active .hills-apply__steplabel { font-weight: 700; }
+
+@media (min-width: 900px) {
+  .hills-apply__steps { display: block; margin-top: 40px; }
+  .hills-apply__step { display: block; }
+  .hills-apply__step:not(:last-child) { margin-bottom: 20px; }
+  .hills-apply__step:not(:last-child)::after {
+    position: absolute;
+    left: 19px;
+    top: 46px;
+    bottom: -18px;
+    width: 2px;
+    height: auto;
+    margin: 0;
+  }
+  .hills-apply__chip { width: 40px; height: 40px; }
+  .hills-apply__steplabel {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+  }
+}
+
+/* ── The form surface ───────────────────────────────────────────────────── */
+
+.hills-apply__form { min-width: 0; }
+.hills-apply__surface {
+  container-type: inline-size;
+  min-width: 0;
+  padding: clamp(20px, 3vw, 40px);
+  border: 1px solid color-mix(in srgb, var(--hills-line) 80%, transparent);
+  border-radius: 20px;
+  background: var(--hills-surface);
+  color: var(--hills-surface-fg);
+  box-shadow: 0 24px 60px -28px rgb(0 0 0 / 0.45);
+  animation: hills-rise 0.9s 0.16s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+  color-scheme: light;
+
+  /* Same colours as the sign-in card (day palette in the light theme, night
+     palette in the dark theme). */
+  --c-ink: var(--hills-surface-fg);
+  --c-ink2: color-mix(in srgb, var(--hills-surface-fg) 82%, transparent);
+  --c-ph: color-mix(in srgb, var(--hills-surface-fg) 62%, transparent);
+  --c-line: color-mix(in srgb, var(--hills-surface-fg) 18%, transparent);
+  --c-acc: #932e09;
+  --c-acc2: #ffb27a;
+  --c-danger: #6c160d;
+  --c-warn: #552f00;
+}
+.dark .hills-apply__surface {
+  color-scheme: dark;
+  --c-acc: #f2a650;
+  --c-acc2: #a8350b;
+  --c-danger: #ff9c8f;
+  --c-warn: #ffd27a;
+}
+
+.hills-apply__sec {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 0 0 28px;
+  padding: 0 0 22px;
+  border-bottom: 1px solid var(--c-line);
+}
+.hills-apply__sec-ico {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--c-ink) 8%, transparent);
+  color: var(--c-ink);
+}
+.hills-apply__sec-title { margin: 0; font-size: 22px; font-weight: 700; line-height: 1.2; letter-spacing: -0.02em; color: var(--c-ink); }
+.hills-apply__sec-sub { margin: 2px 0 0; font-size: 15px; line-height: 1.4; color: var(--c-ink2); }
+
+/* Field grid: two columns when the surface is wide enough, otherwise one. */
+.hills-apply__fields,
+.hills-apply__checks { display: grid; grid-template-columns: minmax(0, 1fr); gap: 26px 28px; }
+.hills-apply__checks { gap: 6px 24px; }
+@container (min-width: 560px) {
+  .hills-apply__fields,
+  .hills-apply__checks { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.hills-apply__phone { display: flex; gap: 12px; }
+.hills-apply__lead { margin: 0 0 22px; font-size: 16px; line-height: 1.55; color: var(--c-ink2); }
+.hills-apply__needs { display: grid; gap: 18px; margin-top: 18px; }
+
+.hills-fld__label {
+  display: block;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--c-ink);
+}
+.hills-fld__label--sm { font-size: 14px; }
+.hills-fld__req { margin-left: 4px; color: var(--c-danger); }
+.hills-fld__hint { margin: 6px 0 0; font-size: 14px; line-height: 1.4; color: var(--c-ink2); }
+.hills-fld__hint--lead { margin: 0 0 12px; }
+.hills-fld__err { margin: 6px 0 0; font-size: 14px; font-weight: 600; line-height: 1.4; color: var(--c-danger); }
+.hills-fld__group {
+  grid-column: 1 / -1;
+  margin: 8px 0 -6px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--c-ink2);
+}
+
+/* Underlined controls: inputs, selects, the date field and the textarea. */
+.hills-apply__surface .hills-ctl {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 0 8px;
+  border: 0;
+  border-bottom: 1.5px solid var(--c-ink);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  font: inherit;
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--c-ink);
+  outline: 0;
+  transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
+}
+.hills-apply__surface .hills-ctl::placeholder { color: var(--c-ph); font-weight: 400; opacity: 1; }
+.hills-apply__surface .hills-ctl:focus {
+  border-bottom-color: var(--c-acc);
+  box-shadow: 0 2px 0 0 var(--c-acc);
+  background-color: color-mix(in srgb, var(--c-acc) 7%, transparent);
+}
+.hills-apply__surface textarea.hills-ctl { min-height: 96px; line-height: 1.45; }
+.hills-apply__surface .hills-ctl option { background: var(--hills-surface); color: var(--hills-surface-fg); }
+.hills-apply__surface .hills-ctl:-webkit-autofill {
+  -webkit-text-fill-color: var(--c-ink);
+  box-shadow: 0 0 0 1000px hsl(var(--card)) inset;
+  caret-color: var(--c-ink);
+}
+.hills-apply__surface .hills-ctl--err {
+  border-bottom-color: var(--c-danger);
+  box-shadow: 0 1px 0 0 var(--c-danger);
+  background-color: color-mix(in srgb, var(--c-danger) 6%, transparent);
+}
+.hills-apply__surface .hills-ctl--err:focus { border-bottom-color: var(--c-danger); box-shadow: 0 2px 0 0 var(--c-danger); }
+/* Calling-code select next to the phone number: fixed, compact width. */
+.hills-apply__surface .hills-ctl--code { flex: none; width: 6.25rem; text-overflow: ellipsis; }
+
+.hills-chkrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 36px;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--c-ink);
+  cursor: pointer;
+}
+.hills-chkrow--top { align-items: flex-start; }
+.hills-chkrow__sub { display: block; margin-top: 2px; font-size: 14px; font-weight: 400; color: var(--c-ink2); }
+.hills-chk { flex: none; width: 20px; height: 20px; margin: 0; accent-color: var(--c-acc); }
+.hills-chkrow--top .hills-chk { margin-top: 2px; }
+.hills-chk:focus-visible { outline: 2px solid var(--c-acc); outline-offset: 2px; }
+
+/* ── Review step ────────────────────────────────────────────────────────── */
+
+.hills-apply__rsec { margin: 0 0 30px; }
+.hills-apply__rh {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--c-acc);
+}
+.hills-apply__dl { margin: 0; }
+.hills-apply__row {
+  display: grid;
+  grid-template-columns: minmax(7rem, 11.5rem) minmax(0, 1fr);
+  gap: 16px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--c-line);
+  font-size: 16px;
+  line-height: 1.45;
+}
+.hills-apply__dt { margin: 0; font-weight: 500; color: var(--c-ink2); }
+.hills-apply__dd { margin: 0; font-weight: 600; color: var(--c-ink); overflow-wrap: anywhere; }
+.hills-apply__confirm {
+  margin: 8px 0 0;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--c-warn) 40%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--c-warn) 9%, transparent);
+  color: var(--c-warn);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.55;
+}
+.hills-apply__err { margin: 16px 0 0; }
+
+/* ── Previous / Step x of y / Next ──────────────────────────────────────── */
+
+.hills-apply__nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 36px;
+  padding-top: 24px;
+  border-top: 1px solid var(--c-line);
+}
+.hills-apply__nav--end { justify-content: flex-end; }
+.hills-apply__prev {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 48px;
+  margin-left: -8px;
+  padding: 0 14px 0 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--c-ink);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.hills-apply__prev:hover:not(:disabled) { background: color-mix(in srgb, var(--c-ink) 8%, transparent); }
+.hills-apply__prev:focus-visible { outline: 3px solid var(--c-acc); outline-offset: 2px; }
+.hills-apply__prev:disabled { opacity: 0.4; cursor: not-allowed; }
+.hills-apply__count { font-size: 15px; font-weight: 500; color: var(--c-ink2); text-align: center; }
+@media (max-width: 479px) {
+  .hills-apply__nav { flex-wrap: wrap; }
+  .hills-apply__count { order: -1; flex-basis: 100%; }
+}
+.hills-go--inline {
+  display: inline-flex;
+  justify-content: center;
+  gap: 12px;
+  width: auto;
+  height: 52px;
+  margin: 0;
+  padding: 0 24px;
+  font-size: 17px;
+  text-decoration: none;
+}
+.hills-go--inline .hills-go__arrow { width: 18px; height: 18px; }
+.hills-go--solid { background: var(--c-acc); }
+.hills-go--solid:hover:not(:disabled) { background: color-mix(in srgb, var(--c-acc) 86%, var(--c-ink)); }
+
+/* ── Submitted screen ───────────────────────────────────────────────────── */
+
+.hills-apply__tick {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  margin: 0 0 24px;
+  border: 2px solid var(--hills-ok);
+  border-radius: 50%;
+  color: var(--hills-ok);
+}
+.hills-apply__next-title { margin: 0 0 6px; }
+.hills-apply__next { margin: 0; padding: 0; list-style: none; }
+.hills-apply__next li {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--c-line);
+  font-size: 17px;
+  line-height: 1.45;
+  color: var(--c-ink);
+}
+.hills-apply__next li:last-child { border-bottom: 0; }
+.hills-apply__next-n {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--c-acc) 14%, transparent);
+  color: var(--c-acc);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hills-apply__side,
+  .hills-apply__surface { animation: none; }
+  .hills-apply__chip,
+  .hills-apply__surface .hills-ctl { transition: none; }
+}
+
+
+/* ════════════════════════════════════════════════════════════════════════════
+   HILLS PAGE (Phase 6a): the frame for the public content pages
+   (admissions, academics, student life, leadership, privacy, terms).
+   Two columns from 900px, one below. Left (sticky): title, intro and an "On
+   this page" list, all on the sky (the interim scrim is off via `hills-open`).
+   Right: the content on ONE opaque surface that follows the Light/Dark THEME,
+   like the sign-in card. Leadership (`--wide`, no surface) lets its own cards
+   fill the wider column. Below 900px the contents list is a row of pills that
+   scrolls sideways inside itself. Class names only; no page logic changes.
+   Contrast: `pnpm hills:contrast` (surface pairs) and real-pixel measurement.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+.hills-page {
+  --hills-split-cols: clamp(240px, 26vw, 340px) minmax(0, 860px);
+
+  /* Same palette as the sign-in card and the apply surface. */
+  --c-ink: var(--hills-surface-fg);
+  --c-ink2: color-mix(in srgb, var(--hills-surface-fg) 82%, transparent);
+  --c-line: color-mix(in srgb, var(--hills-surface-fg) 18%, transparent);
+  --c-acc: #932e09;
+  --c-acc2: #ffb27a;
+}
+.dark .hills-page {
+  --c-acc: #f2a650;
+  --c-acc2: #a8350b;
+}
+.hills-page--wide { --hills-split-cols: clamp(240px, 26vw, 340px) minmax(0, 1fr); }
+.hills-page__wrap { padding-block: clamp(28px, 5vw, 72px); }
+.hills-page__grid { align-items: start; }
+@media (min-width: 900px) {
+  .hills-page:not(.hills-page--wide) .hills-split { justify-content: center; }
+}
+
+/* ── Left column, on the sky ────────────────────────────────────────────── */
+
+.hills-page__side { min-width: 0; animation: hills-rise 0.9s 0.08s cubic-bezier(0.2, 0.7, 0.2, 1) backwards; }
+/* Pinned from 900px wide at ANY window height: the left column stays put while
+   the content scrolls. A column taller than the window scrolls inside itself, and
+   the current contents entry is kept in view. */
+@media (min-width: 900px) {
+  .hills-page__side {
+    position: sticky;
+    top: 96px;
+    max-height: calc(100svh - 112px);
+    margin: -4px;
+    padding: 4px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+}
+.hills-page__title {
+  margin: 0 0 14px;
+  font-size: clamp(36px, 3.6vw, 54px);
+  font-weight: 300;
+  line-height: 1.04;
+  letter-spacing: -0.035em;
+  color: var(--hills-ink);
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+.hills-page__intro {
+  margin: 0;
+  max-width: 40ch;
+  font-size: clamp(17px, 1.3vw, 19px);
+  line-height: 1.5;
+  /* Full-strength ink: the 93% ink-2 measured under 4.5:1 on the real day sky. */
+  color: var(--hills-ink);
+}
+
+.hills-page__toc { margin-top: 28px; }
+.hills-page__toc-title {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--hills-ink);
+}
+.hills-page__toc ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-left: 2px solid color-mix(in srgb, var(--hills-ink) 38%, transparent);
+}
+.hills-page__toc a {
+  display: block;
+  margin-left: -2px;
+  padding: 6px 0 6px 14px;
+  border-left: 2px solid transparent;
+  color: var(--hills-ink);
+  font-size: 15px;
+  line-height: 1.35;
+  text-decoration: none;
+}
+.hills-page__toc a.is-active { border-left-color: var(--hills-ink); font-weight: 700; }
+.hills-page__toc a:focus-visible { outline: 2px solid var(--hills-ink); outline-offset: 2px; border-radius: 2px; }
+
+@media (max-width: 899.98px) {
+  .hills-page__toc { margin-top: 20px; }
+  .hills-page__toc-title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .hills-page__toc ol {
+    display: flex;
+    gap: 8px;
+    margin-inline: -5vw;
+    padding: 2px 5vw 8px;
+    border-left: 0;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-padding-inline: 5vw;
+  }
+  .hills-page__toc li { flex: none; }
+  .hills-page__toc a {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    margin: 0;
+    padding: 0 16px;
+    border: 1px solid var(--hills-line);
+    border-radius: 999px;
+    background: var(--hills-surface);
+    color: var(--hills-surface-fg);
+    white-space: nowrap;
+  }
+  .hills-page__toc a.is-active {
+    border-color: var(--hills-surface-fg);
+    background: var(--hills-surface-fg);
+    color: var(--hills-surface);
+  }
+  .hills-page__toc a:focus-visible { outline-color: var(--hills-ink); }
+}
+
+/* ── The content surface ────────────────────────────────────────────────── */
+
+.hills-page__main { min-width: 0; }
+.hills-page__surface {
+  min-width: 0;
+  padding: clamp(20px, 3.4vw, 48px);
+  border: 1px solid color-mix(in srgb, var(--hills-line) 80%, transparent);
+  border-radius: 20px;
+  background: var(--hills-surface);
+  color: var(--hills-surface-fg);
+  box-shadow: 0 24px 60px -28px rgb(0 0 0 / 0.45);
+  animation: hills-rise 0.9s 0.16s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+}
+/* Headings written with text-brand-navy (no dark variant) follow the surface. */
+.hills-page__surface :is(h2, h3, th) { color: var(--c-ink); }
+/* Long text never runs wider than a comfortable line. */
+.hills-page__main :is(p, ul, ol) { max-width: 760px; }
+
+.hills-page__link,
+.hills-page__accent { color: var(--c-acc); }
+.hills-page__link { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+.hills-page__link:hover { text-decoration-thickness: 2px; }
+.hills-page__link:focus-visible { outline: 2px solid var(--c-acc); outline-offset: 2px; border-radius: 2px; }
+
+/* "Ready to apply?" band: inverted, so it reads in both themes. */
+.hills-page__cta {
+  padding: 28px;
+  border-radius: 16px;
+  background: var(--hills-surface-fg);
+  color: var(--hills-surface);
+}
+.hills-page__surface .hills-page__cta h2 { color: inherit; }
+.hills-page__cta p { max-width: none; color: color-mix(in srgb, var(--hills-surface) 90%, transparent); }
+.hills-page__cta-btn { background: var(--hills-surface); color: var(--hills-surface-fg); }
+.hills-page__cta-btn:hover { background: color-mix(in srgb, var(--hills-surface) 86%, var(--c-acc)); }
+.hills-page__cta-btn:focus-visible { outline: 3px solid var(--hills-surface); outline-offset: 3px; }
+
+/* Admissions office: three small cards that wrap by width (the surface is
+   narrower than the old max-w-4xl page, so a fixed 3-up grid cut the email). */
+.hills-page__contacts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
+  gap: 16px;
+}
+.hills-page__contacts > * { min-width: 0; overflow-wrap: anywhere; }
+
+/* Leadership: cards fill the wider column; each keeps its own opaque frame. */
+.hills-page__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr));
+  gap: 24px;
+  animation: hills-rise 0.9s 0.16s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+}
+.hills-page__cards > * { box-shadow: 0 24px 60px -28px rgb(0 0 0 / 0.45); }
+.hills-page__empty {
+  border: 1px solid color-mix(in srgb, var(--hills-line) 80%, transparent);
+  border-radius: 20px;
+  background: var(--hills-surface);
+  box-shadow: 0 24px 60px -28px rgb(0 0 0 / 0.45);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hills-page__side,
+  .hills-page__surface,
+  .hills-page__cards { animation: none; }
+}
+
+
+/* ════════════════════════════════════════════════════════════════════════════
+   HILLS PAGE, Phase 6b additions: list pages, details, gallery, placements, 404
+   Same frame as 6a. New pieces: a smaller title for post headlines, a back link
+   and an eyebrow on the sky, an inverted button, quick links, a pager panel,
+   accent links inside post bodies and a visible focus ring for form controls.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+.hills-page--compact .hills-page__title {
+  font-size: clamp(28px, 2.6vw, 38px);
+  font-weight: 400;
+  line-height: 1.12;
+  letter-spacing: -0.025em;
+}
+
+/* Detail pages: the date and byline sit in an opaque chip. With a four-line headline the
+   line lands low on a phone, where the dawn and dusk horizon glow measured 3.5 to 4.2:1
+   behind bare ink; the chip is foreground on card (17:1) on every sky. */
+.hills-page--compact .hills-page__intro {
+  display: inline-block;
+  max-width: none;
+  padding: 8px 14px;
+  border: 1px solid color-mix(in srgb, var(--hills-line) 80%, transparent);
+  border-radius: 14px;
+  background: var(--hills-surface);
+  color: var(--hills-surface-fg);
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.hills-page__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  margin-bottom: 10px;
+  color: var(--hills-ink);
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.hills-page__back:focus-visible { outline: 2px solid var(--hills-ink); outline-offset: 2px; border-radius: 4px; }
+
+.hills-page__eyebrow {
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--hills-ink);
+}
+
+/* Inverted button (card colour on foreground), outlined in ink so its edge
+   reads on every sky. */
+.hills-page__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  margin-top: 26px;
+  padding: 0 24px;
+  border: 1.5px solid var(--hills-ink);
+  border-radius: 12px;
+  background: var(--hills-surface-fg);
+  color: var(--hills-surface);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background-color 0.2s;
+}
+.hills-page__btn:hover { background: color-mix(in srgb, var(--hills-surface-fg) 86%, var(--c-acc)); }
+.hills-page__btn:focus-visible { outline: 3px solid var(--hills-ink); outline-offset: 3px; }
+
+.hills-page__quick { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-top: 22px; }
+.hills-page__quick a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  color: var(--hills-ink);
+  font-size: 15px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.hills-page__quick a:hover { text-decoration-thickness: 2px; }
+.hills-page__quick a:focus-visible { outline: 2px solid var(--hills-ink); outline-offset: 2px; border-radius: 2px; }
+
+/* Pager that sits on the bare sky (gallery): its own opaque panel. */
+.hills-page__pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
+  padding: 10px 16px;
+  border: 1px solid color-mix(in srgb, var(--hills-line) 80%, transparent);
+  border-radius: 999px;
+  background: var(--hills-surface);
+  color: var(--hills-surface-fg);
+  box-shadow: 0 16px 40px -24px rgb(0 0 0 / 0.45);
+}
+
+/* Links inside a post body (author-written HTML): accent colour, 4.5:1+. */
+.hills-prose a { color: var(--c-acc); text-decoration: underline; text-underline-offset: 3px; }
+/* The blockquote colour set by the post-body classes (`text-muted` as a variant) resolved to a
+   near-invisible tint on both themes; give quotes a readable, slightly softer ink. */
+.hills-prose blockquote { color: var(--c-ink2); }
+
+/* Form controls on the surface: a visible keyboard focus ring. */
+.hills-page__surface :is(input, select, textarea):focus-visible {
+  outline: 2px solid var(--c-acc);
+  outline-offset: 2px;
+}
+
+
+/* ════════════════════════════════════════════════════════════════════════════
+   HILLS AUTH FAMILY (Phase 7): forgot, reset and change password, and the
+   parent claim form. They now use the same pieces as the sign-in card
+   (.hills-field, .hills-input, .hills-go, .hills-alert); this block adds the
+   few parts login does not have: back link, hint and field error text, a
+   monospace code field, a read-only field, and the centred status screens
+   (checking, sent, link expired, password updated, account ready).
+   Colours come from the card's own tokens (--c-*), so contrast follows the
+   sign-in proof in `pnpm hills:contrast`. Class names only.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* Success colour for the card (follows the theme, like the other card colours). */
+.hills-auth__card { --c-ok: #0c3f31; }
+.dark .hills-auth__card { --c-ok: #8fe3bf; }
+
+.hills-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  margin: -6px 0 10px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--c-ink2);
+  text-decoration: none;
+}
+.hills-back svg { width: 16px; height: 16px; }
+.hills-back:hover,
+.hills-back:focus-visible { color: var(--c-ink); }
+.hills-back:focus-visible { outline: 2px solid var(--c-acc); outline-offset: 2px; border-radius: 2px; }
+
+.hills-hint { margin: 8px 0 0; font-size: 15px; line-height: 1.4; color: var(--c-ink2); }
+.hills-label small { font-size: 14px; font-weight: 400; color: var(--c-ink2); }
+.hills-field-err {
+  margin: 8px 0 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--c-danger);
+}
+.hills-input > input[aria-invalid='true'] { border-bottom-color: var(--c-danger); }
+.hills-input > input.hills-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 18px;
+  letter-spacing: 0.06em;
+}
+.hills-input > input[readonly] { color: var(--c-ink2); cursor: not-allowed; }
+.hills-input > input[readonly]:focus { border-color: var(--c-ink); }
+.hills-input > input[type='date'] { min-width: 0; }
+
+/* Link styled as the card's main button. */
+a.hills-go { text-decoration: none; }
+.hills-go--link { justify-content: center; gap: 12px; }
+
+/* Centred status screens. */
+.hills-status { text-align: left; }
+.hills-status__icon {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  margin: 0 0 20px;
+  border: 2px solid var(--c-x, var(--c-ink));
+  border-radius: 50%;
+  color: var(--c-x, var(--c-ink));
+}
+.hills-status__icon svg { width: 30px; height: 30px; }
+.hills-status__icon--ok { --c-x: var(--c-ok); }
+.hills-status__icon--danger { --c-x: var(--c-danger); }
+.hills-status__icon--key { --c-x: var(--c-ink); }
+.hills-status .hills-auth__lede { margin-bottom: 28px; }
+.hills-status .hills-auth__lede strong { color: var(--c-ink); }
+.hills-status .hills-go { margin-top: 0; }
+.hills-checking {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 28px 0;
+  font-size: 17px;
+  color: var(--c-ink2);
+}
+.hills-checking svg { flex: none; width: 24px; height: 24px; color: var(--c-ink); animation: hills-spin 1s linear infinite; }
+@keyframes hills-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .hills-checking svg { animation: none; } }
+
+/* ─────────────────────────────────────────────────────────
+   PHASE 8a: LOGGED-IN SURFACE
+   One bordered surface per module page (ModuleSurface), one light
+   tint for sub-blocks inside it (stat tiles, mobile rows), and thin
+   dividers. Unlayered on purpose, like .main-scroll-pad: it must beat
+   Tailwind's layered utilities. Looks only: no logic reads these.
+
+   Gutters of the page (layout <main>): 16px on phones, 24px from 768px,
+   32px from 1024px. Surface padding: 16 / 20 / 24px.
+   Phones (< 768px): the surface runs edge to edge. Its negative margin
+   equals the 16px gutter, and the side border and the corners go.
+   The tint is chosen so .text-muted keeps 4.5:1 on it in both themes
+   (measured by tools/hills/check-contrast.mts).
+   ───────────────────────────────────────────────────────── */
+:root { --app-tint: 210 25% 98.5%; }
+.dark { --app-tint: 224 30% 14%; }
+
+.app-tint { background-color: hsl(var(--app-tint)); }
+
+.app-surface {
+  position: relative;
+  background-color: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 14px;
+  padding: 20px;
+}
+@media (min-width: 1024px) {
+  .app-surface { padding: 24px; }
+}
+@media (max-width: 767.98px) {
+  .app-surface {
+    margin-inline: -1rem;
+    border-inline-width: 0;
+    border-radius: 0;
+    padding: 16px;
+  }
+}
+/* Text that sits directly on the page sky (tab labels, the line under a page
+   title). The faint contour lines run behind it, so it uses 78% of the body
+   ink instead of .text-muted (measured on real pixels in the Phase 8a pack). */
+.app-sky-idle { color: color-mix(in srgb, hsl(var(--foreground)) 78%, transparent); }
+.app-sky-idle:hover { color: hsl(var(--foreground)); }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   HILLS APP FOUNDATIONS (Phase 8b-0): tones, button fills, motion, dialogs
+   Unlayered on purpose, like .app-surface above: these must beat Tailwind's
+   layered utilities. Looks only. Every colour pair below is proven by
+   tools/hills/check-contrast.mts (section "Phase 8b-0").
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* Text-use tones: the brand colours darkened (light) so words and links reach
+   4.5:1 on white, the page, the tint and muted rows. Dark mode keeps the
+   existing bright brand values, which already pass. */
+:root {
+  --tone-teal:  163 79% 26%;
+  --tone-coral: 8 68% 44%;
+  --tone-amber: 32 93% 32%;
+
+  /* Filled buttons: one label colour per fill, 4.5:1 or better.
+     Light: white on a darker teal / coral. Dark: the old white label on the
+     light teal measured 1.91:1, so the label is the page's dark navy instead. */
+  --btn-brand:        163 79% 26%;
+  --btn-brand-hover:  163 79% 22%;
+  --btn-brand-fg:     0 0% 100%;
+  --btn-danger:       8 68% 44%;
+  --btn-danger-hover: 8 68% 38%;
+  --btn-danger-fg:    0 0% 100%;
+
+  /* Attention badge (count or dot) on a sidebar, bottom bar or tab. */
+  --attn-fill: var(--btn-danger);
+  --attn-fg:   var(--btn-danger-fg);
+  /* The sidebar is dark navy in BOTH themes, so a badge there uses the bright
+     pair (the dark-theme values) whatever the theme is. */
+  --attn-fill-on-dark: 8 85% 68%;
+  --attn-fg-on-dark:   224 44% 7%;
+
+  /* Motion (RULEBOOK R9). Keep in step with src/lib/hills/motion.ts. */
+  --ease-enter:    cubic-bezier(0, 0, 0.2, 1);
+  --ease-leave:    cubic-bezier(0.4, 0, 1, 1);
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-hover:      120ms;
+  --dur-dialog-in:  250ms;
+  --dur-dialog-out: 200ms;
+  --dur-page:       400ms;
+}
+.dark {
+  --tone-teal:  163 60% 55%;
+  --tone-coral: 8 85% 68%;
+  --tone-amber: 38 92% 60%;
+
+  --btn-brand:        163 60% 55%;
+  --btn-brand-hover:  162 65% 62%;
+  --btn-brand-fg:     224 44% 7%;
+  --btn-danger:       8 85% 68%;
+  --btn-danger-hover: 8 85% 74%;
+  --btn-danger-fg:    224 44% 7%;
+}
+
+/* One hover rule (R9.5): a tint or a text colour change in 120ms, no lift, no
+   scaling. Opt in with .app-hover on rows, links and quiet buttons. */
+.app-hover {
+  transition: background-color var(--dur-hover) var(--ease-standard),
+              color var(--dur-hover) var(--ease-standard);
+}
+.app-hover:hover { background-color: hsl(var(--app-tint)); }
+@media (hover: none) {
+  .app-hover:hover { background-color: transparent; }
+}
+
+/* The hover standard, in full (R9.5, Phase 10b). Four rules, no others:
+   1. Anything with a box (row, card, menu item, quiet button): a background
+      tint, 120ms. Use .app-hover or the existing hover:bg-page tokens.
+   2. Words that do something but have no box ("Edit", "Open reports", "Remove"):
+      .app-action. A soft pill of the word's OWN colour appears behind it. It is
+      drawn with a shadow, so nothing moves or reflows. Keyboard focus shows the
+      same pill plus the focus ring, so every way of arriving looks alike.
+   3. A link inside a sentence is underlined at rest and 2px on hover (base layer).
+   4. Filled buttons use their own hover colour token (bg-btn-*-hover).
+   Never: lift, scale, glow, or an underline that exists only on hover. Pointer
+   devices only: touch screens do not get a hover state that sticks after a tap. */
+.app-action {
+  border-radius: 6px;
+  transition: background-color var(--dur-hover) var(--ease-standard),
+              box-shadow var(--dur-hover) var(--ease-standard),
+              color var(--dur-hover) var(--ease-standard);
+}
+@media (hover: hover) {
+  .app-action:hover:not(:disabled):not([aria-disabled='true']) {
+    background-color: color-mix(in srgb, currentColor 10%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 10%, transparent);
+  }
+}
+.app-action:focus-visible {
+  background-color: color-mix(in srgb, currentColor 10%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 10%, transparent);
+}
+
+/* The same pill for the public pages' quiet text links, so a link looks the
+   same on a hover whether it sits on the sky or in the app. */
+.hills-link,
+.hills-back,
+.hills-page__back,
+.hills-page__toc a,
+a.hills-studio__credit-name {
+  transition: background-color var(--dur-hover, 120ms) var(--ease-standard, ease),
+              box-shadow var(--dur-hover, 120ms) var(--ease-standard, ease),
+              color var(--dur-hover, 120ms) var(--ease-standard, ease);
+}
+
+/* A waiting indicator that stays hidden for the first second (R9.6: nothing for
+   waits under 1 second). Put it on a spinner or skeleton; it fades in after. */
+.app-wait {
+  opacity: 0;
+  animation: app-wait-in 160ms var(--ease-enter) 1000ms forwards;
+}
+@keyframes app-wait-in { to { opacity: 1; } }
+
+/* A button that is doing its work (R9.7): same width, no clicks, a soft sweep.
+   Set by <Button loading>; the label text is changed by the caller. */
+.app-btn-busy { position: relative; overflow: hidden; pointer-events: none; }
+.app-btn-busy::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, currentColor 18%, transparent), transparent);
+  transform: translateX(-100%);
+  animation: skeleton-sweep 1.5s var(--ease-standard) infinite;
+}
+
+/* Dialogs (R8). New sizes: s 400px, m 560px, l 720px. Legacy sm to 2xl are
+   unchanged until their pages are converted. A dialog that holds a form fills
+   the screen on phones (sticky footer, no bottom-sheet gap); a dialog without
+   input stays a bottom sheet. */
+.app-dialog { border-radius: 14px; }
+.app-dialog .app-modal-footer { padding-bottom: max(12px, env(safe-area-inset-bottom, 0px)); }
+@media (max-width: 639.98px) {
+  .app-dialog { border-radius: 14px 14px 0 0; }
+  .app-dialog--form {
+    height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0;
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .app-dialog--form .app-modal-footer { flex-direction: column-reverse; }
+}
+
+/* Reduced motion: no transforms, colour and opacity only (R9.4). */
+@media (prefers-reduced-motion: reduce) {
+  .app-btn-busy::after { animation: none; transform: none; opacity: 0.5; }
+  .app-wait { animation-duration: 0.01ms; }
+  .app-dialog { transform: none !important; }
+}
+
+
+/* Hover pills for the public pages' quiet links (see the hover standard above).
+   Kept at the end so it sits after every .hills-* rule it joins. */
+@media (hover: hover) {
+  .hills-link:hover {
+    /* A pill as tall as the text only, not the whole tap area. */
+    background-image: linear-gradient(
+      color-mix(in srgb, currentColor 10%, transparent),
+      color-mix(in srgb, currentColor 10%, transparent)
+    );
+    background-size: 100% calc(100% - 20px);
+    background-position: center;
+    background-repeat: no-repeat;
+    border-radius: 6px;
+  }
+  .hills-back:hover,
+  .hills-page__back:hover,
+  .hills-page__toc a:hover,
+  a.hills-studio__credit-name:hover {
+    border-radius: 4px;
+    background-color: color-mix(in srgb, currentColor 10%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 10%, transparent);
+  }
+}
+.hills-back:focus-visible,
+.hills-page__back:focus-visible {
+  background-color: color-mix(in srgb, currentColor 10%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 10%, transparent);
+}
+.hills-link:focus-visible {
+  background-image: linear-gradient(
+    color-mix(in srgb, currentColor 10%, transparent),
+    color-mix(in srgb, currentColor 10%, transparent)
+  );
+  background-size: 100% calc(100% - 20px);
+  background-position: center;
+  background-repeat: no-repeat;
+  border-radius: 6px;
 }

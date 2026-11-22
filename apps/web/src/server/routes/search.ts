@@ -17,6 +17,8 @@
 import { Router }             from 'express'
 import { verifyAuth }         from '@/lib/verifyAuth'
 import { requirePermission }  from '@/server/middleware/verifyPermission'
+import { rateLimit }          from '@/lib/ratelimit'
+import { parseSearchTerm }    from '@/lib/requestLimits'
 import { algoliaSearch, fallbackSearch } from '@/server/services/algoliaService'
 
 export const searchRouter = Router()
@@ -32,8 +34,10 @@ export const searchRouter = Router()
 searchRouter.get('/fallback',
   verifyAuth,
   requirePermission('search.globalSearch'),
+  rateLimit('search'),
   async (req, res) => {
-    const query = String(req.query.q ?? '').trim()
+    // [Issue 6] Bound the term BEFORE it reaches Algolia / the Postgres `contains` fallback.
+    const query = parseSearchTerm(req.query.q)
     if (query.length < 2) return res.json({ students: [], staff: [], books: [] })
     const viaAlgolia = await algoliaSearch(query, 8)
     res.json(viaAlgolia ?? await fallbackSearch(query, 8))

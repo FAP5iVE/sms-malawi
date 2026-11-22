@@ -51,6 +51,38 @@ interface DirectUploadTicket {
  * @returns the Appwrite fileId to attach to the follow-up metadata call.
  */
 export async function uploadFileDirectly(ticketPath: string, file: File): Promise<string> {
+  const { fileId } = await uploadFileDirectlyInternal(ticketPath, file)
+  return fileId
+}
+
+/**
+ * [NEW] Same upload as uploadFileDirectly(), but also returns a ready-to-use
+ * public view URL — for inline images embedded directly in RichTextEditor
+ * body HTML (`<img src="...">`), which (unlike a cover-image imageKey
+ * stored in its own field) needs a real URL at insert time, not just a
+ * file ID to resolve later.
+ *
+ * The URL is built client-side from the ticket's own endpoint/projectId/
+ * bucketId — no extra server round-trip — using the exact same format
+ * lib/storage.ts's getPublicViewUrl() constructs server-side:
+ *   `${endpoint}/storage/buckets/${bucketId}/files/${fileId}/view?project=${projectId}`
+ * Only ever call this with a ticketPath whose FILE_PREFIX is in
+ * storage.ts's PUBLIC_FILE_PREFIXES (e.g. '/announcements/image/upload-ticket')
+ * — anything else would produce a URL that 403s for anonymous visitors.
+ */
+export async function uploadFileDirectlyWithUrl(
+  ticketPath: string,
+  file: File
+): Promise<{ fileId: string; url: string }> {
+  const { fileId, ticket } = await uploadFileDirectlyInternal(ticketPath, file)
+  const url = `${ticket.endpoint}/storage/buckets/${ticket.bucketId}/files/${encodeURIComponent(fileId)}/view?project=${ticket.projectId}`
+  return { fileId, url }
+}
+
+async function uploadFileDirectlyInternal(
+  ticketPath: string,
+  file: File
+): Promise<{ fileId: string; ticket: DirectUploadTicket }> {
   const ticket = await apiFetch<DirectUploadTicket>(ticketPath, { method: 'POST' })
 
   const client  = new Client().setEndpoint(ticket.endpoint).setProject(ticket.projectId)
@@ -83,5 +115,5 @@ export async function uploadFileDirectly(ticketPath: string, file: File): Promis
     await account.deleteSession('current').catch(() => {})
   }
 
-  return ticket.fileId
+  return { fileId: ticket.fileId, ticket }
 }

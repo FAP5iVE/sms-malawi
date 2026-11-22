@@ -52,6 +52,8 @@ import {
   ChevronRight,
   Filter,
   Plus,
+  Loader2,
+  AlertCircle,
   CalendarDays,
   Search,
   X,
@@ -65,7 +67,7 @@ import { CalendarEventListItem } from './CalendarEventListItem'
 import { MotionBottomSheet } from '@/components/shared/MotionBottomSheet'
 import type { CalendarViewMode } from './DesktopCalendarView'
 import {
-  WEEK_HEADERS_SHORT,
+  WEEK_HEADERS,
   formatMonthShort,
   formatMonthYear,
   formatDisplayDate,
@@ -101,7 +103,9 @@ interface MobileCalendarViewProps {
    *  quick-add, which creates immediately rather than opening a form).
    *  Full detail can always be added afterwards via the row's Edit action,
    *  which opens the same CalendarEventFormDialog the desktop view uses. */
-  onQuickAdd: (title: string) => void
+  onQuickAdd: (title: string, onCreated: () => void) => void
+  /** True while the quick-add request is in flight (input + button lock, spinner shows). */
+  quickAdding?: boolean
   /** Opens the full CalendarEventFormDialog (category/time/location) on
    *  the selected day — the sub-header's Add Event button, distinct from
    *  the quick-add bar's title-only creation. */
@@ -133,6 +137,7 @@ export function MobileCalendarView({
   canEdit,
   canDelete,
   onQuickAdd,
+  quickAdding = false,
   onOpenCreate,
   onEditEvent,
   onRequestDelete,
@@ -149,22 +154,23 @@ export function MobileCalendarView({
   function handleQuickAdd(e: React.FormEvent) {
     e.preventDefault()
     const trimmed = quickTitle.trim()
-    if (trimmed.length < 2) return
-    onQuickAdd(trimmed)
-    setQuickTitle('')
+    if (trimmed.length < 2 || quickAdding) return
+    // Cleared only once the event really exists - a failed add keeps the
+    // typed title so nothing is lost (the failure is toasted).
+    onQuickAdd(trimmed, () => setQuickTitle(''))
   }
 
   return (
-    <div className="md:hidden flex flex-col h-[calc(100vh-9.5rem)] min-h-[480px] bg-surface border border-base rounded-2xl overflow-hidden">
+    <div className="md:hidden flex flex-col h-[calc(100vh-9.5rem)] min-h-[480px] overflow-hidden">
       {/* ── TOP BAR ──────────────────────────────────────────────── */}
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-base shrink-0">
         <button
           type="button"
           onClick={onGoToToday}
           aria-label="Jump to today"
-          className="p-2 min-h-[40px] min-w-[40px] rounded-xl text-muted hover:text-body hover:bg-page transition-colors flex items-center justify-center"
+          className="px-2.5 min-h-11 rounded-xl text-sm font-heading font-semibold text-tone-teal hover:bg-page transition-colors flex items-center justify-center"
         >
-          <CalendarDays className="w-4 h-4" aria-hidden="true" />
+          Today
         </button>
 
         <div className="flex items-center gap-1">
@@ -172,18 +178,18 @@ export function MobileCalendarView({
             type="button"
             onClick={() => onNavigateMonth(-1)}
             aria-label="Previous month"
-            className="p-2 min-h-[40px] min-w-[40px] rounded-xl text-muted hover:text-body hover:bg-page transition-colors flex items-center justify-center"
+            className="p-2 min-h-11 min-w-11 rounded-xl text-muted hover:text-body hover:bg-page transition-colors flex items-center justify-center"
           >
             <ChevronLeft className="w-4 h-4" aria-hidden="true" />
           </button>
-          <span className="text-sm font-heading font-bold text-body px-1 min-w-[7.5rem] text-center">
+          <span className="text-sm font-heading font-bold text-body px-1 min-w-[5.5rem] text-center">
             {formatMonthShort(monthDate)} {monthDate.getFullYear()}
           </span>
           <button
             type="button"
             onClick={() => onNavigateMonth(1)}
             aria-label="Next month"
-            className="p-2 min-h-[40px] min-w-[40px] rounded-xl text-muted hover:text-body hover:bg-page transition-colors flex items-center justify-center"
+            className="p-2 min-h-11 min-w-11 rounded-xl text-muted hover:text-body hover:bg-page transition-colors flex items-center justify-center"
           >
             <ChevronRight className="w-4 h-4" aria-hidden="true" />
           </button>
@@ -195,8 +201,8 @@ export function MobileCalendarView({
             onClick={() => setSearchOpen((s) => !s)}
             aria-label="Search events"
             aria-pressed={searchOpen}
-            className={`p-2 min-h-[40px] min-w-[40px] rounded-xl transition-colors flex items-center justify-center ${
-              searchOpen ? 'text-brand-teal bg-brand-teal/10' : 'text-muted hover:text-body hover:bg-page'
+            className={`p-2 min-h-11 min-w-11 rounded-xl transition-colors flex items-center justify-center ${
+              searchOpen ? 'text-tone-teal bg-brand-teal/10' : 'text-muted hover:text-body hover:bg-page'
             }`}
           >
             <Search className="w-4 h-4" aria-hidden="true" />
@@ -205,11 +211,11 @@ export function MobileCalendarView({
             type="button"
             onClick={() => setFilterSheetOpen(true)}
             aria-label="Filter by category"
-            className="relative p-2 min-h-[40px] min-w-[40px] rounded-xl text-muted hover:text-body hover:bg-page transition-colors flex items-center justify-center"
+            className="relative p-2 min-h-11 min-w-11 rounded-xl text-muted hover:text-body hover:bg-page transition-colors flex items-center justify-center"
           >
             <Filter className="w-4 h-4" aria-hidden="true" />
             {activeCount < totalCount && (
-              <span className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full bg-brand-coral text-white text-[9px] font-bold flex items-center justify-center">
+              <span className="absolute top-1 right-1 min-w-4 h-4 px-1 rounded-full bg-btn-brand text-btn-brand-fg text-xs font-bold flex items-center justify-center">
                 {activeCount}
               </span>
             )}
@@ -226,7 +232,7 @@ export function MobileCalendarView({
               autoFocus
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="Search events..."
+              placeholder="Search events"
               aria-label="Search events"
               className="w-full pl-9 pr-9 py-2.5 min-h-[44px] text-sm bg-page border border-base rounded-xl text-body placeholder-muted focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
             />
@@ -235,7 +241,7 @@ export function MobileCalendarView({
                 type="button"
                 onClick={() => onSearchChange('')}
                 aria-label="Clear search"
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 min-h-[32px] min-w-[32px] text-muted hover:text-body"
+                className="absolute right-0 top-1/2 -translate-y-1/2 min-h-11 min-w-11 flex items-center justify-center text-muted hover:text-body"
               >
                 <X className="w-3.5 h-3.5" aria-hidden="true" />
               </button>
@@ -245,13 +251,14 @@ export function MobileCalendarView({
       )}
 
       {isLoading && (
-        <div className="px-3 py-1.5 text-[11px] text-muted flex items-center gap-1.5 shrink-0">
+        <div className="px-3 py-1.5 text-xs text-muted flex items-center gap-1.5 shrink-0">
           <span className="w-2 h-2 rounded-full bg-brand-teal animate-pulse" aria-hidden="true" />
           Loading events…
         </div>
       )}
       {isError && (
-        <div role="alert" className="mx-3 mt-1.5 text-[11px] text-brand-coral bg-red-50 border border-red-200 rounded-lg px-2.5 py-1.5 shrink-0">
+        <div role="alert" className="mx-3 mt-1.5 text-sm text-tone-coral app-tint rounded-xl px-3 py-2 shrink-0 flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0" aria-hidden="true" />
           Couldn&apos;t load calendar events.
         </div>
       )}
@@ -260,7 +267,7 @@ export function MobileCalendarView({
       {/* New row, kept deliberately separate from the top bar above so the
           approved nav row stays pixel-identical. */}
       <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-base shrink-0">
-        <div className="flex items-center bg-page border border-base rounded-lg p-0.5">
+        <div className="flex items-center border border-base rounded-xl p-0.5">
           {(['month', 'agenda'] as CalendarViewMode[]).map((mode) => {
             const Icon = mode === 'month' ? LayoutGrid : ListChecks
             return (
@@ -269,9 +276,9 @@ export function MobileCalendarView({
                 type="button"
                 onClick={() => onViewModeChange(mode)}
                 aria-pressed={viewMode === mode}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 min-h-[36px] rounded-md text-xs font-heading font-medium capitalize transition-colors ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 min-h-11 rounded-lg text-sm font-heading font-medium capitalize transition-colors ${
                   viewMode === mode
-                    ? 'bg-brand-navy text-white font-semibold shadow-sm'
+                    ? 'bg-btn-brand text-btn-brand-fg font-semibold'
                     : 'text-muted'
                 }`}
               >
@@ -286,10 +293,10 @@ export function MobileCalendarView({
           <button
             type="button"
             onClick={() => onOpenCreate(selectedDateKey)}
-            className="flex items-center gap-1.5 px-3 py-1.5 min-h-[36px] rounded-lg bg-brand-teal hover:bg-brand-teal-light text-white font-heading font-semibold text-xs transition-colors shadow-sm"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 min-h-11 rounded-xl bg-btn-brand hover:bg-btn-brand-hover text-btn-brand-fg font-heading font-semibold text-sm transition-colors"
           >
-            <Plus className="w-3.5 h-3.5" aria-hidden="true" />
-            Add Event
+            <Plus className="w-4 h-4" aria-hidden="true" />
+            Add event
           </button>
         )}
       </div>
@@ -299,8 +306,8 @@ export function MobileCalendarView({
           {/* ── MONTH GRID ───────────────────────────────────────────── */}
           <div className="px-2.5 pt-2 shrink-0">
             <div className="grid grid-cols-7 mb-1">
-              {WEEK_HEADERS_SHORT.map((d, i) => (
-                <span key={i} className="text-[10px] font-bold text-muted text-center py-1">
+              {WEEK_HEADERS.map((d, i) => (
+                <span key={i} className="text-xs font-medium text-muted text-center py-1">
                   {d}
                 </span>
               ))}
@@ -317,17 +324,17 @@ export function MobileCalendarView({
                     aria-pressed={isSelected}
                     className={`min-h-[46px] rounded-xl flex flex-col items-center justify-start gap-1 pt-1.5 pb-1 transition-colors ${
                       isSelected
-                        ? 'bg-brand-teal text-white shadow-sm'
+                        ? 'bg-btn-brand text-btn-brand-fg'
                         : cell.isToday
-                          ? 'bg-brand-teal/10 ring-1 ring-brand-teal/50'
+                          ? 'app-tint ring-2 ring-brand-teal'
                           : cell.isCurrentMonth
-                            ? 'hover:bg-page'
-                            : 'opacity-35 hover:bg-page'
+                            ? 'app-tint hover:bg-brand-teal/10'
+                            : 'hover:bg-brand-teal/5'
                     }`}
                   >
                     <span
-                      className={`text-xs font-semibold ${
-                        isSelected ? 'text-white' : cell.isToday ? 'text-brand-teal' : 'text-body'
+                      className={`text-sm font-semibold ${
+                        isSelected ? 'text-btn-brand-fg' : cell.isToday ? 'text-tone-teal' : cell.isCurrentMonth ? 'text-body' : 'text-muted'
                       }`}
                     >
                       {cell.dayNumber}
@@ -354,8 +361,8 @@ export function MobileCalendarView({
             <h3 className="text-sm font-heading font-bold text-body truncate">
               {formatDisplayDate(selectedDateKey)}
             </h3>
-            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-page text-muted border border-base shrink-0">
-              {selectedDayEvents.length}
+            <span className="text-xs font-semibold text-muted shrink-0">
+              {selectedDayEvents.length} {selectedDayEvents.length === 1 ? 'event' : 'events'}
             </span>
           </div>
 
@@ -364,7 +371,7 @@ export function MobileCalendarView({
               <div className="flex flex-col items-center justify-center text-center py-8 text-muted">
                 <CalendarDays className="w-8 h-8 mb-2 opacity-60" aria-hidden="true" />
                 <p className="text-sm font-medium">No events for this date</p>
-                <p className="text-xs mt-1">Use the input below to quickly add a schedule item.</p>
+                {canCreate && <p className="text-xs mt-1">Use the box below to add something to this day.</p>}
               </div>
             ) : (
               selectedDayEvents.map((evt) => (
@@ -383,21 +390,26 @@ export function MobileCalendarView({
           {canCreate && (
             <form
               onSubmit={handleQuickAdd}
-              className="flex items-center gap-2 p-2.5 border-t border-base bg-page/60 shrink-0"
+              className="flex items-center gap-2 p-2.5 border-t border-base app-tint shrink-0"
             >
               <input
                 type="text"
                 value={quickTitle}
                 onChange={(e) => setQuickTitle(e.target.value)}
-                placeholder={`Add event on ${formatMonthShort(monthDate)} ${Number(selectedDateKey.split('-')[2])}`}
-                className="flex-1 min-w-0 px-4 py-2.5 min-h-[44px] text-sm bg-surface border border-base rounded-full text-body placeholder-muted focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+                disabled={quickAdding}
+                placeholder={`Add event on ${Number(selectedDateKey.split('-')[2])} ${formatMonthShort(monthDate)}`}
+                className="flex-1 min-w-0 px-4 py-2.5 min-h-11 text-sm bg-surface border border-base rounded-xl text-body placeholder-muted focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
               />
               <button
                 type="submit"
-                aria-label="Add event"
-                className="w-11 h-11 shrink-0 rounded-full bg-brand-teal hover:bg-brand-teal-light text-white flex items-center justify-center transition-colors shadow-sm"
+                disabled={quickAdding}
+                aria-busy={quickAdding}
+                aria-label={quickAdding ? 'Adding event' : 'Add event'}
+                className="w-11 h-11 shrink-0 rounded-xl bg-btn-brand hover:bg-btn-brand-hover text-btn-brand-fg flex items-center justify-center transition-colors disabled:opacity-70"
               >
-                <Plus className="w-5 h-5" aria-hidden="true" />
+                {quickAdding
+                  ? <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
+                  : <Plus className="w-5 h-5" aria-hidden="true" />}
               </button>
             </form>
           )}
@@ -412,8 +424,8 @@ export function MobileCalendarView({
           {filteredEvents.length === 0 ? (
             <div className="flex flex-col items-center justify-center text-center py-12 text-muted">
               <ListChecks className="w-8 h-8 mb-2 opacity-60" aria-hidden="true" />
-              <p className="text-sm font-medium">No events found</p>
-              <p className="text-xs mt-1">Try adjusting your filters or search.</p>
+              <p className="text-sm font-medium">No events match</p>
+              <p className="text-xs mt-1">Try a different word or choose more categories.</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -425,7 +437,7 @@ export function MobileCalendarView({
                       onSelectDate(group.dateKey)
                       onViewModeChange('month')
                     }}
-                    className="text-xs font-heading font-bold text-brand-teal uppercase tracking-wide mb-1.5 hover:underline"
+                    className="text-sm font-heading font-bold text-tone-teal min-h-11 inline-flex items-center app-action"
                   >
                     {formatGroupHeading(group.dateKey)}
                   </button>
@@ -450,7 +462,7 @@ export function MobileCalendarView({
       <MotionBottomSheet
         open={filterSheetOpen}
         onClose={() => setFilterSheetOpen(false)}
-        title="Filter by Category"
+        title="Filter by category"
       >
         <div className="space-y-4">
           <CategoryFilterBar
@@ -464,16 +476,16 @@ export function MobileCalendarView({
             <button
               type="button"
               onClick={onSelectAllCategories}
-              className="flex-1 py-2.5 min-h-[44px] text-sm font-medium border border-base rounded-xl hover:bg-page"
+              className="flex-1 py-2.5 min-h-11 text-sm font-medium border border-base rounded-xl hover:bg-page"
             >
-              Select All
+              Select all
             </button>
             <button
               type="button"
               onClick={onClearAllCategories}
-              className="flex-1 py-2.5 min-h-[44px] text-sm font-medium border border-base rounded-xl hover:bg-page"
+              className="flex-1 py-2.5 min-h-11 text-sm font-medium border border-base rounded-xl hover:bg-page"
             >
-              Clear All
+              Clear all
             </button>
           </div>
         </div>

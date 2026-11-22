@@ -26,9 +26,9 @@ import { VercelAlertsPanel } from './VercelAlertsPanel'
 type InnerTab = 'deployments' | 'errors' | 'alerts'
 
 function StatTile({ label, value, tone }: { label: string; value: string; tone?: 'ok' | 'warn' | 'bad' }) {
-  const toneClass = tone === 'bad' ? 'text-brand-coral' : tone === 'warn' ? 'text-brand-amber' : 'text-brand-navy'
+  const toneClass = tone === 'bad' ? 'text-tone-coral' : tone === 'warn' ? 'text-tone-amber' : 'text-brand-navy'
   return (
-    <div className="bg-surface border border-base rounded-xl p-4 text-center">
+    <div className="app-tint rounded-xl p-4 text-center">
       <p className={`text-2xl font-heading font-bold ${toneClass}`}>{value}</p>
       <p className="text-xs text-muted mt-1">{label}</p>
     </div>
@@ -53,16 +53,16 @@ export function VercelPlatformPanel() {
   const tabs: TabItem<InnerTab>[] = [
     { id: 'deployments', label: 'Deployments', icon: Rocket },
     { id: 'errors',      label: 'Errors',      icon: AlertTriangle },
-    { id: 'alerts',      label: 'Alerts',      icon: Bell, badge: isConfigured ? unacknowledgedAlerts : undefined },
+    { id: 'alerts',      label: 'Alerts',      icon: Bell, badge: isConfigured ? unacknowledgedAlerts : undefined, badgeNoun: 'unacknowledged' },
   ]
 
   if (summary && !summary.configured) {
     return (
-      <div className="bg-surface border border-base rounded-xl p-6 text-center space-y-2">
+      <div className="p-6 text-center space-y-2">
         <p className="font-semibold text-brand-navy">Vercel monitoring is not set up yet</p>
         <p className="text-sm text-muted">
           Set <code className="text-xs">VERCEL_API_TOKEN</code> and <code className="text-xs">VERCEL_PROJECT_ID</code> in
-          the environment to enable this tab — see docs/vercel-native-monitoring-research.md §3 Phase 1.
+          the environment to enable this tab. See docs/vercel-native-monitoring-research.md §3 Phase 1.
         </p>
       </div>
     )
@@ -72,27 +72,27 @@ export function VercelPlatformPanel() {
     <div className="space-y-4">
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <StatTile
-          label="Latest Deploy"
-          value={isConfigured ? (latestDeploymentState ?? '\u2014') : '\u2014'}
+          label="Latest deploy"
+          value={isConfigured ? (latestDeploymentState ?? '-') : '-'}
           tone={isConfigured && latestDeploymentState === 'ERROR' ? 'bad' : 'ok'}
         />
         <StatTile
-          label="Unacknowledged Alerts"
-          value={isConfigured ? String(unacknowledgedAlerts) : '\u2014'}
+          label="Unacknowledged alerts"
+          value={isConfigured ? String(unacknowledgedAlerts) : '-'}
           tone={isConfigured && unacknowledgedAlerts > 0 ? 'warn' : 'ok'}
         />
         <StatTile
           label="Errors (24h)"
-          value={isConfigured ? String(errorCount24h) : '\u2014'}
+          value={isConfigured ? String(errorCount24h) : '-'}
           tone={isConfigured && errorCount24h > 0 ? 'warn' : 'ok'}
         />
         <StatTile
           label="Pageviews (24h)"
-          value={isConfigured ? String(pageviews24h ?? '\u2014') : '\u2014'}
+          value={isConfigured ? String(pageviews24h ?? '-') : '-'}
         />
         <StatTile
           label="Visitors (24h)"
-          value={isConfigured ? String(visitors24h ?? '\u2014') : '\u2014'}
+          value={isConfigured ? String(visitors24h ?? '-') : '-'}
         />
       </div>
 

@@ -30,8 +30,8 @@ export function VercelAlertsPanel({ canManage }: Props) {
     {
       key: 'severity', label: 'Severity', priority: 'critical',
       render: (row) => (
-        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-          row.severity === 'critical' ? 'bg-brand-coral/15 text-brand-coral' : 'bg-brand-amber/15 text-brand-amber'
+        <span className={`text-xs font-semibold ${
+          row.severity === 'critical' ? 'text-status-danger' : 'text-status-warning'
         }`}>
           {row.severity}
         </span>
@@ -47,8 +47,8 @@ export function VercelAlertsPanel({ canManage }: Props) {
           type="button"
           disabled={!canManage || row.acknowledged || acknowledge.isPending}
           onClick={() => acknowledge.mutate(row.id)}
-          className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors disabled:opacity-50 ${
-            row.acknowledged ? 'bg-page text-muted' : 'bg-brand-teal/15 text-brand-teal'
+          className={`px-3 py-1 rounded-lg border text-xs font-semibold transition-colors disabled:opacity-50 ${
+            row.acknowledged ? 'border-base text-muted' : 'border-status-success/60 text-status-success hover:bg-status-success/10'
           }`}
         >
           {row.acknowledged ? 'Acknowledged' : 'Acknowledge'}
@@ -67,7 +67,8 @@ export function VercelAlertsPanel({ canManage }: Props) {
         isLoading={isLoading}
         rowKey="id"
         columns={columns}
-        emptyMessage="No platform alerts. These are computed from deployment status and error-log volume — see the panel description in docs/vercel-native-monitoring-research.md §3 Phase 5."
+        emptyMessage="No platform alerts. These are computed from deployment status and error-log volume. See the panel description in docs/vercel-native-monitoring-research.md §3 Phase 5."
+        bordered={false}
       />
     </div>
   )

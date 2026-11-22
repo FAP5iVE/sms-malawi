@@ -54,6 +54,7 @@
 
 import 'server-only'
 import { Router }            from 'express'
+import { rateLimit } from '@/lib/ratelimit'
 import { z }                 from 'zod'
 import { prisma }            from '@/lib/prisma'
 import { requireRole }       from '@/lib/verifyAuth'
@@ -64,7 +65,10 @@ import {
   invalidateGradeCache,
 }                            from '@/server/services/gradeService'
 import * as settingsService  from '@/server/services/settingsService'
+import * as hrService          from '@/server/services/hrService'
 import { SETTING_KEYS, SETTING_META } from '@shared/types/settings'
+import { validateCaConfig } from '@shared/constants/exams'
+import { validateIdFormat } from '@shared/constants/malawi/registration'
 import type { SettingKey, DepartmentTitles } from '@shared/types/settings'
 import { logger }            from '@/lib/logger'
 import { sendError } from '@/server/lib/sendError'
@@ -171,7 +175,10 @@ settingsRouter
 const ACADEMIC_KEYS = [
   'term1_start', 'term1_end', 'term2_start', 'term2_end',
   'term3_start', 'term3_end', 'min_attendance_pct',
-  'report_card_comment_required', 'ca_weight_pct', 'exam_weight_pct',
+  'report_card_comment_required',
+  // [2026-10-22] 'ca_weight_pct'/'exam_weight_pct' removed: nothing ever read
+  // them. Continuous-assessment weighting now lives in Exam & Grading
+  // (SETTING_KEYS.EXAM_CA_*) and is what computeTermResults actually uses.
   'current_academic_year', 'current_term', 'next_term_date',
 ]
 
@@ -190,6 +197,25 @@ settingsRouter
   })
 
 // ─────────────────────────────────────────────────────────────────────────────
+// CONTINUOUS-ASSESSMENT CONFIG  (any authenticated user — read only)
+// Teachers need this to pick a CA slot when scheduling a test, and students see
+// the same weights on their results; the full /exam group below is staff-only.
+// ─────────────────────────────────────────────────────────────────────────────
+
+settingsRouter.get('/exam/ca-config', async (_req, res) => {
+  const v = await settingsService.getMany([
+    SETTING_KEYS.EXAM_CA_AGGREGATE_ENABLED,
+    SETTING_KEYS.EXAM_CA_COUNT,
+    SETTING_KEYS.EXAM_CA_WEIGHTS,
+  ])
+  return res.json({
+    enabled: v[SETTING_KEYS.EXAM_CA_AGGREGATE_ENABLED],
+    count:   v[SETTING_KEYS.EXAM_CA_COUNT],
+    weights: v[SETTING_KEYS.EXAM_CA_WEIGHTS],
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
 // EXAM SETTINGS  (admin | high_rank | exam_officer)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -199,17 +225,55 @@ settingsRouter
     const vals = await settingsService.getMany([
       SETTING_KEYS.PROMOTION_MIN_AVERAGE,
       SETTING_KEYS.PROMOTION_REQUIRED_PASSES,
+      SETTING_KEYS.EXAM_CA_AGGREGATE_ENABLED,
+      SETTING_KEYS.EXAM_CA_COUNT,
+      SETTING_KEYS.EXAM_CA_WEIGHTS,
     ])
     return res.json({
       promotion_min_average:     vals[SETTING_KEYS.PROMOTION_MIN_AVERAGE],
       promotion_required_passes: vals[SETTING_KEYS.PROMOTION_REQUIRED_PASSES],
+      ca_aggregate_enabled:      vals[SETTING_KEYS.EXAM_CA_AGGREGATE_ENABLED],
+      ca_count:                  vals[SETTING_KEYS.EXAM_CA_COUNT],
+      ca_weights:                vals[SETTING_KEYS.EXAM_CA_WEIGHTS],
     })
   })
   .patch(requireRole(['admin', 'high_rank']), async (req, res) => {
-    const body = req.body as { promotion_min_average?: number; promotion_required_passes?: number }
-    const updates: Array<{ key: typeof SETTING_KEYS.PROMOTION_MIN_AVERAGE | typeof SETTING_KEYS.PROMOTION_REQUIRED_PASSES; value: number }> = []
+    const body = req.body as {
+      promotion_min_average?: number; promotion_required_passes?: number
+      ca_aggregate_enabled?: boolean; ca_count?: number; ca_weights?: number[]
+    }
+    const updates: Array<{ key: SettingKey; value: number | boolean | number[] }> = []
     if (body.promotion_min_average     !== undefined) updates.push({ key: SETTING_KEYS.PROMOTION_MIN_AVERAGE,     value: body.promotion_min_average })
     if (body.promotion_required_passes !== undefined) updates.push({ key: SETTING_KEYS.PROMOTION_REQUIRED_PASSES, value: body.promotion_required_passes })
+
+    // ── Continuous assessment. count + weights are cross-field (length ===
+    // count, total < 100) so they are validated TOGETHER here - against the
+    // submitted values, falling back to the stored ones for whichever was not
+    // sent - before anything is written. Per-key shape is re-checked by
+    // settingsService.setMany's zod schemas.
+    const caTouched = body.ca_aggregate_enabled !== undefined || body.ca_count !== undefined || body.ca_weights !== undefined
+    if (caTouched) {
+      const cur = await settingsService.getMany([
+        SETTING_KEYS.EXAM_CA_AGGREGATE_ENABLED, SETTING_KEYS.EXAM_CA_COUNT, SETTING_KEYS.EXAM_CA_WEIGHTS,
+      ])
+      const next = {
+        enabled: body.ca_aggregate_enabled ?? cur[SETTING_KEYS.EXAM_CA_AGGREGATE_ENABLED],
+        count:   body.ca_count             ?? cur[SETTING_KEYS.EXAM_CA_COUNT],
+        weights: body.ca_weights           ?? cur[SETTING_KEYS.EXAM_CA_WEIGHTS],
+      }
+      // Count and weights are always kept consistent, so check them even when
+      // aggregation is being switched OFF: a saved-but-broken set would block
+      // the next time it is switched on.
+      const problem = (next.enabled || body.ca_count !== undefined || body.ca_weights !== undefined)
+        ? validateCaConfig({ count: next.count, weights: next.weights })
+        : null
+      if (problem) return res.status(400).json({ error: problem })
+      if (body.ca_aggregate_enabled !== undefined) updates.push({ key: SETTING_KEYS.EXAM_CA_AGGREGATE_ENABLED, value: next.enabled })
+      if (body.ca_count   !== undefined || body.ca_weights !== undefined) {
+        updates.push({ key: SETTING_KEYS.EXAM_CA_COUNT,   value: next.count })
+        updates.push({ key: SETTING_KEYS.EXAM_CA_WEIGHTS, value: next.weights })
+      }
+    }
 
     if (updates.length === 0) {
       return res.status(400).json({ error: 'No valid fields to update.' })
@@ -323,24 +387,135 @@ settingsRouter
 // this value is a real JSON object (Record<department, title[]>), not a flat
 // scalar, and settingsService.set() carries its own Zod validation
 // (SETTING_VALUE_SCHEMAS) which the generic helpers don't apply.
+// Leave settings: the field the form sends -> the setting it is saved under.
+const LEAVE_FIELD_KEYS = {
+  annualDays:       SETTING_KEYS.HR_ANNUAL_LEAVE_DAYS,
+  sickFullDays:     SETTING_KEYS.HR_SICK_LEAVE_DAYS,
+  sickHalfDays:     SETTING_KEYS.HR_SICK_HALF_PAY_DAYS,
+  emergencyDays:    SETTING_KEYS.HR_EMERGENCY_LEAVE_DAYS,
+  maternityDays:    SETTING_KEYS.HR_MATERNITY_LEAVE_DAYS,
+  paternityDays:    SETTING_KEYS.HR_PATERNITY_LEAVE_DAYS,
+  studyDays:        SETTING_KEYS.HR_STUDY_LEAVE_DAYS,
+  maxConcurrentPct: SETTING_KEYS.HR_MAX_CONCURRENT_LEAVE_PCT,
+  payPercent:       SETTING_KEYS.HR_LEAVE_PAY_PERCENT,
+} as const
+const LEAVE_SETTING_KEYS = Object.values(LEAVE_FIELD_KEYS)
+
 settingsRouter
   .route('/hr')
   .get(requireRole(['admin', 'hr', 'high_rank']), async (req, res) => {
-    const departmentTitles = await settingsService.get(SETTING_KEYS.HR_DEPARTMENT_TITLES)
-    return res.json({ departmentTitles })
+    const [departmentTitles, retirementAge, leave] = await Promise.all([
+      settingsService.get(SETTING_KEYS.HR_DEPARTMENT_TITLES),
+      settingsService.get(SETTING_KEYS.HR_RETIREMENT_AGE),
+      settingsService.getMany(LEAVE_SETTING_KEYS),
+    ])
+    return res.json({
+      departmentTitles,
+      retirementAge,
+      leave: {
+        annualDays:      leave[SETTING_KEYS.HR_ANNUAL_LEAVE_DAYS],
+        sickFullDays:    leave[SETTING_KEYS.HR_SICK_LEAVE_DAYS],
+        sickHalfDays:    leave[SETTING_KEYS.HR_SICK_HALF_PAY_DAYS],
+        emergencyDays:   leave[SETTING_KEYS.HR_EMERGENCY_LEAVE_DAYS],
+        maternityDays:   leave[SETTING_KEYS.HR_MATERNITY_LEAVE_DAYS],
+        paternityDays:   leave[SETTING_KEYS.HR_PATERNITY_LEAVE_DAYS],
+        studyDays:       leave[SETTING_KEYS.HR_STUDY_LEAVE_DAYS],
+        maxConcurrentPct: leave[SETTING_KEYS.HR_MAX_CONCURRENT_LEAVE_PCT],
+        payPercent:      leave[SETTING_KEYS.HR_LEAVE_PAY_PERCENT],
+      },
+    })
   })
   .patch(requireRole(['admin', 'hr', 'high_rank']), async (req, res) => {
-    const { departmentTitles } = req.body as { departmentTitles?: unknown }
-    if (!departmentTitles || typeof departmentTitles !== 'object') {
-      return res.status(400).json({ error: 'departmentTitles is required.' })
+    // Either field may be sent on its own (the department editor and the
+    // retirement-age card save independently), but at least one is required.
+    const { departmentTitles, retirementAge, leave } = req.body as {
+      departmentTitles?: unknown
+      retirementAge?: unknown
+      leave?: Record<string, unknown>
+    }
+    const hasTitles = departmentTitles !== undefined
+    const hasAge    = retirementAge !== undefined
+    const hasLeave  = leave !== undefined
+    if (!hasTitles && !hasAge && !hasLeave) {
+      return res.status(400).json({ error: 'departmentTitles, retirementAge or leave is required.' })
+    }
+    if (hasLeave && (!leave || typeof leave !== 'object')) {
+      return res.status(400).json({ error: 'leave must be an object.' })
+    }
+    if (hasTitles && (!departmentTitles || typeof departmentTitles !== 'object')) {
+      return res.status(400).json({ error: 'departmentTitles must be an object.' })
+    }
+    if (hasAge && typeof retirementAge !== 'number') {
+      return res.status(400).json({ error: 'retirementAge must be a number.' })
     }
     try {
-      await settingsService.set(SETTING_KEYS.HR_DEPARTMENT_TITLES, departmentTitles as DepartmentTitles, req.user!.uid)
+      if (hasTitles) {
+        await settingsService.set(SETTING_KEYS.HR_DEPARTMENT_TITLES, departmentTitles as DepartmentTitles, req.user!.uid)
+      }
+      // settingsService.set() validates against SETTING_VALUE_SCHEMAS (50-75, whole number).
+      if (hasAge) {
+        await settingsService.set(SETTING_KEYS.HR_RETIREMENT_AGE, retirementAge as number, req.user!.uid)
+      }
+      // Leave days and leave pay. Each value is validated by its own schema in
+      // settingsService.set(); then this year's balances are rebuilt so the new
+      // days apply to everyone straight away (used / pending days are kept).
+      if (hasLeave && leave) {
+        const map: Array<[keyof typeof LEAVE_FIELD_KEYS, SettingKey]> = Object.entries(LEAVE_FIELD_KEYS) as never
+        const entries = map.filter(([field]) => leave[field] !== undefined)
+        for (const [field, key] of entries) {
+          await settingsService.set(key, leave[field] as never, req.user!.uid)
+        }
+        if (entries.length > 0) await hrService.refreshLeaveBalances()
+      }
     } catch (err) {
-      return sendError(res, err, { defaultStatus: 400, fallbackMessage: 'Invalid department/title data.', tags: { module: 'settings' } })
+      return sendError(res, err, { defaultStatus: 400, fallbackMessage: 'Invalid HR settings.', tags: { module: 'settings' } })
     }
     return res.json({ ok: true })
   })
+
+  
+// ─────────────────────────────────────────────────────────────────────────────
+// ID NUMBER FORMATS  (admin | hr | high_rank) — 2026-11-21
+// ─────────────────────────────────────────────────────────────────────────────
+// How new employee numbers and student registration numbers are laid out, e.g.
+// 'EMP-{YYYY}-000'. Staff and student numbers are generated from these (see
+// hrService.createStaff and studentService.nextRegistrationNo); records that
+// already have a number are never changed. Either field may be sent alone.
+settingsRouter
+  .route('/id-numbers')
+  .get(requireRole(['admin', 'hr', 'high_rank']), async (_req, res) => {
+    const [employeeNoFormat, studentRegistrationNoFormat] = await Promise.all([
+      settingsService.get(SETTING_KEYS.HR_EMPLOYEE_NO_FORMAT),
+      settingsService.get(SETTING_KEYS.STUDENT_REGISTRATION_NO_FORMAT),
+    ])
+    return res.json({ employeeNoFormat, studentRegistrationNoFormat })
+  })
+  .patch(requireRole(['admin', 'hr', 'high_rank']), async (req, res) => {
+    const { employeeNoFormat, studentRegistrationNoFormat } = req.body as {
+      employeeNoFormat?: unknown
+      studentRegistrationNoFormat?: unknown
+    }
+    const updates: Array<[typeof SETTING_KEYS.HR_EMPLOYEE_NO_FORMAT | typeof SETTING_KEYS.STUDENT_REGISTRATION_NO_FORMAT, unknown]> = []
+    if (employeeNoFormat !== undefined) updates.push([SETTING_KEYS.HR_EMPLOYEE_NO_FORMAT, employeeNoFormat])
+    if (studentRegistrationNoFormat !== undefined) updates.push([SETTING_KEYS.STUDENT_REGISTRATION_NO_FORMAT, studentRegistrationNoFormat])
+    if (updates.length === 0) {
+      return res.status(400).json({ error: 'employeeNoFormat or studentRegistrationNoFormat is required.' })
+    }
+    for (const [, value] of updates) {
+      if (typeof value !== 'string') return res.status(400).json({ error: 'The format must be text.' })
+      const problem = validateIdFormat(value)
+      if (problem) return res.status(400).json({ error: problem })
+    }
+    try {
+      for (const [key, value] of updates) {
+        await settingsService.set(key, (value as string).trim(), req.user!.uid)
+      }
+    } catch (err) {
+      return sendError(res, err, { defaultStatus: 400, fallbackMessage: 'Invalid ID number format.', tags: { module: 'settings' } })
+    }
+    return res.json({ ok: true })
+  })
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SCHOOL IDENTITY SETTINGS  (admin | hr | high_rank) — production fix, 2026-07-28
@@ -373,10 +548,13 @@ const SCHOOL_SCALAR_KEYS = [
 settingsRouter
   .route('/school')
   .get(requireRole(['admin', 'hr', 'high_rank']), async (req, res) => {
-    const [scalars, coreValues, leadershipTeam, foundedYear] = await Promise.all([
+    const [scalars, coreValues, leadershipTeam, discoverCards, foundedYear] = await Promise.all([
       readSettings(SCHOOL_SCALAR_KEYS),
       settingsService.get(SETTING_KEYS.SCHOOL_CORE_VALUES),
       settingsService.get(SETTING_KEYS.SCHOOL_LEADERSHIP_TEAM),
+      // [NEW] Discover-section card preview photos — same JSON-array/
+      // typed-settingsService split as coreValues/leadershipTeam above.
+      settingsService.get(SETTING_KEYS.SCHOOL_DISCOVER_CARDS),
       // [PRODUCTION FIX 2026-07-28] The "Years of excellence" figure on the
       // landing page is genuinely computed live from this setting — but the
       // setting itself had no write path anywhere, so in practice it was
@@ -395,7 +573,21 @@ settingsRouter
         photoUrl: m.photoKey ? await getPublicViewUrl('', m.photoKey) : null,
       })),
     )
-    return res.json({ ...scalars, coreValues, leadershipTeam: leadershipTeamWithPhotos, foundedYear })
+    // [NEW] Same photoKey -> photoUrl resolution, for the Discover Cards
+    // editor preview.
+    const discoverCardsWithPhotos = await Promise.all(
+      discoverCards.map(async (c) => ({
+        ...c,
+        photoUrl: c.photoKey ? await getPublicViewUrl('', c.photoKey) : null,
+      })),
+    )
+    return res.json({
+      ...scalars,
+      coreValues,
+      leadershipTeam: leadershipTeamWithPhotos,
+      discoverCards: discoverCardsWithPhotos,
+      foundedYear,
+    })
   })
   .patch(requireRole(['admin', 'hr', 'high_rank']), async (req, res) => {
     const body = req.body as Record<string, unknown>
@@ -412,6 +604,9 @@ settingsRouter
       }
       if (body.leadershipTeam !== undefined) {
         await settingsService.set(SETTING_KEYS.SCHOOL_LEADERSHIP_TEAM, body.leadershipTeam as never, req.user!.uid)
+      }
+      if (body.discoverCards !== undefined) {
+        await settingsService.set(SETTING_KEYS.SCHOOL_DISCOVER_CARDS, body.discoverCards as never, req.user!.uid)
       }
       if (body.foundedYear !== undefined) {
         await settingsService.set(SETTING_KEYS.SCHOOL_FOUNDED_YEAR, Number(body.foundedYear) as never, req.user!.uid)
@@ -434,12 +629,32 @@ settingsRouter
 settingsRouter.post(
   '/leadership-photo/upload-ticket',
   requireRole(['admin', 'hr', 'high_rank']),
+  rateLimit('upload-ticket'),
   async (_req, res) => {
     try {
       const ticket = await createDirectUploadTicket(FILE_PREFIX.LEADERSHIP_PHOTO)
       res.json(ticket)
     } catch (err: unknown) {
       return sendError(res, err, { tags: { module: 'settings', route: 'leadership-photo-ticket' } })
+    }
+  },
+)
+
+// POST /settings/discover-photo/upload-ticket
+// [NEW] Same direct-to-Appwrite ticket pattern as leadership-photo above,
+// for the four Discover-section card preview photos — FILE_PREFIX.DISCOVER_PHOTO
+// instead of LEADERSHIP_PHOTO, same admin/hr/high_rank gating as GET/PATCH
+// /school (this is a School Identity field, not a separate permission).
+settingsRouter.post(
+  '/discover-photo/upload-ticket',
+  requireRole(['admin', 'hr', 'high_rank']),
+  rateLimit('upload-ticket'),
+  async (_req, res) => {
+    try {
+      const ticket = await createDirectUploadTicket(FILE_PREFIX.DISCOVER_PHOTO)
+      res.json(ticket)
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'settings', route: 'discover-photo-ticket' } })
     }
   },
 )
@@ -536,7 +751,8 @@ settingsRouter
     const body    = req.body as Record<string, boolean>
     const allowed = Object.fromEntries(
       Object.entries(body)
-        .filter(([k]) => NOTIF_KEYS.includes(k))
+        // [Issue 7] only declared keys AND real booleans — anything else is dropped
+        .filter(([k, v]) => NOTIF_KEYS.includes(k) && typeof v === 'boolean')
         .map(([k, v]) => [k, String(v)]),
     )
     await writeUserSettings(req.user!.uid, allowed, req.user!.uid)

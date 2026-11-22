@@ -37,16 +37,24 @@ import {
   useConvertToStudent,
 } from '@/hooks/useApplications'
 import { RoleGuard } from '@/components/shared/RoleGuard'
+import { ModuleSurface } from '@/components/shared/ModuleSurface'
 import { DataTable } from '@/components/shared/DataTable'
 import type { DataColumn, MobileAction } from '@/components/shared/DataTable'
 import { ModuleTabs } from '@/components/shared/ModuleTabs'
 import type { TabItem } from '@/components/shared/ModuleTabs'
+import { usePermissions } from '@/hooks/usePermissions'
 import { CheckCircle, XCircle, UserPlus, Loader2, Inbox } from 'lucide-react'
 
 type ApplicationStatusValue = (typeof ApplicationStatusSchema.options)[number]
 
+// Sentence case for the visible word (R4): "Awaiting admission", not "AWAITING ADMISSION".
+function statusWord(s: string): string {
+  const w = s.replace(/_/g, ' ').toLowerCase()
+  return w.charAt(0).toUpperCase() + w.slice(1)
+}
+
 const STATUS_TABS: TabItem<ApplicationStatusValue>[] = ApplicationStatusSchema.options.map(
-  (s) => ({ id: s, label: s.replace(/_/g, ' ') })
+  (s) => ({ id: s, label: statusWord(s) })
 )
 
 export default function ApplicationsPage() {
@@ -59,6 +67,18 @@ export default function ApplicationsPage() {
 
 function ApplicationsContent() {
   const router = useRouter()
+  const { can } = usePermissions()
+  // [PRODUCTION FIX] Approve/Deny/Admit were rendered unconditionally for
+  // every role this page's RoleGuard admits (admin, high_rank, lower_rank).
+  // The backend (PATCH /applications/:id/status, POST /applications/:id/
+  // convert) only grants application.approve/deny/convertToStudent to
+  // high_rank — lower_rank holds only application.review and admin holds
+  // neither — so lower_rank previously saw working-looking buttons that
+  // always 403'd. Gate rendering to match the real backend grant, the same
+  // fix pattern already applied to exams/page.tsx and hr/page.tsx.
+  const canApprove = can('application.approve')
+  const canDeny    = can('application.deny')
+  const canConvert = can('application.convertToStudent')
   const [activeStatus, setActiveStatus] = useState<ApplicationStatusValue>('PENDING')
   const [page, setPage]                 = useState(1)
   const [actionError, setActionError]   = useState<string | null>(null)
@@ -105,7 +125,7 @@ function ApplicationsContent() {
     },
     {
       key:      'dateOfBirth',
-      label:    'DOB',
+      label:    'Date of birth',
       priority: 'important',
       render: (app) => new Date(app.dateOfBirth).toLocaleDateString(),
     },
@@ -126,31 +146,35 @@ function ApplicationsContent() {
       priority: 'important',
       render: (app) => (
         <div className="flex items-center justify-end gap-2">
-          {activeStatus === 'PENDING' && (
+          {activeStatus === 'PENDING' && (canApprove || canDeny) && (
             <>
-              <button
-                onClick={() => handleUpdateStatus(app.id, 'APPROVED')}
-                disabled={updating}
-                className="flex items-center gap-1 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg hover:bg-emerald-100 min-h-[44px] sm:min-h-0"
-                aria-label={`Approve application from ${app.firstName} ${app.lastName}`}
-              >
-                <CheckCircle className="w-3.5 h-3.5" aria-hidden /> Approve
-              </button>
-              <button
-                onClick={() => handleUpdateStatus(app.id, 'DENIED')}
-                disabled={updating}
-                className="flex items-center gap-1 text-xs text-brand-coral bg-brand-coral/10 border border-brand-coral/20 px-2.5 py-1 rounded-lg hover:bg-brand-coral/20 min-h-[44px] sm:min-h-0"
-                aria-label={`Deny application from ${app.firstName} ${app.lastName}`}
-              >
-                <XCircle className="w-3.5 h-3.5" aria-hidden /> Deny
-              </button>
+              {canApprove && (
+                <button
+                  onClick={() => handleUpdateStatus(app.id, 'APPROVED')}
+                  disabled={updating}
+                  className="flex items-center gap-1 text-xs font-semibold border border-status-success/60 text-status-success px-2.5 py-1 rounded-lg hover:bg-status-success/10 transition-colors disabled:opacity-60 min-h-[44px] sm:min-h-0"
+                  aria-label={`Approve application from ${app.firstName} ${app.lastName}`}
+                >
+                  <CheckCircle className="w-3.5 h-3.5" aria-hidden /> Approve
+                </button>
+              )}
+              {canDeny && (
+                <button
+                  onClick={() => handleUpdateStatus(app.id, 'DENIED')}
+                  disabled={updating}
+                  className="flex items-center gap-1 text-xs font-semibold border border-status-danger/60 text-status-danger px-2.5 py-1 rounded-lg hover:bg-status-danger/10 transition-colors disabled:opacity-60 min-h-[44px] sm:min-h-0"
+                  aria-label={`Deny application from ${app.firstName} ${app.lastName}`}
+                >
+                  <XCircle className="w-3.5 h-3.5" aria-hidden /> Deny
+                </button>
+              )}
             </>
           )}
-          {(activeStatus === 'APPROVED' || activeStatus === 'AWAITING_ADMISSION') && (
+          {(activeStatus === 'APPROVED' || activeStatus === 'AWAITING_ADMISSION') && canConvert && (
             <button
               onClick={() => handleConvert(app.id)}
               disabled={converting}
-              className="flex items-center gap-1 text-xs text-brand-teal bg-brand-teal/10 border border-brand-teal/20 px-2.5 py-1 rounded-lg hover:bg-brand-teal/20 min-h-[44px] sm:min-h-0"
+              className="flex items-center gap-1 text-xs font-semibold border border-status-success/60 text-status-success px-2.5 py-1 rounded-lg hover:bg-status-success/10 transition-colors disabled:opacity-60 min-h-[44px] sm:min-h-0"
               aria-label={`Admit ${app.firstName} ${app.lastName} as a student`}
             >
               {converting ? (
@@ -161,13 +185,16 @@ function ApplicationsContent() {
               Admit as Student
             </button>
           )}
+          {activeStatus === 'PENDING' && !canApprove && !canDeny && (
+            <span className="text-xs text-muted">Awaiting reviewer</span>
+          )}
         </div>
       ),
     },
   ]
 
   const mobileActions: MobileAction<ApiApplication>[] = [
-    ...(activeStatus === 'PENDING'
+    ...(activeStatus === 'PENDING' && canApprove
       ? [
           {
             label:   'Approve',
@@ -175,6 +202,10 @@ function ApplicationsContent() {
             variant: 'default' as const,
             onClick: (row: ApiApplication) => handleUpdateStatus(row.id, 'APPROVED'),
           },
+        ]
+      : []),
+    ...(activeStatus === 'PENDING' && canDeny
+      ? [
           {
             label:   'Deny',
             icon:    XCircle,
@@ -183,10 +214,10 @@ function ApplicationsContent() {
           },
         ]
       : []),
-    ...(activeStatus === 'APPROVED' || activeStatus === 'AWAITING_ADMISSION'
+    ...((activeStatus === 'APPROVED' || activeStatus === 'AWAITING_ADMISSION') && canConvert
       ? [
           {
-            label:   'Admit as Student',
+            label:   'Admit as student',
             icon:    UserPlus,
             variant: 'default' as const,
             onClick: (row: ApiApplication) => handleConvert(row.id),
@@ -202,6 +233,12 @@ function ApplicationsContent() {
         <p className="text-sm text-muted mt-0.5">Student admission applications</p>
       </div>
 
+      <ModuleSurface>
+      {/* [PRODUCTION FIX] Was variant="pill" — in light mode the active
+         chip's navy background rendered behind the page (see
+         ModuleTabs.tsx), leaving white active-tab text invisible against
+         the white page. Switched to the transparent underline variant
+         already used by Finance/HR/Placements, which has no such issue. */}
       <ModuleTabs<ApplicationStatusValue>
         id="applications-status"
         tabs={STATUS_TABS}
@@ -210,25 +247,24 @@ function ApplicationsContent() {
           setActiveStatus(status)
           setPage(1)
         }}
-        variant="pill"
       />
 
       {actionError && (
         <p
           role="alert"
-          className="text-sm text-brand-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3"
+          className="text-sm text-tone-coral bg-brand-coral/8 rounded-xl px-4 py-3"
         >
           {actionError}
         </p>
       )}
 
       {apps.length === 0 && !isLoading ? (
-        <div className="flex flex-col items-center justify-center gap-3 py-16 text-center bg-surface border border-base rounded-xl">
+        <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
           <Inbox className="w-8 h-8 text-muted" aria-hidden />
           <div>
             <p className="font-heading font-semibold text-body">No applications found</p>
             <p className="text-sm text-muted mt-1">
-              There are no applications with status &ldquo;{activeStatus.replace(/_/g, ' ')}&rdquo; right now.
+              There are no applications with the status &ldquo;{statusWord(activeStatus).toLowerCase()}&rdquo; right now.
             </p>
           </div>
         </div>
@@ -246,8 +282,10 @@ function ApplicationsContent() {
             onPageChange: setPage,
           }}
           emptyMessage="No applications found for this status."
+          bordered={false}
         />
       )}
+      </ModuleSurface>
     </div>
   )
 }

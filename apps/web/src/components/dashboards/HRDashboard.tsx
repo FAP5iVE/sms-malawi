@@ -33,45 +33,36 @@
  *   W/components/shared/ListCard.tsx (same phase), W/components/shared/StatCard.tsx (statValue, same phase)
  */
 
-import { useState } from 'react'
 import {
-  Users,
-  Clock,
-  AlertTriangle,
-  Banknote,
   UserPlus,
   CheckCircle,
   CalendarDays,
   FileText,
 } from 'lucide-react'
-import { StatCard, StatCardGrid, statValue } from '@/components/shared/StatCard'
 import { QuickActions } from '@/components/shared/QuickActions'
 import { ListCard } from '@/components/shared/ListCard'
-import {
-  useStaffDirectory,
-  useLeaveRequests,
-  useUpcomingContractExpiries,
-  useLoans,
-} from '@/hooks/useHR'
+import { useOnLeaveNow, useUpcomingContractExpiries } from '@/hooks/useHR'
+import { LEAVE_TYPE_LABELS } from '@shared/types/settings'
+import type { LeaveTypeKey } from '@shared/types/settings'
+import { useHrOverview, useHrAttention } from '@/hooks/reporting/useHrReporting'
+import { useViewingPeriod } from '@/hooks/useViewingPeriod'
+import { DashboardAttention } from './DashboardReport'
+import { PrimaryOverviewKpis, ReportLinks, SecondaryKpis } from './DashboardSections'
+import type { ReportLink } from './DashboardSections'
 import type { QuickAction } from '@/components/shared/QuickActions'
-import type {
-  ApiStaffProfile,
-  ApiLeaveRequest,
-  ApiContractAlert,
-  ApiStaffLoan,
-} from '@shared/types/api'
+import type { ApiContractAlert } from '@shared/types/api'
 
 const QUICK_ACTIONS: QuickAction[] = [
   {
-    label: 'Approve Leave',
+    label: 'Approve leave',
     // R15: was /hr/leave — a route that has never existed (404)
     href: '/hr?tab=leave',
     icon: CheckCircle,
     color: 'bg-brand-teal/10',
-    text: 'text-brand-teal',
+    text: 'text-tone-teal',
   },
   {
-    label: 'Add Staff',
+    label: 'Add staff',
     // R15: was /hr/staff/new (404) — staff creation lives in the Directory tab
     href: '/hr?tab=directory',
     icon: UserPlus,
@@ -79,11 +70,11 @@ const QUICK_ACTIONS: QuickAction[] = [
     text: 'text-blue-600',
   },
   {
-    label: 'Leave Calendar',
+    label: 'Leave calendar',
     href: '/calendar',
     icon: CalendarDays,
     color: 'bg-brand-amber/10',
-    text: 'text-brand-amber',
+    text: 'text-tone-amber',
   },
   {
     label: 'HR Reports',
@@ -97,91 +88,52 @@ const QUICK_ACTIONS: QuickAction[] = [
 /** Matches useContractAlerts()'s documented default lookahead window. */
 const CONTRACT_ALERT_DAYS = 60
 
-/** Msec in a day — for the "who is off this week" leave-window check. */
-const DAY_MS = 24 * 60 * 60 * 1000
+/** Lead with headcount, absence and the two decisions HR is waiting on; the rest sit in "More figures". */
+const PREFERRED = ['headcount', 'onLeaveToday', 'pendingLeave', 'expiringContracts']
+
+const REPORT_LINKS: ReportLink[] = [
+  { label: 'Overview', href: '/reports?tab=overview', description: 'Every workforce figure with its definition' },
+  { label: 'Workforce', href: '/reports?tab=workforce', description: 'Headcount by department and role' },
+  { label: 'Leave', href: '/reports?tab=leave', description: 'Requests, balances, days taken' },
+  { label: 'Contracts', href: '/reports?tab=contracts', description: 'Expiring and expired contracts' },
+  { label: 'Staff loans', href: '/reports?tab=loans', description: 'Balances and approvals' },
+  { label: 'Reviews', href: '/reports?tab=reviews', description: 'Performance review completion' },
+]
 
 export function HRDashboard() {
-  const { data: staffData, isLoading: staffLoading }       = useStaffDirectory()
-  const { data: leaveData, isLoading: leaveLoading }       = useLeaveRequests({ status: 'PENDING' })
+  const { academicYear } = useViewingPeriod()
+  const overview = useHrOverview(academicYear ?? '')
+  const attention = useHrAttention(academicYear ?? '')
   // [PRODUCTION FIX] was useContractAlerts() — an exact-day match (see
   // hrService.getUpcomingContractExpiries()'s header comment) that could
   // only ever show a contract expiring exactly 60 days from today. Both
   // this stat card and the widget below need a genuine "next 60 days" range.
-  const { data: contractData, isLoading: contractLoading } = useUpcomingContractExpiries(CONTRACT_ALERT_DAYS)
-  const { data: loansData, isLoading: loansLoading }       = useLoans('PENDING')
-  // "Who is off this week" — every APPROVED leave request, filtered to
-  // whichever ones overlap the current week.
-  const { data: approvedLeaveData, isLoading: approvedLeaveLoading } = useLeaveRequests({ status: 'APPROVED' })
+  const { data: contractData, isLoading: contractLoading, isError: contractError, refetch: refetchContracts } = useUpcomingContractExpiries(CONTRACT_ALERT_DAYS)
+  // Who is away right now: everyone whose approved leave covers today. Comes
+  // from the server by date, not from a filtered list of requests.
+  const { data: onLeaveNow, isLoading: onLeaveLoading, isError: leaveError, refetch: refetchLeave } = useOnLeaveNow()
 
-  const staff     = staffData    as ApiStaffProfile[]  | undefined
-  const leave     = leaveData    as ApiLeaveRequest[]  | undefined
   const contracts = contractData as ApiContractAlert[] | undefined
-  const loans     = loansData    as ApiStaffLoan[]     | undefined
-  const approvedLeave = approvedLeaveData as ApiLeaveRequest[] | undefined
 
-  // [PRODUCTION FIX] react-hooks/purity — Date.now() called directly in the
-  // render body is an impure call (react.dev/reference/rules/components-and-
-  // hooks-must-be-pure#components-and-hooks-must-be-idempotent). Reading it
-  // through a lazy useState initializer keeps the render body pure: React
-  // only ever invokes the initializer function once, on mount, rather than
-  // on every render — which is also the right *behaviour* here, since this
-  // widget doesn't need "this week" to shift mid-session as real time ticks
-  // past a boundary.
-  const [weekStart] = useState(() => Date.now())
-  const weekEnd = weekStart + 7 * DAY_MS
-  const offThisWeek = (approvedLeave ?? []).filter((lr) => {
-    const start = new Date(lr.startDate).getTime()
-    const end   = new Date(lr.endDate).getTime()
-    return Number.isFinite(start) && Number.isFinite(end) && start <= weekEnd && end >= weekStart - DAY_MS
-  })
 
   return (
-    <div className="space-y-6">
-      <StatCardGrid className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard
-          label="Total Staff"
-          value={statValue(staffLoading, staff?.length)}
-          icon={Users}
-          trend="neutral"
-          trendLabel="on record"
-          iconColor="bg-brand-teal/10"
-          iconText="text-brand-teal"
-        />
-        <StatCard
-          label="Leave Requests"
-          value={statValue(leaveLoading, leave?.length)}
-          icon={Clock}
-          trend="neutral"
-          trendLabel="pending review"
-          iconColor="bg-brand-amber/10"
-          iconText="text-brand-amber"
-        />
-        <StatCard
-          label="Contract Expiries"
-          value={statValue(contractLoading, contracts?.length)}
-          icon={AlertTriangle}
-          trend="neutral"
-          trendLabel={`within ${CONTRACT_ALERT_DAYS} days`}
-          iconColor="bg-brand-coral/10"
-          iconText="text-brand-coral"
-        />
-        <StatCard
-          label="Pending Loan Approvals"
-          value={statValue(loansLoading, loans?.length)}
-          icon={Banknote}
-          trend="neutral"
-          trendLabel="awaiting"
-          iconColor="bg-blue-50"
-          iconText="text-blue-600"
-        />
-      </StatCardGrid>
-      <QuickActions actions={QUICK_ACTIONS} />
-      <div className="grid md:grid-cols-2 gap-4">
+    <div className="space-y-4 md:space-y-6">
+      <PrimaryOverviewKpis
+        title="Workforce"
+        summary="Check staff numbers, upcoming contract dates, leave and requests waiting for a decision."
+        academicYear={academicYear}
+        overview={overview}
+        preferred={PREFERRED}
+        reportsHref="/reports?tab=overview"
+      />
+      <div className="grid md:grid-cols-2 gap-3 md:gap-4">
         <ListCard
-          title="Contract Expiry Alerts"
+          title="Contract expiry alerts"
           sub={`Expiring in the next ${CONTRACT_ALERT_DAYS} days`}
           isLoading={contractLoading}
           isEmpty={(contracts ?? []).length === 0}
+          isError={contractError}
+          onRetry={() => void refetchContracts()}
           emptyMessage={`No contracts expiring in the next ${CONTRACT_ALERT_DAYS} days.`}
         >
           <ul className="divide-y divide-base">
@@ -193,7 +145,7 @@ export function HRDashboard() {
                   </p>
                   <p className="text-xs text-muted truncate">{c.department}</p>
                 </div>
-                <span className="text-xs text-brand-coral whitespace-nowrap shrink-0">
+                <span className="text-xs text-tone-coral whitespace-nowrap shrink-0">
                   {new Date(c.contractExpiry).toLocaleDateString('en-MW')}
                 </span>
               </li>
@@ -201,29 +153,35 @@ export function HRDashboard() {
           </ul>
         </ListCard>
         <ListCard
-          title="Staff Leave Calendar"
-          sub="Who is off this week"
-          isLoading={approvedLeaveLoading}
-          isEmpty={offThisWeek.length === 0}
-          emptyMessage="No staff are on approved leave this week."
+          title="On leave today"
+          sub="Staff whose approved leave covers today"
+          isLoading={onLeaveLoading}
+          isEmpty={(onLeaveNow ?? []).length === 0}
+          isError={leaveError}
+          onRetry={() => void refetchLeave()}
+          emptyMessage="Nobody is on leave today."
         >
           <ul className="divide-y divide-base">
-            {offThisWeek.map((lr) => (
-              <li key={lr.id} className="py-2.5 flex items-center justify-between gap-3">
+            {(onLeaveNow ?? []).map((p) => (
+              <li key={p.requestId} className="py-2.5 flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-brand-navy truncate">
-                    {lr.staff ? `${lr.staff.firstName} ${lr.staff.lastName}` : 'Staff member'}
+                  <p className="text-sm font-medium text-brand-navy truncate">{p.firstName} {p.lastName}</p>
+                  <p className="text-xs text-muted truncate">
+                    {LEAVE_TYPE_LABELS[p.leaveType as LeaveTypeKey] ?? p.leaveType} · {p.department}
                   </p>
-                  <p className="text-xs text-muted truncate">{lr.leaveType}</p>
                 </div>
-                <span className="text-xs text-muted whitespace-nowrap shrink-0">
-                  {new Date(lr.startDate).toLocaleDateString('en-MW')} – {new Date(lr.endDate).toLocaleDateString('en-MW')}
+                <span className="text-xs text-muted whitespace-nowrap shrink-0 text-right">
+                  Back {new Date(p.returnDate).toLocaleDateString('en-MW')}
                 </span>
               </li>
             ))}
           </ul>
         </ListCard>
       </div>
+      <DashboardAttention query={attention} title="HR attention queue" limit={5} />
+      <SecondaryKpis title="More figures and findings" overview={overview} preferred={PREFERRED} showInsights />
+      <QuickActions actions={QUICK_ACTIONS} compact />
+      <ReportLinks links={REPORT_LINKS} />
     </div>
   )
 }

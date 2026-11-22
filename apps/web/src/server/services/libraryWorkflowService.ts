@@ -47,6 +47,7 @@
 import 'server-only'
 import { prisma }    from '@/lib/prisma'
 import { logger }    from '@/lib/logger'
+import { assertNotSelfReview } from '@/server/lib/selfReview'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RESOURCE RECOMMENDATIONS
@@ -60,6 +61,11 @@ export interface CreateRecommendationInput {
   type:           'BOOK' | 'EBOOK' | 'JOURNAL' | 'OTHER'
   subject?:       string
   reason:         string
+  // [R21] Display-only fields captured on the redesigned "Recommend a
+  // Resource" form — requestedByUid (above) remains the real identity link.
+  requesterName?:  string
+  requesterRole?:  string
+  requesterClass?: string
 }
 
 export async function createRecommendation(
@@ -74,6 +80,9 @@ export async function createRecommendation(
       type:           input.type,
       subject:        input.subject,
       reason:         input.reason,
+      requesterName:  input.requesterName,
+      requesterRole:  input.requesterRole,
+      requesterClass: input.requesterClass,
       status:         'PENDING',
     },
   })
@@ -176,6 +185,8 @@ export async function approveFineWaiver(
   if (waiver.status !== 'PENDING') {
     throw new Error(`Waiver ${waiverId} is already ${waiver.status}`)
   }
+  // [Issue 7] A waiver may not be decided by the person who requested it.
+  assertNotSelfReview(waiver.requestedByUid, actorUid, 'fine waiver request')
 
   await prisma.$transaction([
     // Waiving the fine zeroes its balance by moving it to WAIVED status —
@@ -204,6 +215,7 @@ export async function rejectFineWaiver(
   if (waiver.status !== 'PENDING') {
     throw new Error(`Waiver ${waiverId} is already ${waiver.status}`)
   }
+  assertNotSelfReview(waiver.requestedByUid, actorUid, 'fine waiver request')
 
   await prisma.fineWaiverRequest.update({
     where: { id: waiverId },
@@ -216,20 +228,29 @@ export async function rejectFineWaiver(
 export async function listFineWaiverRequests(
   status?: 'PENDING' | 'APPROVED' | 'REJECTED',
 ) {
-  return prisma.fineWaiverRequest.findMany({
+  const rows = await prisma.fineWaiverRequest.findMany({
     where:   status ? { status } : {},
-    include: {
-      fine: {
-        include: {
-          borrowing: {
-            include: {
-              student: { select: { firstName: true, lastName: true, registrationNo: true } },
-              book:    { select: { title: true } },
-            },
-          },
-        },
-      },
-    },
+    include: { fine: true },
     orderBy: { createdAt: 'desc' },
   })
+
+  // The reviewer has to see WHO owes it, for WHICH book and WHY (late / damaged / lost) —
+  // a bare "reason — MWK amount" row is not enough to approve or reject. LibraryFine keeps
+  // plain string studentId/staffId (no relation), so names are batch-resolved.
+  const studentIds = [...new Set(rows.map((r) => r.fine.studentId).filter((id): id is string => !!id))]
+  const staffIds   = [...new Set(rows.map((r) => r.fine.staffId).filter((id): id is string => !!id))]
+  const [students, staff] = await Promise.all([
+    studentIds.length ? prisma.student.findMany({ where: { id: { in: studentIds } }, select: { id: true, firstName: true, lastName: true } }) : [],
+    staffIds.length   ? prisma.staffProfile.findMany({ where: { id: { in: staffIds } }, select: { id: true, firstName: true, lastName: true } }) : [],
+  ])
+  const nameById = new Map([...students, ...staff].map((p) => [p.id, `${p.firstName} ${p.lastName}`]))
+
+  return rows.map((r) => ({
+    ...r,
+    amount:       Number(r.amount),
+    bookTitle:    r.fine.bookTitle,
+    kind:         r.fine.kind,
+    fineReason:   r.fine.reason,
+    borrowerName: nameById.get(r.fine.studentId ?? r.fine.staffId ?? '') ?? 'Unknown',
+  }))
 }

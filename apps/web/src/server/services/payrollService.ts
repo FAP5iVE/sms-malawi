@@ -46,6 +46,31 @@
  *   settles the loan and clears SalaryStructure.monthlyLoanDeduction
  *   once the balance reaches zero — see hrService.ts's disburseLoan()/
  *   recordLoanRepayment() for the other half of this connection).
+ *
+ *   [Payroll Runs & Approvals / My Pay redesign, user-requested]:
+ *     - getPayrollRunWindow()/getPayrollScalarSettings(): Settings >
+ *       Finance > "Payroll Processing Day" (payroll_day_of_month) was a
+ *       real, saved setting read by nothing — Run Payroll could be
+ *       clicked on any date, any number of times (blocked only by luck,
+ *       via the @@unique([month,year]) constraint on a *successful*
+ *       first run). processMonthlyPayroll() now genuinely enforces a
+ *       window of payroll_run_window_days days starting on
+ *       payroll_day_of_month before it will create a run at all; once a
+ *       month is run, the existing unique constraint already makes that
+ *       permanent — this only closes the "whenever" half of the gap.
+ *     - getPayrollHistory(): now resolves totalPaye/totalPension per run
+ *       (summed from that run's own payslips — not a stored, independently
+ *       driftable column) and runByUid/submittedByUid/approvedByUid to
+ *       display names, for the Payroll Runs & Approvals history table.
+ *     - getPayrollRunDetail(): new — GET /payroll/:id's "Inspect Payslips"
+ *       drill-down. PayrollApprovalPanel.tsx (Phase D13) noted no such
+ *       route existed and removed its own per-staff line table rather
+ *       than call one; this adds it against the real Payslip rows.
+ *     - getMySalaryStructure(): new — GET /payroll/my-salary did not
+ *       exist at all (useMySalaryStructure() called it and 404'd). Built
+ *       against the same base-salary + itemized-recurring-StaffAllowance
+ *       computation this file already performs for a real payslip, not
+ *       the stale flat SalaryStructure.allowances/loanBalance columns.
  * [DEPENDS ON]: settingsService.ts (FINANCE_PAYE_BRACKETS/
  *   FINANCE_PENSION_PERCENT, already correctly built), StaffProfile model,
  *   hrService.recordLoanRepayment() (POST-R11 loan↔payroll reconciliation)
@@ -53,11 +78,87 @@
 
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
-import { generatePayslipPdf } from '@/server/services/receiptService'
+import { generatePayslipPdf, type PayslipEarnings } from '@/server/services/receiptService'
 import * as settingsService from '@/server/services/settingsService'
 import * as hrService from '@/server/services/hrService'
+import * as auditService from '@/server/services/auditService'
 import { SETTING_KEYS } from '@shared/types/settings'
 import type { PayeBracket } from '@shared/types/settings'
+import type { ApiPayrollRunWindow, ApiSalaryStructure } from '@shared/types/api'
+import type { UserRole } from '@shared/types/roles'
+import { monthLeaveReduction, leaveDeductionAmount } from '@shared/utils/leave'
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RUN WINDOW — payroll_day_of_month / payroll_run_window_days
+//
+// Both are plain generic-string SystemSettings rows (like settings.ts's own
+// FINANCE_KEYS scalars), not part of the typed SETTING_KEYS/settingsService
+// registry, so they're read directly here rather than fighting that typed
+// system for two ad hoc values — same convention settings.ts itself uses for
+// every other FINANCE_KEYS entry.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const DEFAULT_WINDOW_START_DAY = 25
+const DEFAULT_WINDOW_LENGTH_DAYS = 5
+
+async function getPayrollScalarSettings(): Promise<{ startDay: number; windowDays: number }> {
+  const rows = await prisma.systemSettings.findMany({
+    where: { key: { in: ['payroll_day_of_month', 'payroll_run_window_days'] } },
+  })
+  const byKey = Object.fromEntries(rows.map((r) => [r.key, r.value]))
+  const startDay = Number(byKey['payroll_day_of_month']) || DEFAULT_WINDOW_START_DAY
+  const windowDays = Number(byKey['payroll_run_window_days']) || DEFAULT_WINDOW_LENGTH_DAYS
+  return { startDay, windowDays }
+}
+
+/**
+ * Computes the [opensAt, closesAt) window for a given payroll month/year.
+ * Plain Date arithmetic — `new Date(year, month - 1, startDay + windowDays)`
+ * rolls over into the next calendar month on its own when the window
+ * overruns month-end, so no per-month day-count clamping is needed.
+ * closesAt is set to the end of its calendar day (23:59:59.999) so the
+ * window's last day is fully usable rather than closing at midnight.
+ */
+function computeRunWindow(month: number, year: number, startDay: number, windowDays: number) {
+  const opensAt = new Date(year, month - 1, startDay, 0, 0, 0, 0)
+  const closesAt = new Date(year, month - 1, startDay + windowDays - 1, 23, 59, 59, 999)
+  return { opensAt, closesAt }
+}
+
+/**
+ * GET /payroll/run-window — whether payroll for month/year can be triggered
+ * right now, for the Run Payroll button's enabled state and "opens on"/
+ * "window closed" copy in Payroll Runs & Approvals.
+ */
+export async function getPayrollRunWindow(
+  month: number,
+  year: number
+): Promise<ApiPayrollRunWindow> {
+  const { startDay, windowDays } = await getPayrollScalarSettings()
+  const { opensAt, closesAt } = computeRunWindow(month, year, startDay, windowDays)
+  const now = new Date()
+
+  const [existingRun, enrolledStaffCount] = await Promise.all([
+    prisma.payrollRun.findUnique({
+      where: { month_year: { month, year } },
+      select: { id: true, status: true },
+    }),
+    prisma.salaryStructure.count(),
+  ])
+
+  return {
+    month,
+    year,
+    opensAt: opensAt.toISOString(),
+    closesAt: closesAt.toISOString(),
+    isOpen: now >= opensAt && now <= closesAt,
+    alreadyRun: !!existingRun,
+    existingRun: existingRun ?? undefined,
+    enrolledStaffCount,
+    windowStartDay: startDay,
+    windowLengthDays: windowDays,
+  }
+}
 
 // Genuine marginal (bracket-by-bracket) PAYE calculation. Brackets are
 // configured in annual MWK (Settings > Finance); grossMonthly is
@@ -79,20 +180,95 @@ function calculateMonthlyPAYE(grossMonthly: number, brackets: readonly PayeBrack
   return annualTax / 12
 }
 
+/**
+ * POST /payroll/runs/:id/discard — clears a run stuck in PROCESSING so
+ * Finance can retry. [NEW, user-requested]
+ *
+ * PROCESSING only exists for the moment processMonthlyPayroll() is
+ * literally mid-transaction below — it should never be visible to a user
+ * for longer than that. If a run is ever OBSERVED sitting at PROCESSING
+ * (the transaction crashed after creating the row but before completing,
+ * a serverless function timed out mid-run, etc.), the
+ * @@unique([month,year]) constraint means that month can never be run
+ * again — there was previously no way out of this short of a manual DB
+ * fix. Only valid on a PROCESSING run; every other status has a real,
+ * intentional next step (submit/approve/lock/rollback) and should go
+ * through payrollApprovalService.ts instead, not be discarded.
+ */
+export async function discardStuckRun(
+  runId: string,
+  actorUid: string,
+  actorRole: UserRole
+): Promise<void> {
+  const run = await prisma.payrollRun.findUniqueOrThrow({ where: { id: runId } })
+  if (run.status !== 'PROCESSING') {
+    throw Object.assign(
+      new Error(`Only a run stuck in PROCESSING can be discarded (this one is ${run.status}).`),
+      { status: 409 }
+    )
+  }
+  // Defensive: a healthy transaction failure already rolls its own payslip
+  // inserts back, but delete any that somehow survived (e.g. a crash
+  // between the transaction committing and the final status update) so
+  // discarding never leaves orphaned Payslip rows behind.
+  await prisma.$transaction([
+    prisma.payslip.deleteMany({ where: { payrollRunId: runId } }),
+    prisma.payrollRun.delete({ where: { id: runId } }),
+  ])
+  await auditService.log({
+    action: 'payroll.discardStuckRun',
+    entityType: 'PayrollRun',
+    entityId: runId,
+    actorUid,
+    actorRole,
+  })
+  logger.warn({
+    event: 'payroll.discarded_stuck_run',
+    runId,
+    month: run.month,
+    year: run.year,
+    actorUid,
+  })
+}
+
 export async function processMonthlyPayroll(
   month: number,
   year: number,
   runByUid: string
 ): Promise<string> {
-  // Prevent duplicate payroll runs
+  // Prevent duplicate payroll runs — once a month is run, it is
+  // permanently locked; this constraint is the actual enforcement of that
+  // (nothing below can ever re-create a row for the same month/year).
   const existing = await prisma.payrollRun.findUnique({
     where: { month_year: { month, year } },
   })
-  if (existing) throw new Error(`Payroll for ${month}/${year} already exists`)
+  if (existing) {
+    throw Object.assign(
+      new Error(`Payroll for ${month}/${year} has already been run and is locked for this month.`),
+      { status: 409 }
+    )
+  }
 
-  // Get all active salary structures
-  const salaries = await prisma.salaryStructure.findMany()
-  if (salaries.length === 0) throw new Error('No salary structures found')
+  // [PRODUCTION FIX] Run window enforcement — payroll_day_of_month/
+  // payroll_run_window_days were real settings with no reader anywhere;
+  // Run Payroll could otherwise be triggered on any date. See
+  // getPayrollRunWindow()'s header comment above.
+  const { startDay, windowDays } = await getPayrollScalarSettings()
+  const { opensAt, closesAt } = computeRunWindow(month, year, startDay, windowDays)
+  const now = new Date()
+  if (now < opensAt || now > closesAt) {
+    throw Object.assign(
+      new Error(
+        `Payroll for ${month}/${year} can only be run between ${opensAt.toDateString()} and ${closesAt.toDateString()}.`
+      ),
+      { status: 403 }
+    )
+  }
+
+  // Salary structures of everyone still employed. A terminated staff member
+  // keeps their salary row but must not be paid again.
+  const allSalaries = await prisma.salaryStructure.findMany()
+  if (allSalaries.length === 0) throw new Error('No salary structures found')
 
   // [R10 fix 1] Real, configured PAYE brackets and pension rate instead
   // of hardcoded constants.
@@ -105,14 +281,16 @@ export async function processMonthlyPayroll(
   // [R10 fix 3] Real staff names — SalaryStructure.staffUid is a Firebase
   // UID plain string with no Prisma relation, so this is a manual
   // StaffProfile lookup, not an `include`.
-  const staffUids = salaries.map((s) => s.staffUid)
-  const staffProfiles = await prisma.staffProfile.findMany({
-    where: { uid: { in: staffUids } },
-    select: { id: true, uid: true, firstName: true, lastName: true },
+  const allStaffProfiles = await prisma.staffProfile.findMany({
+    where: { uid: { in: allSalaries.map((s) => s.staffUid) } },
+    select: { id: true, uid: true, firstName: true, lastName: true, status: true },
   })
-  const staffNameByUid = new Map(
-    staffProfiles.map((s) => [s.uid, `${s.firstName} ${s.lastName}`])
-  )
+  const terminatedUids = new Set(allStaffProfiles.filter((p) => p.status === 'TERMINATED').map((p) => p.uid))
+  const salaries = allSalaries.filter((s) => !terminatedUids.has(s.staffUid))
+  if (salaries.length === 0) throw new Error('No active salary structures found')
+  const staffUids = salaries.map((s) => s.staffUid)
+  const staffProfiles = allStaffProfiles.filter((p) => !terminatedUids.has(p.uid))
+  const staffNameByUid = new Map(staffProfiles.map((s) => [s.uid, `${s.firstName} ${s.lastName}`]))
   const staffIdByUid = new Map(staffProfiles.map((s) => [s.uid, s.id]))
 
   // [PRODUCTION FIX] Allowances are itemized now (StaffAllowance) — a
@@ -122,15 +300,45 @@ export async function processMonthlyPayroll(
   const allowances = await prisma.staffAllowance.findMany({
     where: {
       staffUid: { in: staffUids },
-      OR: [
-        { recurring: true },
-        { recurring: false, paidMonth: month, paidYear: year },
-      ],
+      OR: [{ recurring: true }, { recurring: false, paidMonth: month, paidYear: year }],
     },
   })
   const allowanceTotalByUid = new Map<string, number>()
+  // The itemised lines behind those totals — the payslip PDF prints each one
+  // (Base Salary, Allowance (Housing), ...) instead of a single gross figure.
+  const allowanceLinesByUid = new Map<string, Array<{ type: string; amount: number }>>()
   for (const a of allowances) {
-    allowanceTotalByUid.set(a.staffUid, (allowanceTotalByUid.get(a.staffUid) ?? 0) + Number(a.amount))
+    allowanceTotalByUid.set(
+      a.staffUid,
+      (allowanceTotalByUid.get(a.staffUid) ?? 0) + Number(a.amount)
+    )
+    const lines = allowanceLinesByUid.get(a.staffUid) ?? []
+    lines.push({ type: a.type, amount: Number(a.amount) })
+    allowanceLinesByUid.set(a.staffUid, lines)
+  }
+  const earningsByUid = new Map<string, PayslipEarnings>()
+
+  // Approved leave that touches this month. Half-paid and unpaid days dock
+  // pay (the split was fixed when HR approved the request); paid days do not.
+  const monthStart = new Date(Date.UTC(year, month - 1, 1))
+  const monthEnd   = new Date(Date.UTC(year, month, 0))
+  const leaveRows = await prisma.leaveRequest.findMany({
+    where: {
+      status:    'APPROVED',
+      startDate: { lte: monthEnd },
+      endDate:   { gte: monthStart },
+      staff:     { uid: { in: staffUids } },
+    },
+    select: {
+      startDate: true, endDate: true, fullPayDays: true, halfPayDays: true, unpaidDays: true,
+      staff: { select: { uid: true } },
+    },
+  })
+  const leaveByUid = new Map<string, typeof leaveRows>()
+  for (const r of leaveRows) {
+    const list = leaveByUid.get(r.staff.uid) ?? []
+    list.push(r)
+    leaveByUid.set(r.staff.uid, list)
   }
 
   let totalGross = 0
@@ -142,11 +350,18 @@ export async function processMonthlyPayroll(
     paye: number
     pension: number
     loanDeduction: number
+    leaveDeduction: number
     netSalary: number
   }[] = []
 
   for (const sal of salaries) {
-    const gross = Number(sal.baseSalary) + (allowanceTotalByUid.get(sal.staffUid) ?? 0)
+    const fullGross = Number(sal.baseSalary) + (allowanceTotalByUid.get(sal.staffUid) ?? 0)
+    // Leave docks the day rate (gross over the month's weekdays) for each
+    // unpaid day and half of it for each half-pay day. PAYE and pension are
+    // then worked out on the reduced pay, not on the full salary.
+    const leave = monthLeaveReduction(leaveByUid.get(sal.staffUid) ?? [], month, year)
+    const leaveDeduction = leaveDeductionAmount(fullGross, leave.reductionDays, month, year)
+    const gross = fullGross - leaveDeduction
     const paye = calculateMonthlyPAYE(gross, payeBrackets)
     const pension = gross * (pensionPercent / 100)
     const loanDeduction = Number(sal.monthlyLoanDeduction)
@@ -155,6 +370,18 @@ export async function processMonthlyPayroll(
     totalGross += gross
     totalNet += net
 
+    const leaveParts = [
+      leave.unpaidDays > 0 ? `${leave.unpaidDays} unpaid` : '',
+      leave.halfPayDays > 0 ? `${leave.halfPayDays} half-pay` : '',
+    ].filter(Boolean).join(', ')
+    earningsByUid.set(sal.staffUid, {
+      baseSalary: Number(sal.baseSalary),
+      allowances: allowanceLinesByUid.get(sal.staffUid) ?? [],
+      ...(leaveDeduction > 0
+        ? { leaveAdjustment: { label: `Leave pay adjustment (${leaveParts} day${leave.unpaidDays + leave.halfPayDays === 1 ? '' : 's'})`, amount: leaveDeduction } }
+        : {}),
+    })
+
     payslipData.push({
       staffUid: sal.staffUid,
       staffName: staffNameByUid.get(sal.staffUid) ?? sal.staffUid,
@@ -162,6 +389,7 @@ export async function processMonthlyPayroll(
       paye,
       pension,
       loanDeduction,
+      leaveDeduction,
       netSalary: net,
     })
   }
@@ -182,7 +410,12 @@ export async function processMonthlyPayroll(
         })
 
         // Generate payslip PDF → store in Appwrite
-        const pdfKey = await generatePayslipPdf(payslip.id, { ...ps, pensionPercent }, month, year)
+        const pdfKey = await generatePayslipPdf(
+          payslip.id,
+          { ...ps, pensionPercent, earnings: earningsByUid.get(ps.staffUid), runByUid, processedAt: new Date() },
+          month,
+          year,
+        )
         await tx.payslip.update({ where: { id: payslip.id }, data: { payslipKey: pdfKey } })
       }
 
@@ -228,12 +461,81 @@ export async function processMonthlyPayroll(
   return runId
 }
 
+/** Resolves a set of Firebase UIDs to "First Last" display names — the same
+ *  manual lookup processMonthlyPayroll() already does above (SalaryStructure/
+ *  PayrollRun store plain UID strings with no Prisma relation to
+ *  StaffProfile). Returns a Map so callers can look up "" for an unknown/
+ *  missing uid without a conditional at every call site. */
+async function resolveStaffNames(
+  uids: (string | null | undefined)[]
+): Promise<Map<string, string>> {
+  const distinct = [...new Set(uids.filter((u): u is string => !!u))]
+  if (distinct.length === 0) return new Map()
+  const profiles = await prisma.staffProfile.findMany({
+    where: { uid: { in: distinct } },
+    select: { uid: true, firstName: true, lastName: true },
+  })
+  return new Map(profiles.map((p) => [p.uid, `${p.firstName} ${p.lastName}`]))
+}
+
+/**
+ * GET /payroll — payroll run history for a year, with totalPaye/totalPension
+ * summed from each run's own payslips (never a stored, independently
+ * driftable column) and runByUid/submittedByUid/approvedByUid resolved to
+ * display names for the Payroll Runs & Approvals history table.
+ */
 export async function getPayrollHistory(year: number) {
-  return prisma.payrollRun.findMany({
+  const runs = await prisma.payrollRun.findMany({
     where: { year },
     orderBy: { month: 'desc' },
-    include: { _count: { select: { payslips: true } } },
+    include: {
+      _count: { select: { payslips: true } },
+      payslips: { select: { paye: true, pension: true } },
+    },
   })
+
+  const nameByUid = await resolveStaffNames(
+    runs.flatMap((r) => [r.runByUid, r.submittedByUid, r.approvedByUid])
+  )
+
+  return runs.map(({ payslips, ...run }) => ({
+    ...run,
+    totalPaye: payslips.reduce((sum, p) => sum + Number(p.paye), 0),
+    totalPension: payslips.reduce((sum, p) => sum + Number(p.pension), 0),
+    runByName: run.runByUid ? nameByUid.get(run.runByUid) : undefined,
+    submittedByName: run.submittedByUid ? nameByUid.get(run.submittedByUid) : undefined,
+    approvedByName: run.approvedByUid ? nameByUid.get(run.approvedByUid) : undefined,
+  }))
+}
+
+/**
+ * GET /payroll/:id — a single run's full detail, including every payslip
+ * line, for the "Deep Inspection" / "Inspect Payslips" drill-down. No such
+ * route existed before (PayrollApprovalPanel.tsx's own header comment
+ * confirmed this gap and removed its per-staff table rather than call a
+ * route that didn't exist).
+ */
+export async function getPayrollRunDetail(runId: string) {
+  const run = await prisma.payrollRun.findUniqueOrThrow({
+    where: { id: runId },
+    include: {
+      payslips: { orderBy: { staffName: 'asc' } },
+      _count: { select: { payslips: true } },
+    },
+  })
+
+  const nameByUid = await resolveStaffNames([run.runByUid, run.submittedByUid, run.approvedByUid])
+  const totalPaye = run.payslips.reduce((sum, p) => sum + Number(p.paye), 0)
+  const totalPension = run.payslips.reduce((sum, p) => sum + Number(p.pension), 0)
+
+  return {
+    ...run,
+    totalPaye,
+    totalPension,
+    runByName: run.runByUid ? nameByUid.get(run.runByUid) : undefined,
+    submittedByName: run.submittedByUid ? nameByUid.get(run.submittedByUid) : undefined,
+    approvedByName: run.approvedByUid ? nameByUid.get(run.approvedByUid) : undefined,
+  }
 }
 
 export async function getStaffPayslips(staffUid: string) {
@@ -242,4 +544,104 @@ export async function getStaffPayslips(staffUid: string) {
     orderBy: { createdAt: 'desc' },
     include: { payrollRun: { select: { month: true, year: true } } },
   })
+}
+
+/**
+ * GET /payroll/my-salary — self-service current salary structure (own, or
+ * another staff member's when the route's caller holds hr.viewAnyPayslips).
+ * [PRODUCTION FIX] This route/function did not exist at all —
+ * useMySalaryStructure() called GET /payroll/my-salary and 404'd. Computes
+ * monthlyGross the same way processMonthlyPayroll() computes a real
+ * payslip's gross (base salary + every currently-recurring StaffAllowance),
+ * not the stale flat SalaryStructure.allowances/loanBalance columns
+ * confirmed to have zero readers elsewhere in this file.
+ */
+/**
+ * Returns the payslip's PDF key, generating and saving the PDF first if the
+ * payslip has none. Mirrors feeService.ensurePaymentReceipt().
+ *
+ * [PRODUCTION FIX] Payslip rows can legitimately exist without a file: payroll
+ * runs created by the seed/demo script never generate one, and a storage or
+ * rendering failure at run time leaves payslipKey null. GET
+ * /payroll/payslips/:id/download used to answer 404 "Payslip PDF not ready"
+ * for those forever, so "View Payslip" failed for every payslip in that state.
+ * It now builds the PDF on first view from the figures already stored on the
+ * Payslip row (no recalculation — the PDF always matches what was paid).
+ * Idempotent: an existing payslipKey is returned as-is.
+ */
+export async function ensurePayslipPdf(payslipId: string): Promise<string> {
+  const payslip = await prisma.payslip.findUniqueOrThrow({
+    where: { id: payslipId },
+    include: { payrollRun: { select: { month: true, year: true, runByUid: true, completedAt: true } } },
+  })
+  if (payslip.payslipKey) return payslip.payslipKey
+
+  const gross = Number(payslip.grossSalary)
+  const pension = Number(payslip.pension)
+  // The rate that was actually applied, recovered from the stored amounts so a
+  // later change to the pension setting cannot rewrite history.
+  const pensionPercent = gross > 0 ? Math.round((pension / gross) * 10000) / 100 : 0
+
+  const payslipKey = await generatePayslipPdf(
+    payslip.id,
+    {
+      staffUid: payslip.staffUid,
+      staffName: payslip.staffName,
+      grossSalary: gross,
+      paye: Number(payslip.paye),
+      pension,
+      pensionPercent,
+      loanDeduction: Number(payslip.loanDeduction),
+      netSalary: Number(payslip.netSalary),
+      leaveDeduction: Number(payslip.leaveDeduction),
+      // No earnings here: this payslip pre-dates its PDF, so the breakdown is
+      // rebuilt inside generatePayslipPdf from the staff allowances in force
+      // for that month (the stored gross stays the source of truth).
+      runByUid: payslip.payrollRun.runByUid,
+      processedAt: payslip.payrollRun.completedAt ?? payslip.createdAt,
+    },
+    payslip.payrollRun.month,
+    payslip.payrollRun.year,
+  )
+  await prisma.payslip.update({ where: { id: payslip.id }, data: { payslipKey } })
+  return payslipKey
+}
+
+export async function getMySalaryStructure(staffUid: string): Promise<ApiSalaryStructure | null> {
+  const [salary, staff, allowances] = await Promise.all([
+    prisma.salaryStructure.findUnique({ where: { staffUid } }),
+    prisma.staffProfile.findFirst({
+      where: { uid: staffUid },
+      select: { firstName: true, lastName: true, department: true, jobTitle: true },
+    }),
+    prisma.staffAllowance.findMany({
+      where: { staffUid, recurring: true },
+      orderBy: { createdAt: 'desc' },
+    }),
+  ])
+  if (!salary) return null
+
+  const recurringTotal = allowances.reduce((sum, a) => sum + Number(a.amount), 0)
+  const baseSalary = Number(salary.baseSalary)
+
+  return {
+    id: salary.id,
+    staffUid,
+    staffName: staff ? `${staff.firstName} ${staff.lastName}` : staffUid,
+    department: staff?.department ?? null,
+    jobTitle: staff?.jobTitle ?? null,
+    baseSalary,
+    monthlyLoanDeduction: Number(salary.monthlyLoanDeduction),
+    monthlyGross: baseSalary + recurringTotal,
+    updatedAt: salary.updatedAt.toISOString(),
+    allowances: allowances.map((a) => ({
+      id: a.id,
+      type: a.type,
+      amount: Number(a.amount),
+      recurring: a.recurring,
+      paidMonth: a.paidMonth,
+      paidYear: a.paidYear,
+      notes: a.notes,
+    })),
+  }
 }

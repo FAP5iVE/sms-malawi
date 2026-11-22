@@ -72,19 +72,21 @@ import { useStudentMe } from '@/hooks/useStudents'
 import { RoleGuard } from '@/components/shared/RoleGuard'
 import { ExamForm } from '@/components/exams/ExamForm'
 import { MarksEntrySheet } from '@/components/exams/MarksEntrySheet'
-import { AnalyticsPanel } from '@/components/exams/AnalyticsPanel'
+import { AnalyticsPanel, StudentAnalyticsPanel } from '@/components/exams/AnalyticsPanel'
 import { ManebPanel } from '@/components/exams/ManebPanel'
 import { StudentResultsView } from '@/components/exams/StudentResultsView'
 import { ReportCardGenerator } from '@/components/exams/ReportCardGenerator'
 import { PromotionEngine } from '@/components/exams/PromotionEngine'
 import { ResultsReleaseWorkflow } from '@/components/exams/ResultsReleaseWorkflow'
-import { useExams, useApproveResults, useReleaseResults } from '@/hooks/useExams'
+import { useExams, useApproveResults, useReleaseResults, useDeleteExam } from '@/hooks/useExams'
 import { useClasses } from '@/hooks/useClasses'
-import { usePublicSchoolInfo } from '@/hooks/usePublic'
+import { useEffectiveViewingPeriod } from '@/hooks/useViewingPeriod'
 import { usePermissions } from '@/hooks/usePermissions'
-import { apiFetch } from '@/lib/api-client'
-import { EXAM_MARKS_ENTERABLE_STATUSES } from '@shared/schemas/exam'
+import { apiFetch, ApiError } from '@/lib/api-client'
+import { EXAM_MARKS_ENTERABLE_STATUSES, EXAM_MODIFIABLE_STATUSES } from '@shared/schemas/exam'
+import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import { ModuleTabs }        from '@/components/shared/ModuleTabs'
+import { ModuleSurface }     from '@/components/shared/ModuleSurface'
 import {
   Calendar,
   Plus,
@@ -98,8 +100,13 @@ import {
   Printer,
   TrendingUp,
   Send,
+  Pencil,
+  Trash2,
 } from 'lucide-react'
 import type { ApiExam, ApiClass } from '@shared/types/api'
+import { Modal } from '@/components/shared/Modal'
+import { StatusText } from '@/components/shared/StatusText'
+import { statusTone, statusWord } from '@/lib/hills/statusWord'
 
 const ALLOWED_ROLES = [
   'admin',
@@ -120,17 +127,13 @@ const TABS = [
   { id: 'exams', label: 'Exams', icon: Calendar },
   { id: 'analytics', label: 'Analytics', icon: BarChart2 },
   { id: 'maneb', label: 'MANEB', icon: GraduationCap },
-  { id: 'report-cards', label: 'Report Cards', icon: Printer },
+  { id: 'report-cards', label: 'Report cards', icon: Printer },
   { id: 'promotion', label: 'Promotion', icon: TrendingUp },
-  { id: 'release', label: 'Results Release', icon: Send },
-  { id: 'results', label: 'My Results', icon: FileText },
+  { id: 'release', label: 'Results release', icon: Send },
+  { id: 'results', label: 'My results', icon: FileText },
 ] as const
 
 type Tab = (typeof TABS)[number]['id']
-
-// Fallback used only while usePublicSchoolInfo() is still loading —
-// matches the same fallback settingsService.ts itself uses server-side.
-const FALLBACK_YEAR = '2025/2026'
 
 function ExamsPageInner() {
   const { role, setTitle, setSubtitle } = useAuthStore()
@@ -146,11 +149,21 @@ function ExamsPageInner() {
   const tabParam = searchParams.get('tab')
   const initialTab: Tab = tabParam && TABS.some((x) => x.id === tabParam) ? (tabParam as Tab) : 'exams'
 
-  const [tab, setTab] = useState<Tab>(initialTab)
-  const [term, setTerm] = useState(1)
-  const [selectedClassId, setSelectedClassId] = useState('')
+  const [pickedTab, setTab] = useState<Tab>(initialTab)
+  // Term (like the year, below) follows the school's stored current period
+  // until the user explicitly picks a different one.
+  // [UNIVERSAL PERIOD FILTER] Year AND term come ONLY from the app-wide header
+  // filter (useViewingPeriod). This page used to carry its own year select and
+  // term select that wrote THROUGH to it — two controls for one value, on a
+  // page that already shows the period in its subtitle. They are gone; change
+  // the period from the header and every tab here follows.
+  const { academicYear, term } = useEffectiveViewingPeriod()
+  const [pickedClassId, setSelectedClassId] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [marksExamId, setMarksExamId] = useState<string | null>(null)
+  // Edit / delete of a scheduled exam (allowed until the teacher confirms its marks).
+  const [editExamId, setEditExamId] = useState<string | null>(null)
+  const [deleteExamId, setDeleteExamId] = useState<string | null>(null)
   // [PRODUCTION FIX 2026-07-28] Separate from marksExamId (teacher entry)
   // — exam officers reviewing before approval reuse the same sheet in
   // read-only mode, but need their own state so opening one doesn't
@@ -161,36 +174,69 @@ function ExamsPageInner() {
   const [viewMarksExamId, setViewMarksExamId] = useState<string | null>(null)
   const [computing, setComputing] = useState(false)
   const [computeResult, setComputeResult] = useState<{ kind: 'success' | 'error'; text: string } | null>(null)
+  // Set when continuous assessment is on and some subject lacks a finalised CA:
+  // the server refused, and this lets the user explicitly compute anyway.
+  const [canComputeAnyway, setCanComputeAnyway] = useState(false)
 
   const { data: myStudent, isLoading: myStudentLoading } = useStudentMe()
-  const { data: schoolInfo } = usePublicSchoolInfo()
-  const academicYear = schoolInfo?.currentYear ?? FALLBACK_YEAR
+
+  // ── STUDENT EXAM GUARD ─────────────────────────────────────────────────────
+  // A student sees ONLY the exams of the class they belong to. There is no
+  // class picker for them (it listed every class in the school), and:
+  //   • active student, no class yet  -> the Exams tab stays, with an
+  //     explanation (they are expected to be placed soon)
+  //   • NON-active student (graduated / archived / awaiting MANEB) with no
+  //     class -> the Exams tab is hidden entirely; My Results is what they
+  //     still need. The server (examService.listExams) enforces the same
+  //     scope, so this is presentation on top of a real guard.
+  // `studentResolved` matters: until /students/me answers (or if it fails) we
+  // must not conclude "no class" and hide a tab the student is entitled to.
+  const isStudent = role === 'student'
+  const studentResolved = isStudent && !!myStudent
+  const studentClassId = studentResolved ? (myStudent?.classId ?? null) : null
+  const studentHasNoClass = studentResolved && !studentClassId
+  const hideExamsTab = studentHasNoClass && myStudent?.status !== 'ACTIVE'
+  // [PRODUCTION FIX] Academic year was a fixed read-only value derived
+  // straight from schoolInfo.currentYear — no way to look at a past year's
+  // exams, analytics, or MANEB records at all. Every other multi-year
+  // screen in the app (Finance, Placements, Classes) uses the shared
+  // <AcademicYearSelect> for exactly this reason. Same controlled pattern
+  // as ClaimsVerificationPanel.tsx: empty state = "follow the school's
+  // current year"; once the user picks one, it sticks.
 
   useEffect(() => {
     setTitle('Exams & Results')
-    setSubtitle(`${academicYear} — Term ${term}`)
+    setSubtitle(`${academicYear} · Term ${term}`)
     return () => {
       setTitle(null)
       setSubtitle(null)
     }
   }, [term, academicYear, setTitle, setSubtitle])
 
-  const { data: classesData } = useClasses(academicYear)
+  // Students never choose a class (their own is fixed), so don't fetch the school's class list for them.
+  const { data: classesData } = useClasses(academicYear, false, !isStudent)
   const classes = (classesData ?? []) as ApiClass[]
+  // A class picked under another year is not in this year's list — treat it
+  // as "no class selected" rather than querying with a stale id.
+  const selectedClassId = classes.some((c) => c.id === pickedClassId) ? pickedClassId : ''
 
   const { data: examsData, isLoading: examsLoading } = useExams(
     selectedClassId || undefined,
     academicYear,
-    term
+    term,
+    !studentHasNoClass,   // no class => nothing to fetch (the server would return [] anyway)
   )
   const exams = (examsData ?? []) as ApiExam[]
   const marksExam = marksExamId ? exams.find((e) => e.id === marksExamId) : undefined
+  const editExam = editExamId ? exams.find((e) => e.id === editExamId) : undefined
+  const deleteTarget = deleteExamId ? exams.find((e) => e.id === deleteExamId) : undefined
   const reviewExam = reviewExamId ? exams.find((e) => e.id === reviewExamId) : undefined
   const detailExam = detailExamId ? exams.find((e) => e.id === detailExamId) : undefined
   const viewMarksExam = viewMarksExamId ? exams.find((e) => e.id === viewMarksExamId) : undefined
 
   const approveResults = useApproveResults()
   const releaseResults = useReleaseResults()
+  const deleteExam = useDeleteExam()
   const { can } = usePermissions()
 
   const canScheduleExam    = can('exam.create')
@@ -199,21 +245,28 @@ function ExamsPageInner() {
   const canRelease         = can('exam.authorizeRelease')
   const canEnterMarks      = can('exam.enterOwnClassMarks')
   const canCorrect         = can('exam.correctMarksInReview')
+  const canEditExam        = can('exam.edit')
+  const canDeleteExam      = can('exam.delete')
 
-  async function handleCompute() {
+  async function handleCompute(allowIncompleteCa = false) {
     if (!selectedClassId) return
     setComputing(true)
     setComputeResult(null)
+    setCanComputeAnyway(false)
     try {
-      const result = await apiFetch<{ computed: number }>('/exams/compute', {
+      const result = await apiFetch<{ computed: number; caAggregated?: boolean; notes?: string[] }>('/exams/compute', {
         method: 'POST',
-        body: JSON.stringify({ classId: selectedClassId, academicYear, term }),
+        body: JSON.stringify({ classId: selectedClassId, academicYear, term, allowIncompleteCa }),
       })
+      const notes = result.notes?.length ? ` Note: ${result.notes.join(' ')}` : ''
       setComputeResult({
         kind: 'success',
-        text: `Computed results for ${result.computed} student(s).`,
+        text: `Computed results for ${result.computed} student(s)${result.caAggregated ? ' (continuous assessments included)' : ''}.${notes}`,
       })
     } catch (err) {
+      const missingCa = err instanceof ApiError && err.status === 409
+        && Array.isArray((err.details as { missingCa?: unknown } | undefined)?.missingCa)
+      setCanComputeAnyway(missingCa)
       setComputeResult({
         kind: 'error',
         text: err instanceof Error ? err.message : 'Failed to compute results.',
@@ -227,70 +280,190 @@ function ExamsPageInner() {
   // (Report Cards, Promotion, Results Release) from student/lower_rank —
   // the components themselves also gate their actions, this just avoids
   // showing a tab whose contents a role can only ever view, never act on.
+  //
+  // [PRODUCTION FIX] 'analytics' and 'maneb' were shown to every role this
+  // page's RoleGuard admits, including lower_rank and student — but the
+  // backend only grants GET /exams/analytics/top-bottom to
+  // exam.viewClassAnalytics holders (admin/high_rank/academic/exam_officer)
+  // and GET /exams/maneb to admin/high_rank/exam_officer specifically
+  // (exams.ts). lower_rank and student previously saw a tab that always
+  // failed with a permission error and showed no data — exactly the "all
+  // users… nothing is pulled" symptom this was reported as. Gated to match
+  // the real backend grants, the same fix pattern already applied to
+  // applications/page.tsx and hr/page.tsx's Loans tab.
   const MANAGEMENT_TABS: Tab[] = ['report-cards', 'promotion', 'release']
+  const canViewAnalytics = can('exam.viewClassAnalytics')
+  const canViewManeb = role === 'admin' || role === 'high_rank' || role === 'exam_officer'
   const visibleTabs = TABS.filter((t) => {
+    if (t.id === 'exams') return !hideExamsTab
     if (t.id === 'results') return role === 'student'
+    // Students get their own-class view (top ten + best/average/lowest
+    // comparison) under the same tab; staff keep the full analytics.
+    if (t.id === 'analytics') return canViewAnalytics || role === 'student'
+    if (t.id === 'maneb') return canViewManeb
     if (MANAGEMENT_TABS.includes(t.id)) return role !== 'student' && role !== 'lower_rank'
     return true
   })
+  // The tab actually shown: the picked one if this person may see it, otherwise
+  // the first they can (e.g. a graduated student lands on My Results, and a
+  // deep link to a hidden tab can't render its content).
+  const tab: Tab = visibleTabs.some((t) => t.id === pickedTab) ? pickedTab : (visibleTabs[0]?.id ?? 'exams')
+
+  // Per-exam workflow actions. One definition shared by the desktop table row
+  // and the mobile card, so the two layouts can never drift apart.
+  function renderExamActions(exam: ApiExam) {
+    // The owner may change or remove an exam until the teacher confirms
+    // (finalizes) its marks; from then on it is locked. The server enforces the
+    // same window and ownership - this only decides what is OFFERED.
+    const modifiable = (EXAM_MODIFIABLE_STATUSES as readonly string[]).includes(exam.status)
+    return (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            {canEditExam && modifiable && (
+              <button
+                onClick={() => setEditExamId(exam.id)}
+                className="text-xs text-muted hover:text-tone-teal flex items-center gap-1 min-h-11 md:min-h-0"
+                aria-label={`Edit ${exam.title}`}
+              >
+                <Pencil className="w-3 h-3" /> Edit
+              </button>
+            )}
+            {canDeleteExam && modifiable && (
+              <button
+                onClick={() => setDeleteExamId(exam.id)}
+                className="text-xs text-muted hover:text-tone-coral flex items-center gap-1 min-h-11 md:min-h-0"
+                aria-label={`Delete ${exam.title}`}
+              >
+                <Trash2 className="w-3 h-3" /> Delete
+              </button>
+            )}
+            {canEnterMarks &&
+              (EXAM_MARKS_ENTERABLE_STATUSES as readonly string[]).includes(exam.status) && (
+                <button
+                  onClick={() => setMarksExamId(exam.id)}
+                  className="text-xs text-tone-teal app-action flex items-center gap-1 min-h-11 md:min-h-0"
+                >
+                  Enter marks <ChevronRight className="w-3 h-3" />
+                </button>
+              )}
+            {(canApprove || canCorrect) && (exam.status === 'MARKS_FINAL' || exam.status === 'RESULTS_APPROVED') && (
+              <button
+                onClick={() => setReviewExamId(exam.id)}
+                className="text-xs text-tone-teal app-action flex items-center gap-1 min-h-11 md:min-h-0"
+              >
+                {canCorrect ? 'Review / Correct' : 'Review Marks'} <ChevronRight className="w-3 h-3" />
+              </button>
+            )}
+            {canApprove && exam.status === 'MARKS_FINAL' && (
+              /* [ACTION AFFORDANCE] Approve and Release are
+                 state-changing actions on exam results, but
+                 they rendered as bare underlined text,
+                 visually identical to the "Review / Correct"
+                 navigation link beside them. Both are now
+                 real buttons so an irreversible action looks
+                 like one. */
+              <button
+                onClick={() => approveResults.mutate(exam.id)}
+                disabled={approveResults.isPending}
+                aria-busy={approveResults.isPending && approveResults.variables === exam.id}
+                className="text-xs font-semibold px-3 py-1.5 min-h-11 md:min-h-0 rounded-lg border border-brand-navy text-brand-navy hover:bg-brand-navy hover:text-white transition-colors disabled:opacity-60"
+              >
+                {approveResults.isPending && approveResults.variables === exam.id ? 'Approving…' : 'Approve'}
+              </button>
+            )}
+            {canRelease && exam.status === 'RESULTS_APPROVED' && (
+              <button
+                onClick={() => releaseResults.mutate(exam.id)}
+                disabled={releaseResults.isPending}
+                aria-busy={releaseResults.isPending && releaseResults.variables === exam.id}
+                className="text-xs font-semibold px-3 py-1.5 min-h-11 md:min-h-0 rounded-lg bg-btn-brand text-btn-brand-fg hover:bg-btn-brand-hover transition-colors disabled:opacity-60"
+              >
+                {releaseResults.isPending && releaseResults.variables === exam.id ? 'Releasing…' : 'Release to Students'}
+              </button>
+            )}
+          </div>
+    )
+  }
 
   return (
     <RoleGuard allowed={[...ALLOWED_ROLES]}>
-      <div className="min-h-screen bg-page">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      {/* [PRODUCTION FIX] This page previously wrapped its whole content in
+         its own `min-h-screen bg-page` div — but the authenticated shell
+         (apps/web/src/app/(auth)/layout.tsx) already paints `bg-page` on
+         its own root, with the ambient background artwork sitting behind
+         it. Re-declaring an opaque `bg-page` here painted over that
+         ambient layer for this entire page, which is what produced the
+         large, flat, page-spanning rectangle behind the "Exams" heading —
+         a page-level background that no other module page adds (Students,
+         HR, Finance, etc. render their heading directly on the shell's own
+         background). Removed so this page matches every other module. */}
+      <div className="space-y-5">
           {/* R19 — real page heading (was absent, unlike sibling module pages),
              giving assistive tech and E2E heading-role checks a landmark. */}
-          <h1 className="font-heading text-2xl font-bold text-brand-navy">Exams</h1>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <h1 className="font-heading text-2xl font-bold text-brand-navy">Exams</h1>
+          </div>
 
+          {/* [PRODUCTION FIX] Tab strip + tab content now sit inside
+             ModuleSurface — the standard elevated panel every module page
+             uses (see ModuleSurface.tsx). This page was the visual
+             reference for that standard, so wrapping it here formalises
+             what it already implied rather than changing its look. */}
+          {/* Phase 8a: the tab strip now sits above the surface, on the sky. */}
           {/* Mobile-scrollable pill tab navigation — C7 */}
+            {/* [PRODUCTION FIX] Was variant="pill" — the filled navy chip
+               that (see ModuleTabs.tsx) rendered with its background
+               painted behind the page in light mode, leaving the active
+               tab's white label invisible against the white page. Finance,
+               HR, and Placements never had this problem because they use
+               the transparent underline variant instead — adopted here for
+               the same reason. */}
             <ModuleTabs<Tab>
               tabs={visibleTabs}
               active={tab}
               onChange={setTab}
-              variant="pill"
               id="exams-tabs"
+              onSky
             />
 
+          <ModuleSurface>
           {/* ── EXAMS TAB ── */}
           {tab === 'exams' && (
             <div className="space-y-5">
               <div className="flex items-center gap-3 flex-wrap">
-                <select
-                  value={selectedClassId}
-                  onChange={(e) => setSelectedClassId(e.target.value)}
-                  aria-label="Select class"
-                  className="border border-base rounded-xl px-3 py-2 text-sm bg-surface focus:outline-none"
-                >
-                  <option value="">All classes…</option>
-                  {classes.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  value={term}
-                  onChange={(e) => setTerm(Number(e.target.value))}
-                  aria-label="Select term"
-                  className="border border-base rounded-xl px-3 py-2 text-sm bg-surface focus:outline-none"
-                >
-                  {[1, 2, 3].map((n) => (
-                    <option key={n} value={n}>
-                      Term {n}
-                    </option>
-                  ))}
-                </select>
+                {isStudent ? (
+                  // Read-only: a student's exams are their own class's, nothing else.
+                  myStudent?.className ? (
+                    <span className="inline-flex items-center gap-2 border border-base rounded-xl px-3 py-2 text-sm bg-surface text-body">
+                      <GraduationCap className="w-4 h-4 text-muted" aria-hidden />
+                      {myStudent.className}
+                    </span>
+                  ) : null
+                ) : (
+                  <select
+                    value={selectedClassId}
+                    onChange={(e) => setSelectedClassId(e.target.value)}
+                    aria-label="Select class"
+                    className="border border-base rounded-xl px-3 py-2 text-sm bg-surface focus:outline-none"
+                  >
+                    <option value="">All classes…</option>
+                    {classes.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
                 {canScheduleExam && (
                   <button
                     onClick={() => setShowForm(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-brand-teal text-white rounded-xl text-sm font-semibold hover:bg-brand-teal-light ml-auto"
+                    className="flex items-center gap-2 px-4 py-2 bg-btn-brand text-btn-brand-fg rounded-xl text-sm font-semibold hover:bg-brand-teal-light ml-auto"
                   >
-                    <Plus className="w-4 h-4" /> Schedule Exam
+                    <Plus className="w-4 h-4" /> Schedule exam
                   </button>
                 )}
                 {canComputeResults && selectedClassId && (
                   <button
-                    onClick={handleCompute}
+                    onClick={() => handleCompute()}
                     disabled={computing}
                     className="flex items-center gap-2 px-4 py-2 border border-base rounded-xl text-sm hover:bg-page disabled:opacity-60"
                   >
@@ -299,7 +472,7 @@ function ExamsPageInner() {
                     ) : (
                       <BarChart2 className="w-4 h-4" />
                     )}
-                    Compute Results
+                    Compute results
                   </button>
                 )}
               </div>
@@ -309,8 +482,8 @@ function ExamsPageInner() {
                   role={computeResult.kind === 'success' ? 'status' : 'alert'}
                   className={`flex items-center gap-2 text-sm rounded-xl px-4 py-3 border ${
                     computeResult.kind === 'success'
-                      ? 'text-brand-teal bg-brand-teal/8 border-brand-teal/20'
-                      : 'text-brand-coral bg-brand-coral/8 border-brand-coral/20'
+                      ? 'text-tone-teal bg-brand-teal/8 border-brand-teal/20'
+                      : 'text-tone-coral bg-brand-coral/8 border-brand-coral/20'
                   }`}
                 >
                   {computeResult.kind === 'success' ? (
@@ -322,6 +495,17 @@ function ExamsPageInner() {
                 </p>
               )}
 
+              {canComputeAnyway && (
+                <button
+                  type="button"
+                  onClick={() => handleCompute(true)}
+                  disabled={computing}
+                  className="px-4 py-2 border border-base rounded-xl text-sm hover:bg-page disabled:opacity-60"
+                >
+                  Compute anyway (move the missing CA weight to the end-of-term exam)
+                </button>
+              )}
+
               {examsLoading && (
                 <div className="text-center py-16 text-muted text-sm animate-pulse">
                   Loading exams…
@@ -329,20 +513,59 @@ function ExamsPageInner() {
               )}
 
               {!examsLoading && exams.length === 0 && (
-                <div className="text-center py-20 text-muted text-sm border border-base rounded-2xl">
-                  No exams scheduled yet.{canScheduleExam && ' Click "Schedule Exam" to add one.'}
+                // [PRODUCTION FIX] This empty state previously had its own
+                // border+rounded-2xl "card" wrapper — now nested inside
+                // ModuleSurface's own bg-surface/border/rounded-3xl panel,
+                // that read as a second box-within-a-box (and ate into the
+                // panel's own side padding). Removed so the content sits
+                // directly on the panel, matching every other section.
+                <div className="text-center py-20 text-muted text-sm">
+                  {studentHasNoClass
+                    ? 'You have not been assigned to a class yet, so there are no exams to show. Please check with the school office.'
+                    : isStudent
+                      ? 'No exams have been released for your class in this term yet.'
+                      : <>No exams scheduled yet.{canScheduleExam && ' Use "Schedule Exam" to add one.'}</>}
                 </div>
               )}
 
               {exams.length > 0 && (
-                <div className="border border-base rounded-2xl overflow-hidden bg-surface">
-                  <table className="w-full text-sm border-collapse">
+                // [PRODUCTION FIX] Was its own bordered/bg-surface card;
+                // same reasoning as the empty state above. The header row's
+                // bg-page and the row dividers/hover states already give
+                // the table visual structure without an outer card.
+                <>
+                {/* Mobile (< md): one card per exam. The 5-column table below
+                    was clipped by an `overflow-hidden` wrapper on phones, which
+                    hid Status and Actions entirely. */}
+                <ul className="md:hidden divide-y divide-base">
+                  {exams.map((exam) => (
+                    <li key={exam.id} className="py-3 space-y-2">
+                      <button
+                        type="button"
+                        onClick={() => exam.status === 'RESULTS_RELEASED' ? setViewMarksExamId(exam.id) : setDetailExamId(exam.id)}
+                        className="block w-full text-left min-h-11"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="font-medium text-body wrap-break-word min-w-0">{exam.title}</p>
+                          <StatusText tone={statusTone(exam.status)} className="shrink-0">{statusWord(exam.status)}</StatusText>
+                        </div>
+                        <p className="text-xs text-muted mt-0.5">
+                          {statusWord(exam.type)} · {exam.subject} · {new Date(exam.date).toLocaleDateString('en-MW')}
+                        </p>
+                      </button>
+                      {renderExamActions(exam)}
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="hidden md:block table-scroll">
+                  <table className="w-full text-sm border-collapse min-w-160">
                     <thead>
-                      <tr className="bg-page border-b border-base">
+                      <tr className="app-tint border-b border-base">
                         {['Title', 'Subject', 'Date', 'Status', 'Actions'].map((h) => (
                           <th
                             key={h}
-                            className="px-5 py-3 text-left text-xs font-heading font-semibold text-muted uppercase tracking-wide"
+                            className="px-5 py-3 text-left text-xs font-heading font-semibold text-muted "
                           >
                             {h}
                           </th>
@@ -356,11 +579,11 @@ function ExamsPageInner() {
                             <button
                               type="button"
                               onClick={() => exam.status === 'RESULTS_RELEASED' ? setViewMarksExamId(exam.id) : setDetailExamId(exam.id)}
-                              className="text-left hover:underline"
+                              className="text-left app-action"
                               title={exam.status === 'RESULTS_RELEASED' ? 'View released marks' : 'View exam details'}
                             >
                               <p className="font-medium text-body">{exam.title}</p>
-                              <p className="text-xs text-muted">{exam.type.replace(/_/g, ' ')}</p>
+                              <p className="text-xs text-muted">{statusWord(exam.type)}</p>
                             </button>
                           </td>
                           <td className="px-5 py-3 text-muted">{exam.subject}</td>
@@ -368,77 +591,48 @@ function ExamsPageInner() {
                             {new Date(exam.date).toLocaleDateString('en-MW')}
                           </td>
                           <td className="px-5 py-3">
-                            <span
-                              className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                                exam.status === 'RESULTS_RELEASED'
-                                  ? 'bg-green-100 text-green-700'
-                                  : exam.status === 'RESULTS_APPROVED'
-                                    ? 'bg-brand-teal/15 text-brand-teal'
-                                    : exam.status === 'MARKS_FINAL'
-                                      ? 'bg-blue-100 text-blue-700'
-                                      : exam.status.includes('MARKS')
-                                        ? 'bg-amber-100 text-amber-700'
-                                        : 'bg-gray-100 text-gray-600'
-                              }`}
-                            >
-                              {exam.status.replace(/_/g, ' ')}
-                            </span>
+                            {/* [NO COLOUR BLOCKS] Status was a filled chip
+                                (bg-green-100 text-green-700 and friends).
+                                Those raw Tailwind palette pairs are fixed
+                                light-mode values with no dark variant, so in
+                                dark mode a pale background sat against a
+                                near-black page. Status is now carried by font
+                                colour alone, using the theme-aware brand
+                                tokens, which resolve correctly in BOTH modes. */}
+                            <StatusText tone={statusTone(exam.status)}>{statusWord(exam.status)}</StatusText>
                           </td>
                           <td className="px-5 py-3">
-                            <div className="flex items-center gap-2">
-                              {canEnterMarks &&
-                                (EXAM_MARKS_ENTERABLE_STATUSES as readonly string[]).includes(exam.status) && (
-                                  <button
-                                    onClick={() => setMarksExamId(exam.id)}
-                                    className="text-xs text-brand-teal hover:underline flex items-center gap-1"
-                                  >
-                                    Enter Marks <ChevronRight className="w-3 h-3" />
-                                  </button>
-                                )}
-                              {(canApprove || canCorrect) && (exam.status === 'MARKS_FINAL' || exam.status === 'RESULTS_APPROVED') && (
-                                <button
-                                  onClick={() => setReviewExamId(exam.id)}
-                                  className="text-xs text-brand-teal hover:underline flex items-center gap-1"
-                                >
-                                  {canCorrect ? 'Review / Correct' : 'Review Marks'} <ChevronRight className="w-3 h-3" />
-                                </button>
-                              )}
-                              {canApprove && exam.status === 'MARKS_FINAL' && (
-                                <button
-                                  onClick={() => approveResults.mutate(exam.id)}
-                                  disabled={approveResults.isPending}
-                                  className="text-xs text-brand-navy hover:underline"
-                                >
-                                  Approve
-                                </button>
-                              )}
-                              {canRelease && exam.status === 'RESULTS_APPROVED' && (
-                                <button
-                                  onClick={() => releaseResults.mutate(exam.id)}
-                                  disabled={releaseResults.isPending}
-                                  className="text-xs text-green-700 hover:underline font-semibold"
-                                >
-                                  Release to Students
-                                </button>
-                              )}
-                            </div>
+                            {renderExamActions(exam)}
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
+                </>
               )}
             </div>
           )}
 
           {/* ── ANALYTICS TAB ── */}
           {tab === 'analytics' && (
-            <AnalyticsPanel
-              academicYear={academicYear}
-              selectedClassId={selectedClassId}
-              term={term}
-            />
+            role === 'student' ? (
+              myStudent?.id ? (
+                <StudentAnalyticsPanel studentId={myStudent.id} academicYear={academicYear} term={term} />
+              ) : (
+                <p className="text-sm text-muted text-center py-16" role="status">
+                  {myStudentLoading
+                    ? 'Loading your student record…'
+                    : 'Your student record could not be found. Please contact the school office.'}
+                </p>
+              )
+            ) : (
+              <AnalyticsPanel
+                academicYear={academicYear}
+                selectedClassId={selectedClassId}
+                term={term}
+              />
+            )
           )}
 
           {/* ── MANEB TAB ── */}
@@ -478,7 +672,7 @@ function ExamsPageInner() {
                   term={term}
                 />
               ) : (
-                <div className="text-center py-16 text-muted text-sm border border-base rounded-2xl">
+                <div className="text-center py-16 text-muted text-sm">
                   Select a class above to review its results release status.
                 </div>
               )}
@@ -493,7 +687,7 @@ function ExamsPageInner() {
               passing the Firebase UID, which never matched any row. */}
           {tab === 'results' && role === 'student' && (
             myStudent?.id ? (
-              <StudentResultsView studentId={myStudent.id} />
+              <StudentResultsView studentId={myStudent.id} bordered={false} />
             ) : (
               <p className="text-sm text-muted text-center py-16" role="status">
                 {myStudentLoading
@@ -502,17 +696,49 @@ function ExamsPageInner() {
               </p>
             )
           )}
+          </ModuleSurface>
         </div>
 
         {/* Modals */}
         {showForm && (
           <ExamForm onClose={() => setShowForm(false)} academicYear={academicYear} term={term} />
         )}
+        {editExamId && editExam && (
+          <ExamForm
+            exam={editExam}
+            onClose={() => setEditExamId(null)}
+            academicYear={editExam.academicYear}
+            term={editExam.term}
+          />
+        )}
+        <ConfirmDialog
+          open={!!deleteExamId}
+          title={deleteTarget ? `Delete "${deleteTarget.title}"?` : 'Delete exam?'}
+          description={
+            deleteTarget && (deleteTarget.marksEntered ?? 0) > 0
+              ? `${deleteTarget.marksEntered} draft mark(s) already entered for this exam will be discarded with it. This cannot be undone.`
+              : 'This exam will be removed from the schedule. This cannot be undone.'
+          }
+          confirmLabel="Delete exam"
+          confirmingLabel="Deleting…"
+          confirming={deleteExam.isPending}
+          destructive
+          onConfirm={() => {
+            if (!deleteExamId) return
+            deleteExam.mutate(deleteExamId, {
+              // Success/failure toasts come from the shared mutation feedback.
+              onSettled: () => setDeleteExamId(null),
+            })
+          }}
+          onCancel={() => setDeleteExamId(null)}
+        />
         {marksExamId && (
           <MarksEntrySheet
             examId={marksExamId}
-            classId={selectedClassId}
-            maxMark={marksExam?.maxMark ?? 100}
+            // The exam's OWN class: selectedClassId is '' under "All classes",
+            // which loaded the wrong (or no) student list into the sheet.
+            classId={marksExam?.classId ?? selectedClassId}
+            maxMark={Number(marksExam?.maxMark ?? 100)}
             onClose={() => setMarksExamId(null)}
           />
         )}
@@ -520,7 +746,7 @@ function ExamsPageInner() {
           <MarksEntrySheet
             examId={reviewExamId}
             classId={reviewExam.classId}
-            maxMark={reviewExam.maxMark ?? 100}
+            maxMark={Number(reviewExam.maxMark ?? 100)}
             onClose={() => setReviewExamId(null)}
             correctionMode={canCorrect}
             readOnly={!canCorrect}
@@ -532,7 +758,7 @@ function ExamsPageInner() {
           <MarksEntrySheet
             examId={viewMarksExamId}
             classId={viewMarksExam.classId}
-            maxMark={viewMarksExam.maxMark ?? 100}
+            maxMark={Number(viewMarksExam.maxMark ?? 100)}
             onClose={() => setViewMarksExamId(null)}
             readOnly
           />
@@ -540,41 +766,33 @@ function ExamsPageInner() {
 
         {/* ET-1: exam detail */}
         {detailExamId && detailExam && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-label="Exam details">
-            <div className="absolute inset-0" onClick={() => setDetailExamId(null)} />
-            <div className="relative z-10 w-full max-w-lg bg-surface rounded-2xl shadow-xl overflow-hidden">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-base">
-                <div>
-                  <h2 className="font-heading font-bold text-brand-navy">{detailExam.title}</h2>
-                  <p className="text-xs text-muted mt-0.5">{detailExam.type.replace(/_/g, ' ')} · {detailExam.status.replace(/_/g, ' ')}</p>
+          <Modal
+            title={detailExam.title}
+            description={`${statusWord(detailExam.type)} · ${statusWord(detailExam.status)}`}
+            onClose={() => setDetailExamId(null)}
+            size="l"
+          >
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+              {[
+                ['Subject', detailExam.subject],
+                ['Class', detailExam.className ?? detailExam.classId],
+                ['Date', new Date(detailExam.date).toLocaleDateString('en-MW', { day: '2-digit', month: 'short', year: 'numeric' })],
+                ['Time', `${detailExam.timeStart} – ${detailExam.timeEnd}`],
+                ['Venue', detailExam.venue],
+                ['Max mark', String(detailExam.maxMark)],
+                ['Weight', `${detailExam.weightPercent}%`],
+                ['Term', `Term ${detailExam.term} · ${detailExam.academicYear}`],
+                ['Students', detailExam.totalStudents != null ? String(detailExam.totalStudents) : '—'],
+                ['Marks entered', detailExam.marksEntered != null ? String(detailExam.marksEntered) : '—'],
+              ].map(([label, value]) => (
+                <div key={label}>
+                  <dt className="text-xs text-muted">{label}</dt>
+                  <dd className="text-body font-medium">{value}</dd>
                 </div>
-                <button type="button" onClick={() => setDetailExamId(null)} aria-label="Close" className="p-2 hover:bg-page rounded-xl">
-                  <ChevronRight className="w-4 h-4 text-muted rotate-90" />
-                </button>
-              </div>
-              <dl className="px-6 py-4 grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-                {[
-                  ['Subject', detailExam.subject],
-                  ['Class', detailExam.className ?? detailExam.classId],
-                  ['Date', new Date(detailExam.date).toLocaleDateString('en-MW', { day: '2-digit', month: 'short', year: 'numeric' })],
-                  ['Time', `${detailExam.timeStart} – ${detailExam.timeEnd}`],
-                  ['Venue', detailExam.venue],
-                  ['Max mark', String(detailExam.maxMark)],
-                  ['Weight', `${detailExam.weightPercent}%`],
-                  ['Term', `Term ${detailExam.term} · ${detailExam.academicYear}`],
-                  ['Students', detailExam.totalStudents != null ? String(detailExam.totalStudents) : '—'],
-                  ['Marks entered', detailExam.marksEntered != null ? String(detailExam.marksEntered) : '—'],
-                ].map(([label, value]) => (
-                  <div key={label}>
-                    <dt className="text-[11px] uppercase tracking-wide text-muted">{label}</dt>
-                    <dd className="text-body font-medium">{value}</dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
-          </div>
+              ))}
+            </dl>
+          </Modal>
         )}
-      </div>
     </RoleGuard>
   )
 }

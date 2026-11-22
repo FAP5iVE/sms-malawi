@@ -43,43 +43,40 @@
  */
 
 import {
-  BookOpen,
-  Banknote,
-  GraduationCap,
   Library,
   Clock,
   Bell,
   BarChart3,
   AlertCircle,
 } from 'lucide-react'
-import { StatCard, StatCardGrid, statValue } from '@/components/shared/StatCard'
 import { QuickActions } from '@/components/shared/QuickActions'
 import { ListCard } from '@/components/shared/ListCard'
 import { TodaysTimetableList } from '@/components/shared/TodaysTimetableList'
-import { ChartCard } from '@/components/shared/ChartCard'
 import { Chart } from '@/components/shared/chart'
 import type { ChartDataPoint } from '@/components/shared/chart'
 import type { QuickAction } from '@/components/shared/QuickActions'
 import { StudentResultsView } from '@/components/exams/StudentResultsView'
 import { useStudentMe } from '@/hooks/useStudents'
 import { useStudentPerformanceTrend, useOwnAttendance } from '@/hooks/useAnalytics'
-import { useExams } from '@/hooks/useExams'
+import { useMyOverview, useMyAttention } from '@/hooks/reporting/useStudentReporting'
+import { DashboardAttention } from './DashboardReport'
+import { PrimaryOverviewKpis, ReportLinks, SecondaryKpis, TrendCard } from './DashboardSections'
+import type { ReportLink } from './DashboardSections'
 import { useMyTimetableToday } from '@/hooks/useClasses'
-import { useCurrentAcademicPeriod } from '@/hooks/useSettings'
-import { examsInNextSevenDays } from '@/lib/examFilters'
+import { useViewingPeriod } from '@/hooks/useViewingPeriod'
 import { formatMWK } from '@shared/constants/malawi'
 
 const QUICK_ACTIONS: QuickAction[] = [
   {
-    label: 'My Timetable',
+    label: 'My timetable',
     href: '/timetable',
     icon: Clock,
     color: 'bg-brand-teal/10',
-    text: 'text-brand-teal',
+    text: 'text-tone-teal',
   },
   { label: 'Library', href: '/library', icon: Library, color: 'bg-blue-50', text: 'text-blue-600' },
   {
-    label: 'My Results',
+    label: 'My results',
     // R15: results live in the My Results tab (page reads ?tab= as of this phase)
     href: '/exams?tab=results',
     icon: BarChart3,
@@ -91,26 +88,33 @@ const QUICK_ACTIONS: QuickAction[] = [
     href: '/announcements',
     icon: Bell,
     color: 'bg-brand-amber/10',
-    text: 'text-brand-amber',
+    text: 'text-tone-amber',
   },
 ]
 
-export function StudentDashboard() {
-  const { academicYear, term, isLoading: periodLoading } = useCurrentAcademicPeriod()
-  const { data: me, isLoading: meLoading } = useStudentMe()
-  const { data: examsData, isLoading: examsLoading } = useExams(
-    me?.classId ?? undefined,
-    academicYear ?? '',
-    term ?? 0,
-  )
+/** A student leads with results, attendance, fees and handed-in work; the rest sit in "More about my term". */
+const PREFERRED = ['average', 'attendance', 'feeBalance', 'assignments']
 
-  const upcomingExams = examsInNextSevenDays(examsData ?? []).length
-  const examsLoadingAll = periodLoading || meLoading || examsLoading
+const REPORT_LINKS: ReportLink[] = [
+  { label: 'Progress', href: '/reports?tab=progress', description: 'Results by subject' },
+  { label: 'Assignments', href: '/reports?tab=assignments', description: 'Handed in and due' },
+  { label: 'Attendance', href: '/reports?tab=attendance', description: 'Days present, absent, late' },
+  { label: 'Fees', href: '/reports?tab=fees', description: 'Invoices and balance' },
+  { label: 'Library', href: '/reports?tab=library', description: 'Books out and fines' },
+  { label: 'Placement', href: '/reports?tab=placement', description: 'Your university placement' },
+]
+
+export function StudentDashboard() {
+  const { academicYear, term, isLoading: periodLoading } = useViewingPeriod()
+  const { data: me, isLoading: meLoading, isError: meError, refetch: refetchMe } = useStudentMe()
+  const period = { academicYear: academicYear ?? '', term: term ?? undefined }
+  const overview = useMyOverview(period)
+  const attention = useMyAttention(period)
 
   // Student performance trend (average % per term) — grade data sourced from
   // gradeService.ts via the R14 analytics endpoint. Unblocked by R7/R8's
   // grading reconciliation.
-  const { data: perfTrend = [], isLoading: perfLoading } = useStudentPerformanceTrend(me?.id ?? '')
+  const { data: perfTrend = [], isLoading: perfLoading, isError: perfError, refetch: refetchPerf } = useStudentPerformanceTrend(me?.id ?? '')
   const performanceData: ChartDataPoint[] = perfTrend.map((p) => ({
     x: `${p.academicYear} T${p.term}`,
     average: p.average,
@@ -118,7 +122,7 @@ export function StudentDashboard() {
 
   // Attendance breakdown (present / absent / late) for the current term —
   // unblocked by R6's Postgres Attendance model.
-  const { data: attendance, isLoading: attendanceLoading } = useOwnAttendance(
+  const { data: attendance, isLoading: attendanceLoading, isError: attendanceError, refetch: refetchAttendance } = useOwnAttendance(
     me?.id ?? '',
     academicYear,
     term,
@@ -133,59 +137,26 @@ export function StudentDashboard() {
   const attendanceLoadingAll = periodLoading || meLoading || attendanceLoading
   const perfLoadingAll = meLoading || perfLoading
 
-  const { data: timetableToday, isLoading: timetableLoading } = useMyTimetableToday()
+  const { data: timetableToday, isLoading: timetableLoading, isError: timetableError, refetch: refetchTimetable } = useMyTimetableToday()
 
   return (
-    <div className="space-y-6">
-      <StatCardGrid className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard
-          label="My Class"
-          value={statValue(meLoading, me?.className)}
-          icon={BookOpen}
-          trend="neutral"
-          trendLabel={me?.classForm ? `Form ${me.classForm}` : 'current form'}
-          iconColor="bg-brand-navy/8"
-          iconText="text-brand-navy"
-        />
-        <StatCard
-          label="Books Borrowed"
-          value={statValue(meLoading, me?.currentBorrowings)}
-          icon={Library}
-          trend="neutral"
-          trendLabel="from library"
-          iconColor="bg-blue-50"
-          iconText="text-blue-600"
-        />
-        <StatCard
-          label="Fees Balance"
-          value={statValue(
-            meLoading,
-            me ? formatMWK(me.feeBalance) : undefined,
-          )}
-          icon={Banknote}
-          trend="neutral"
-          trendLabel="outstanding"
-          iconColor="bg-brand-amber/10"
-          iconText="text-brand-amber"
-          href="/finances?tab=invoices"
-        />
-        <StatCard
-          label="Upcoming Exams"
-          value={statValue(examsLoadingAll, upcomingExams)}
-          icon={GraduationCap}
-          trend="neutral"
-          trendLabel="this week"
-          iconColor="bg-brand-teal/10"
-          iconText="text-brand-teal"
-        />
-      </StatCardGrid>
+    <div className="space-y-4 md:space-y-6">
+      <PrimaryOverviewKpis
+        title="My term"
+        summary="Check your results, attendance and assignments for the selected term."
+        academicYear={academicYear}
+        term={term}
+        overview={overview}
+        preferred={PREFERRED}
+        reportsHref="/reports?tab=progress"
+      />
 
       {/* Fee-gated exam results notice — R15: shown only when the student's
           real balance (R9's feeBalance from /students/me) is outstanding,
           instead of unconditionally for every student. */}
       {me !== undefined && me.feeBalance > 0 && (
-        <div className="bg-brand-amber/10 border border-brand-amber/30 rounded-xl p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-brand-amber shrink-0 mt-0.5" aria-hidden />
+        <div className="bg-brand-amber/10 rounded-xl p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-tone-amber shrink-0 mt-0.5" aria-hidden />
           <div>
             <p className="font-heading font-semibold text-sm text-brand-navy">
               Exam results are linked to your fee balance
@@ -199,12 +170,13 @@ export function StudentDashboard() {
         </div>
       )}
 
-      <QuickActions actions={QUICK_ACTIONS} />
-      <div className="grid md:grid-cols-2 gap-4">
-        <ChartCard
-          title="My Performance"
+      <div className="grid md:grid-cols-2 gap-3 md:gap-4">
+        <TrendCard
+          title="My performance"
           sub="Average score per term"
           isLoading={perfLoadingAll}
+          isError={perfError}
+          onRetry={() => void refetchPerf()}
           height={220}
         >
           <Chart
@@ -215,11 +187,13 @@ export function StudentDashboard() {
             emptyStateMessage="No results published yet."
             ariaLabel="My average exam score per term over time"
           />
-        </ChartCard>
-        <ChartCard
-          title="My Attendance"
+        </TrendCard>
+        <TrendCard
+          title="My attendance"
           sub={term ? `Term ${term} · ${academicYear}` : 'This term'}
           isLoading={attendanceLoadingAll}
+          isError={attendanceError}
+          onRetry={() => void refetchAttendance()}
           height={220}
         >
           <Chart
@@ -231,22 +205,25 @@ export function StudentDashboard() {
             ariaLabel={
               attendance
                 ? `Attendance this term: ${attendance.daysPresent} days present, ${attendance.daysAbsent} absent, ${attendance.daysLate} late`
-                : 'Attendance breakdown — no data available'
+                : 'Attendance breakdown: no data available'
             }
           />
-        </ChartCard>
+        </TrendCard>
       </div>
+      <DashboardAttention query={attention} title="For you to look at" limit={5} />
       <ListCard
-        title="Today's Timetable"
+        title="Today's timetable"
         sub="Your schedule today"
         isLoading={timetableLoading}
         isEmpty={(timetableToday ?? []).length === 0}
+        isError={timetableError}
+        onRetry={() => void refetchTimetable()}
         emptyMessage="No classes on your timetable today."
       >
         <TodaysTimetableList slots={timetableToday ?? []} />
       </ListCard>
-      <div className="bg-surface border border-base rounded-2xl p-5">
-        <h3 className="font-heading font-semibold text-brand-navy mb-4">My Exam Results</h3>
+      <div className="app-tint rounded-xl p-5">
+        <h3 className="font-heading font-semibold text-brand-navy mb-4">My exam results</h3>
         {/* R15: the real Student.id from /students/me — not the Firebase UID */}
         {me?.id
           ? <StudentResultsView studentId={me.id} />
@@ -254,10 +231,20 @@ export function StudentDashboard() {
             <p className="text-sm text-muted" role="status">
               {meLoading
                 ? 'Loading your student record…'
-                : 'Your student record could not be found. Please contact the school office.'}
+                : meError
+                  ? 'Your student record could not be loaded.'
+                  : 'Your student record could not be found. Please contact the school office.'}
+              {meError ? (
+                <button type="button" onClick={() => void refetchMe()} className="ml-2 min-h-11 rounded-lg border border-base px-3 text-xs font-medium text-brand-navy hover:bg-page">
+                  Retry
+                </button>
+              ) : null}
             </p>
           )}
       </div>
+      <SecondaryKpis title="More about my term" overview={overview} preferred={PREFERRED} />
+      <QuickActions actions={QUICK_ACTIONS} compact />
+      <ReportLinks links={REPORT_LINKS} title="My reports" />
     </div>
   )
 }

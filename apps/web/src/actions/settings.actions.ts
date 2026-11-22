@@ -1,11 +1,38 @@
 'use server'
 
-import { cookies } from 'next/headers'
-import * as admin from 'firebase-admin'
+/**
+ * [CHANGE TYPE]: SECURITY FIX (P0)
+ * [PURPOSE]: Every action here is a public HTTP endpoint (Next.js Server
+ *   Actions can be invoked directly, without our UI). The previous
+ *   getCallerFromCookie() trusted the client-written `sms_session` (a bare
+ *   UID) and `sms_role` cookies; admin.auth().getUser(uid) only proves the
+ *   account exists, not that the caller owns it, so anyone who knew an
+ *   admin's UID could forge both cookies and change school-wide settings.
+ *
+ *   Now each action takes the caller's Firebase ID token as its FIRST
+ *   argument and resolves identity through requireCurrentUser()
+ *   (lib/serverAuth.ts), which verifies it with verifyIdToken(token, true).
+ *   Cookies are never read here.
+ *
+ *   Order in every action: authenticate → authorise → validate → mutate.
+ *   Unauthenticated callers get a 401-style result (code UNAUTHENTICATED),
+ *   authenticated callers lacking permission a 403-style result (FORBIDDEN),
+ *   and neither learns anything about the form schema.
+ *
+ *   Client usage:
+ *     const token = await getAuth().currentUser?.getIdToken()
+ *     const res = await updateExamSettings(token ?? '', values)
+ *
+ *   NOTE: a 'use server' file may only export async functions, and each one
+ *   is a public endpoint. Keep helpers non-exported, and add a case to
+ *   __tests__/settings.actions.test.ts for every new export (that test fails
+ *   if an exported action is not covered).
+ */
+
 import * as settingsService from '@/server/services/settingsService'
+import { requireCurrentUser, AuthError, type CurrentUser } from '@/lib/serverAuth'
 import { hasPermission } from '@shared/types/permissions'
 import { SETTING_KEYS } from '@shared/types/settings'
-import type { UserRole } from '@shared/types/roles'
 import {
   AcademicSettingsFormSchema,
   SchoolIdentityFormSchema,
@@ -27,36 +54,46 @@ interface ActionResult<T = undefined> {
   success: boolean
   error?: string
   data?: T
+  /**
+   * Machine-readable failure class (HTTP-status analogue):
+   *   UNAUTHENTICATED ≈ 401, FORBIDDEN ≈ 403, VALIDATION ≈ 422.
+   */
+  code?: 'UNAUTHENTICATED' | 'FORBIDDEN' | 'VALIDATION'
 }
 
+type Gate =
+  | { ok: true; caller: CurrentUser }
+  | { ok: false; result: ActionResult }
+
 /**
- * Verify the caller from the session cookie.
- * Returns the uid and role, or throws with an error ActionResult.
+ * Authenticate the caller from their ID token, then check the exact
+ * permission for this operation. Never throws; a failed gate carries the
+ * ActionResult to return unchanged. Fails closed on anything unexpected.
  */
-async function getCallerFromCookie(): Promise<{ uid: string; role: UserRole }> {
-  const cookieStore = await cookies()
-  const uid = cookieStore.get('sms_session')?.value
-  const role = cookieStore.get('sms_role')?.value as UserRole | undefined
-
-  if (!uid || !role) {
-    throw new Error('You must be signed in to perform this action.')
-  }
-
-  // Double-verify the UID against Firebase Admin to prevent
-  // cookie forgery — Server Actions can be called directly.
+async function authorize(
+  idToken: unknown,
+  isAllowed: (caller: CurrentUser) => boolean,
+  deniedMessage: string
+): Promise<Gate> {
+  let caller: CurrentUser
   try {
-    const user = await admin.auth().getUser(uid)
-    const claims = user.customClaims
-    const verifiedRole = claims?.['role'] as UserRole | undefined
-    if (!verifiedRole || verifiedRole !== role) {
-      throw new Error('Session is invalid or role has changed. Please sign in again.')
-    }
+    caller = await requireCurrentUser(idToken)
   } catch (err) {
-    if (err instanceof Error && err.message.includes('Session is invalid')) throw err
-    throw new Error('Could not verify your session. Please sign in again.')
+    const error =
+      err instanceof AuthError
+        ? err.message
+        : 'Could not verify your session. Please sign in again.'
+    return { ok: false, result: { success: false, code: 'UNAUTHENTICATED', error } }
   }
 
-  return { uid, role }
+  if (!isAllowed(caller)) {
+    return { ok: false, result: { success: false, code: 'FORBIDDEN', error: deniedMessage } }
+  }
+  return { ok: true, caller }
+}
+
+function invalid(message: string | undefined): ActionResult {
+  return { success: false, code: 'VALIDATION', error: message ?? 'Validation failed.' }
 }
 
 // ─────────────────────────────────────────────────────────
@@ -64,23 +101,18 @@ async function getCallerFromCookie(): Promise<{ uid: string; role: UserRole }> {
 // ─────────────────────────────────────────────────────────
 
 export async function updateAcademicSettings(
+  idToken: string,
   input: AcademicSettingsFormInput
 ): Promise<ActionResult> {
+  const gate = await authorize(
+    idToken,
+    (c) => hasPermission(c.role, 'settings.manageAcademicPolicy', c.superUser),
+    'You do not have permission to update academic settings.'
+  )
+  if (!gate.ok) return gate.result
+
   const parsed = AcademicSettingsFormSchema.safeParse(input)
-  if (!parsed.success) {
-    return { success: false, error: parsed.error.issues[0]?.message ?? 'Validation failed.' }
-  }
-
-  let caller: { uid: string; role: UserRole }
-  try {
-    caller = await getCallerFromCookie()
-  } catch (err) {
-    return { success: false, error: (err as Error).message }
-  }
-
-  if (!hasPermission(caller.role, 'settings.manageAcademicPolicy')) {
-    return { success: false, error: 'You do not have permission to update academic settings.' }
-  }
+  if (!parsed.success) return invalid(parsed.error.issues[0]?.message)
 
   const { currentAcademicYear, currentTerm, term1Start, term1End,
           term2Start, term2End, term3Start, term3End } = parsed.data
@@ -96,7 +128,7 @@ export async function updateAcademicSettings(
       { key: SETTING_KEYS.TERM3_START,            value: term3Start },
       { key: SETTING_KEYS.TERM3_END,              value: term3End },
     ],
-    caller.uid
+    gate.caller.uid
   )
 
   return { success: true }
@@ -107,23 +139,18 @@ export async function updateAcademicSettings(
 // ─────────────────────────────────────────────────────────
 
 export async function updateSchoolIdentity(
+  idToken: string,
   input: SchoolIdentityFormInput
 ): Promise<ActionResult> {
+  const gate = await authorize(
+    idToken,
+    (c) => hasPermission(c.role, 'settings.manageAcademicPolicy', c.superUser),
+    'You do not have permission to update school identity settings.'
+  )
+  if (!gate.ok) return gate.result
+
   const parsed = SchoolIdentityFormSchema.safeParse(input)
-  if (!parsed.success) {
-    return { success: false, error: parsed.error.issues[0]?.message ?? 'Validation failed.' }
-  }
-
-  let caller: { uid: string; role: UserRole }
-  try {
-    caller = await getCallerFromCookie()
-  } catch (err) {
-    return { success: false, error: (err as Error).message }
-  }
-
-  if (!hasPermission(caller.role, 'settings.manageAcademicPolicy')) {
-    return { success: false, error: 'You do not have permission to update school identity settings.' }
-  }
+  if (!parsed.success) return invalid(parsed.error.issues[0]?.message)
 
   const d = parsed.data
 
@@ -140,7 +167,7 @@ export async function updateSchoolIdentity(
       { key: SETTING_KEYS.SCHOOL_WEBSITE,      value: d.schoolWebsite },
       { key: SETTING_KEYS.SCHOOL_FOUNDED_YEAR, value: d.schoolFoundedYear },
     ],
-    caller.uid
+    gate.caller.uid
   )
 
   return { success: true }
@@ -151,23 +178,18 @@ export async function updateSchoolIdentity(
 // ─────────────────────────────────────────────────────────
 
 export async function updateExamSettings(
+  idToken: string,
   input: ExamSettingsFormInput
 ): Promise<ActionResult> {
+  const gate = await authorize(
+    idToken,
+    (c) => hasPermission(c.role, 'settings.manageExamConfig', c.superUser),
+    'You do not have permission to update exam settings.'
+  )
+  if (!gate.ok) return gate.result
+
   const parsed = ExamSettingsFormSchema.safeParse(input)
-  if (!parsed.success) {
-    return { success: false, error: parsed.error.issues[0]?.message ?? 'Validation failed.' }
-  }
-
-  let caller: { uid: string; role: UserRole }
-  try {
-    caller = await getCallerFromCookie()
-  } catch (err) {
-    return { success: false, error: (err as Error).message }
-  }
-
-  if (!hasPermission(caller.role, 'settings.manageExamConfig')) {
-    return { success: false, error: 'You do not have permission to update exam settings.' }
-  }
+  if (!parsed.success) return invalid(parsed.error.issues[0]?.message)
 
   const d = parsed.data
 
@@ -180,7 +202,7 @@ export async function updateExamSettings(
       { key: SETTING_KEYS.PROMOTION_MIN_AVERAGE,     value: d.promotionMinAverage },
       { key: SETTING_KEYS.PROMOTION_REQUIRED_PASSES, value: d.promotionRequiredPasses },
     ],
-    caller.uid
+    gate.caller.uid
   )
 
   return { success: true }
@@ -191,23 +213,18 @@ export async function updateExamSettings(
 // ─────────────────────────────────────────────────────────
 
 export async function updateFinanceSettings(
+  idToken: string,
   input: FinanceSettingsFormInput
 ): Promise<ActionResult> {
+  const gate = await authorize(
+    idToken,
+    (c) => hasPermission(c.role, 'settings.manageFinanceConfig', c.superUser),
+    'You do not have permission to update finance settings.'
+  )
+  if (!gate.ok) return gate.result
+
   const parsed = FinanceSettingsFormSchema.safeParse(input)
-  if (!parsed.success) {
-    return { success: false, error: parsed.error.issues[0]?.message ?? 'Validation failed.' }
-  }
-
-  let caller: { uid: string; role: UserRole }
-  try {
-    caller = await getCallerFromCookie()
-  } catch (err) {
-    return { success: false, error: (err as Error).message }
-  }
-
-  if (!hasPermission(caller.role, 'settings.manageFinanceConfig')) {
-    return { success: false, error: 'You do not have permission to update finance settings.' }
-  }
+  if (!parsed.success) return invalid(parsed.error.issues[0]?.message)
 
   const d = parsed.data
 
@@ -220,7 +237,7 @@ export async function updateFinanceSettings(
       { key: SETTING_KEYS.FINANCE_PENSION_PERCENT,         value: d.pensionPercent },
       { key: SETTING_KEYS.FINANCE_PAYE_BRACKETS,           value: d.payeBrackets },
     ],
-    caller.uid
+    gate.caller.uid
   )
 
   return { success: true }
@@ -231,23 +248,18 @@ export async function updateFinanceSettings(
 // ─────────────────────────────────────────────────────────
 
 export async function updateLibrarySettings(
+  idToken: string,
   input: LibrarySettingsFormInput
 ): Promise<ActionResult> {
+  const gate = await authorize(
+    idToken,
+    (c) => hasPermission(c.role, 'settings.manageLibraryConfig', c.superUser),
+    'You do not have permission to update library settings.'
+  )
+  if (!gate.ok) return gate.result
+
   const parsed = LibrarySettingsFormSchema.safeParse(input)
-  if (!parsed.success) {
-    return { success: false, error: parsed.error.issues[0]?.message ?? 'Validation failed.' }
-  }
-
-  let caller: { uid: string; role: UserRole }
-  try {
-    caller = await getCallerFromCookie()
-  } catch (err) {
-    return { success: false, error: (err as Error).message }
-  }
-
-  if (!hasPermission(caller.role, 'settings.manageLibraryConfig')) {
-    return { success: false, error: 'You do not have permission to update library settings.' }
-  }
+  if (!parsed.success) return invalid(parsed.error.issues[0]?.message)
 
   const d = parsed.data
 
@@ -261,7 +273,7 @@ export async function updateLibrarySettings(
       { key: SETTING_KEYS.LIBRARY_FINE_GRACE_DAYS,      value: d.fineGraceDays },
       { key: SETTING_KEYS.LIBRARY_REMINDER_DAYS_BEFORE, value: d.reminderDaysBefore },
     ],
-    caller.uid
+    gate.caller.uid
   )
 
   return { success: true }
@@ -272,23 +284,18 @@ export async function updateLibrarySettings(
 // ─────────────────────────────────────────────────────────
 
 export async function updateHRSettings(
+  idToken: string,
   input: HRSettingsFormInput
 ): Promise<ActionResult> {
+  const gate = await authorize(
+    idToken,
+    (c) => hasPermission(c.role, 'settings.manageHRConfig', c.superUser),
+    'You do not have permission to update HR settings.'
+  )
+  if (!gate.ok) return gate.result
+
   const parsed = HRSettingsFormSchema.safeParse(input)
-  if (!parsed.success) {
-    return { success: false, error: parsed.error.issues[0]?.message ?? 'Validation failed.' }
-  }
-
-  let caller: { uid: string; role: UserRole }
-  try {
-    caller = await getCallerFromCookie()
-  } catch (err) {
-    return { success: false, error: (err as Error).message }
-  }
-
-  if (!hasPermission(caller.role, 'settings.manageHRConfig')) {
-    return { success: false, error: 'You do not have permission to update HR settings.' }
-  }
+  if (!parsed.success) return invalid(parsed.error.issues[0]?.message)
 
   const d = parsed.data
 
@@ -301,8 +308,10 @@ export async function updateHRSettings(
       { key: SETTING_KEYS.HR_PATERNITY_LEAVE_DAYS,     value: d.paternityLeaveDays },
       { key: SETTING_KEYS.HR_STUDY_LEAVE_DAYS,         value: d.studyLeaveDays },
       { key: SETTING_KEYS.HR_EMERGENCY_LEAVE_DAYS,     value: d.emergencyLeaveDays },
+      { key: SETTING_KEYS.HR_SICK_HALF_PAY_DAYS,       value: d.sickHalfPayDays },
+      { key: SETTING_KEYS.HR_LEAVE_PAY_PERCENT,        value: d.leavePayPercent },
     ],
-    caller.uid
+    gate.caller.uid
   )
 
   return { success: true }
@@ -314,23 +323,23 @@ export async function updateHRSettings(
 
 /**
  * Toggle app maintenance mode on or off.
- * Admin only — no form schema needed (single boolean).
+ * Admin only. No form schema (single boolean), but the argument still crosses
+ * the network, so it is type-checked at runtime before anything is written.
  */
 export async function setMaintenanceMode(
+  idToken: string,
   enabled: boolean
 ): Promise<ActionResult> {
-  let caller: { uid: string; role: UserRole }
-  try {
-    caller = await getCallerFromCookie()
-  } catch (err) {
-    return { success: false, error: (err as Error).message }
-  }
+  const gate = await authorize(
+    idToken,
+    (c) => c.role === 'admin' || c.superUser,
+    'Only administrators may toggle maintenance mode.'
+  )
+  if (!gate.ok) return gate.result
 
-  if (caller.role !== 'admin') {
-    return { success: false, error: 'Only administrators may toggle maintenance mode.' }
-  }
+  if (typeof enabled !== 'boolean') return invalid('Invalid maintenance mode value.')
 
-  await settingsService.set(SETTING_KEYS.APP_MAINTENANCE_MODE, enabled, caller.uid)
+  await settingsService.set(SETTING_KEYS.APP_MAINTENANCE_MODE, enabled, gate.caller.uid)
 
   return { success: true, data: undefined }
 }

@@ -21,12 +21,12 @@
  */
 'use client'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import type { ApiExam, ApiExamMark, ApiTermResult, ApiManebRecord, ApiExamAnalytics } from '@shared/types/api'
-import type { CreateExamInput, BulkMarkEntryInput, CreateManebRecordInput } from '@shared/schemas/exam'
+import type { ApiExam, ApiExamMark, ApiTermResult, ApiManebRecord, ApiExamAnalytics, ApiStudentClassStanding } from '@shared/types/api'
+import type { CreateExamInput, UpdateExamInput, BulkMarkEntryInput, CreateManebRecordInput } from '@shared/schemas/exam'
 import type { ReportCardData } from '@/components/shared/PrintableReportCard'
-import { apiFetch, queryKeys } from '@/lib/api-client'
+import { apiFetch, newIdempotencyKey, queryKeys } from '@/lib/api-client'
 
-export function useExams(classId: string | undefined, academicYear: string, term: number) {
+export function useExams(classId: string | undefined, academicYear: string, term: number, enabled = true) {
   return useQuery({
     queryKey: queryKeys.exams.list({ classId: classId ?? null, academicYear, term }),
     queryFn:  () =>
@@ -35,22 +35,59 @@ export function useExams(classId: string | undefined, academicYear: string, term
           ? `/exams?classId=${classId}&academicYear=${academicYear}&term=${term}`
           : `/exams?academicYear=${academicYear}&term=${term}`
       ),
-    enabled: !!academicYear && !!term,
+    enabled: enabled && !!academicYear && !!term,
+  })
+}
+
+// Continuous-assessment configuration (any signed-in user may read it).
+// Backs the CA-slot picker in ExamForm and the CA breakdown on results.
+export function useCaConfig() {
+  return useQuery({
+    queryKey: [...queryKeys.exams.all(), 'ca-config'] as const,
+    queryFn:  () => apiFetch<{ enabled: boolean; count: number; weights: number[] }>('/settings/exam/ca-config'),
+    staleTime: 5 * 60 * 1000,
   })
 }
 
 export function useCreateExam() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Exam scheduled', failureTitle: 'Could not schedule the exam' },
     mutationFn: (data: CreateExamInput) =>
       apiFetch<ApiExam>('/exams', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.exams.all() }),
   })
 }
 
+// PATCH /exams/:id - the owner may change an exam's details until the teacher
+// confirms (finalizes) its marks; the server refuses after that.
+export function useUpdateExam() {
+  const qc = useQueryClient()
+  return useMutation({
+    meta: { successMessage: 'Exam updated', failureTitle: 'Could not update the exam' },
+    mutationFn: ({ examId, data }: { examId: string; data: UpdateExamInput }) =>
+      apiFetch<ApiExam>(`/exams/${examId}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.exams.all() }),
+  })
+}
+
+// DELETE /exams/:id - same window as editing. Unconfirmed draft marks are
+// discarded with the exam; the response says how many.
+export function useDeleteExam() {
+  const qc = useQueryClient()
+  return useMutation({
+    meta: { successMessage: 'Exam deleted', failureTitle: 'Could not delete the exam' },
+    mutationFn: (examId: string) =>
+      apiFetch<{ success: boolean; discardedDraftMarks: number }>(`/exams/${examId}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.exams.all() }),
+  })
+}
+
+// "Save Draft" on the marks sheet.
 export function useEnterMarks(examId: string) {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Draft saved', failureTitle: 'Could not save the draft' },
     mutationFn: (data: BulkMarkEntryInput) =>
       apiFetch<unknown[]>(`/exams/${examId}/marks`, { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => {
@@ -65,13 +102,17 @@ export function useEnterMarks(examId: string) {
 export function useCorrectMarks(examId: string) {
   const qc = useQueryClient()
   return useMutation({
+    meta: {
+      affectsRisk: true,   // refreshes student risk badges (see QueryProvider)
+      successMessage: 'Corrections saved',
+      failureTitle: 'Could not save the corrections',
+    },
     mutationFn: (data: BulkMarkEntryInput) =>
       apiFetch<unknown[]>(`/exams/${examId}/correct-marks`, { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.exams.all() })
       qc.invalidateQueries({ queryKey: queryKeys.exams.marks(examId) })
     },
-    onError: (err) => console.error('[useCorrectMarks] Correction failed:', err),
   })
 }
 
@@ -83,17 +124,30 @@ export function useExamMarks(examId: string) {
   })
 }
 
+// "Finalize Marks": the sheet as the teacher sees it is sent WITH the confirm
+// request, so saving and confirming are one atomic server step. (Previously
+// this was "save as final" followed by a second "finalize" call - if the
+// first was rejected, the click appeared to do nothing at all.)
 export function useFinalizeMarks() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (examId: string) => apiFetch<{ success: boolean }>(`/exams/${examId}/finalize`, { method: 'POST' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.exams.all() }),
+    meta: { successMessage: 'Marks finalized and locked', failureTitle: 'Could not finalize the marks' },
+    mutationFn: ({ examId, entries }: { examId: string; entries?: BulkMarkEntryInput['entries'] }) =>
+      apiFetch<{ success: boolean }>(`/exams/${examId}/finalize`, {
+        method: 'POST',
+        body:   JSON.stringify(entries ? { entries } : {}),
+      }),
+    onSuccess: (_data, { examId }) => {
+      qc.invalidateQueries({ queryKey: queryKeys.exams.all() })
+      qc.invalidateQueries({ queryKey: queryKeys.exams.marks(examId) })
+    },
   })
 }
 
 export function useApproveResults() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Results approved', failureTitle: 'Could not approve the results' },
     mutationFn: (examId: string) => apiFetch<{ success: boolean }>(`/exams/${examId}/approve`, { method: 'POST' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.exams.all() }),
   })
@@ -102,6 +156,11 @@ export function useApproveResults() {
 export function useReleaseResults() {
   const qc = useQueryClient()
   return useMutation({
+    meta: {
+      affectsRisk: true,   // refreshes student risk badges (see QueryProvider)
+      successMessage: 'Results released to students',
+      failureTitle: 'Could not release the results',
+    },
     mutationFn: (examId: string) => apiFetch<{ success: boolean }>(`/exams/${examId}/release`, { method: 'POST' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.exams.all() }),
   })
@@ -120,16 +179,30 @@ export function useStudentResults(studentId: string, academicYear: string, term:
 // at-risk). Oversight sees any class; teachers are scoped server-side.
 export function useExamAnalytics(
   academicYear: string, term: number,
-  opts: { classId?: string; subject?: string; limit?: number } = {},
+  opts: { classId?: string; form?: number; subject?: string; limit?: number } = {},
 ) {
   const params = new URLSearchParams({ academicYear, term: String(term) })
   if (opts.classId) params.set('classId', opts.classId)
+  else if (opts.form) params.set('form', String(opts.form))
   if (opts.subject) params.set('subject', opts.subject)
   if (opts.limit)   params.set('limit', String(opts.limit))
   return useQuery({
-    queryKey: ['exams', 'analytics', 'top-bottom', academicYear, term, opts.classId ?? '', opts.subject ?? '', opts.limit ?? 10],
+    queryKey: ['exams', 'analytics', 'top-bottom', academicYear, term, opts.classId ?? '', opts.form ?? 0, opts.subject ?? '', opts.limit ?? 10],
     queryFn:  () => apiFetch<ApiExamAnalytics>(`/exams/analytics/top-bottom?${params.toString()}`),
     enabled:  !!academicYear && !!term,
+  })
+}
+
+// A student's standing inside their own class: class top ten + best / average /
+// lowest comparison, overall and per subject. Fee-gated like useStudentResults.
+export function useStudentClassStanding(studentId: string, academicYear: string, term: number) {
+  return useQuery({
+    queryKey: ['exams', 'class-standing', studentId, academicYear, term],
+    queryFn:  () => apiFetch<ApiStudentClassStanding | null>(
+      `/exams/results/${studentId}/class-standing?academicYear=${academicYear}&term=${term}`,
+    ),
+    enabled:  !!studentId && !!academicYear && !!term,
+    retry:    false, // never retry a 403 fee gate
   })
 }
 
@@ -164,6 +237,7 @@ export interface BulkManebResult {
 export function useBulkCreateManebRecords(academicYear: string) {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'MANEB records imported', failureTitle: 'Could not import the MANEB records' },
     mutationFn: (rows: CreateManebRecordInput[]) =>
       apiFetch<BulkManebResult>('/exams/maneb/bulk', { method: 'POST', body: JSON.stringify(rows) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.exams.manebRecords({ academicYear }) }),
@@ -178,6 +252,7 @@ export function useBulkCreateManebRecords(academicYear: string) {
 export function useCreateManebRecord(academicYear: string) {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'MANEB record added', failureTitle: 'Could not add the MANEB record' },
     mutationFn: (data: CreateManebRecordInput) =>
       apiFetch<ApiManebRecord>('/exams/maneb', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.exams.manebRecords({ academicYear }) }),
@@ -197,6 +272,7 @@ export interface ReportCardGenerationResult {
 // SR-3: a student generates + downloads their OWN report card.
 export function useGenerateMyReportCard() {
   return useMutation({
+    meta: { feedback: 'manual' },
     mutationFn: (vars: { academicYear: string; term: number }) =>
       apiFetch<ReportCardGenerationResult>('/exams/report-card/mine', {
         method: 'POST', body: JSON.stringify(vars),
@@ -207,9 +283,12 @@ export function useGenerateMyReportCard() {
 
 export function useGenerateReportCard() {
   return useMutation({
+    meta: { feedback: 'manual' },
     mutationFn: ({ studentId, academicYear, term }: { studentId: string; academicYear: string; term: number }) =>
       apiFetch<ReportCardGenerationResult>('/exams/report-card', {
         method: 'POST',
+        // [Issue 6] One key per click: a retried generation replays the first result.
+        headers: { 'Idempotency-Key': newIdempotencyKey() },
         body:   JSON.stringify({ studentId, academicYear, term }),
       }),
   })

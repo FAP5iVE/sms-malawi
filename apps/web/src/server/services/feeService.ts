@@ -66,11 +66,13 @@ import type {
 } from '@shared/schemas/finance'
 import { generateReceipt } from '@/server/services/receiptService'
 import * as accountingService from '@/server/services/accountingService'
+import * as algolia from '@/server/services/algoliaService'
 import { resolveStudentFromUid } from '@/server/services/studentService'
 import { getSchoolBranding } from '@/server/services/notificationService'
 import * as settingsService from '@/server/services/settingsService'
 import { SETTING_KEYS } from '@shared/types/settings'
 import { withInvoiceNumber } from '@/server/services/invoiceNumberService'
+import { summariseInvoices } from '@/server/services/analytics/financeLogic'
 
 export async function checkBalanceGate(
   studentId: string,
@@ -102,13 +104,21 @@ export async function checkBalanceGate(
 // everything it needs in this one call. Previously returned bare Invoice
 // rows with neither relation, which is what left that section of the
 // student finance view permanently empty.
-export async function getStudentBalance(studentId: string, academicYear: string) {
+//
+// [FINANCE PAYMENT HISTORY] `academicYear` is now optional: omit it for the
+// student's invoices across EVERY year (the finance "Fee Payment History"
+// panel in InvoicesTab). Each payment also carries its allocations (which fee
+// line each part of it paid) so the history can show where the money went.
+export async function getStudentBalance(studentId: string, academicYear?: string) {
   const invoices = await prisma.invoice.findMany({
-    where: { studentId, academicYear },
-    orderBy: { term: 'asc' },
+    where: { studentId, ...(academicYear ? { academicYear } : {}) },
+    orderBy: [{ academicYear: 'asc' }, { term: 'asc' }],
     include: {
       lineItems: true,
-      payments: { orderBy: { paidAt: 'desc' } },
+      payments: {
+        orderBy: { paidAt: 'desc' },
+        include: { allocations: { include: { lineItem: { select: { feeName: true } } } } },
+      },
     },
   })
   const totalBalance = invoices.reduce(
@@ -285,7 +295,7 @@ export async function generateInvoice(
           scholarshipId: scholarship?.id ?? null,
           lineItems: { create: lineItemsData },
         },
-        include: { lineItems: true },
+        include: { lineItems: true, student: { select: { firstName: true, lastName: true, registrationNo: true, class: { select: { name: true } } } } },
       })
       for (const c of creditApplications) {
         await tx.studentCredit.update({
@@ -300,6 +310,19 @@ export async function generateInvoice(
   logger.info({
     event: 'invoice.generated', invoiceId: invoice.id, studentId: data.studentId,
     totalAmount, feeTypes: feeStructures.map((f) => f.name), creditApplied, actorUid, actorRole,
+  })
+  // [ALGOLIA ROLLOUT — Tier 2 item 7, upgraded to high priority] New index.
+  void algolia.indexInvoice({
+    objectID:       invoice.id,
+    studentName:    `${invoice.student.firstName} ${invoice.student.lastName}`,
+    registrationNo: invoice.student.registrationNo,
+    status:         invoice.status,
+    academicYear:   invoice.academicYear,
+    term:           invoice.term,
+    className:      invoice.student.class?.name ?? null,
+    dueDate:        invoice.dueDate.toISOString(),
+    balance:        Number(invoice.balance),
+    createdAt:      invoice.createdAt.toISOString(),
   })
   return invoice
 }
@@ -317,6 +340,23 @@ export class OverpaymentConfirmationRequiredError extends Error {
     this.name = 'OverpaymentConfirmationRequiredError'
   }
 }
+
+// [FIXED 2026-10-22] Thrown when a payment matches one already recorded on the
+// same invoice -- see the duplicate guard in recordPayment(). The route maps it
+// to a 409 with a plain message (no `overpayments`), which the client shows as
+// an error instead of an overpayment prompt.
+export class DuplicatePaymentError extends Error {
+  constructor() {
+    super(
+      'This looks like a duplicate of a payment already recorded on this invoice (same amount, method and reference). Refresh the invoice to see its latest balance before recording it again.'
+    )
+    this.name = 'DuplicatePaymentError'
+  }
+}
+
+// Same amount + method inside this window is treated as an accidental
+// double-submit (double-click, retry after a slow response, a second tab).
+const DUPLICATE_PAYMENT_WINDOW_MS = 2 * 60 * 1000
 
 // [PRODUCTION FIX] Full rewrite. A payment previously applied as one
 // undifferentiated amount against the whole invoice. It now allocates
@@ -340,49 +380,74 @@ export class OverpaymentConfirmationRequiredError extends Error {
 //      OverpaymentConfirmationRequiredError so the client can warn and
 //      get explicit confirmation first, exactly as requested.
 export async function recordPayment(data: RecordPaymentInput, actorUid: string, actorRole: string) {
-  const invoice = await prisma.invoice.findUniqueOrThrow({
-    where: { id: data.invoiceId },
-    include: { payments: true, lineItems: true },
-  })
+  // [FIXED 2026-10-22] The invoice (balances, existing payments) used to be read
+  // OUTSIDE the transaction that wrote the payment. Two requests for the same
+  // invoice -- a double-click, a retry, two cashiers -- could both read the
+  // same balances, both pass validation and both be recorded. Everything now
+  // happens inside one transaction that first takes a row lock on the invoice:
+  // the second request waits, re-reads the committed state (including the
+  // first payment) and is validated against that.
+  const result = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT "id" FROM "invoices" WHERE "id" = ${data.invoiceId} FOR UPDATE`
 
-  const allocationTotal = Math.round(data.allocations.reduce((sum, a) => sum + a.amount, 0) * 100) / 100
-  if (allocationTotal > data.amount + 0.01) {
-    throw new Error(
-      `Allocated amount MWK ${allocationTotal.toLocaleString()} cannot exceed the total payment MWK ${data.amount.toLocaleString()}.`
-    )
-  }
-
-  const lineItemsById = new Map(invoice.lineItems.map((li) => [li.id, li]))
-  for (const a of data.allocations) {
-    const li = lineItemsById.get(a.lineItemId)
-    if (!li) throw new Error('One or more allocated fees do not belong to this invoice.')
-    if (li.invoiceId !== invoice.id) throw new Error('One or more allocated fees do not belong to this invoice.')
-  }
-
-  // Detect per-line-item overpayment (allocation > that fee's own balance).
-  const overpayments = data.allocations
-    .map((a) => {
-      const li = lineItemsById.get(a.lineItemId)!
-      const excess = Math.round((a.amount - Number(li.balance)) * 100) / 100
-      return excess > 0.01 ? { lineItemId: a.lineItemId, feeName: li.feeName, excess } : null
+    const invoice = await tx.invoice.findUniqueOrThrow({
+      where: { id: data.invoiceId },
+      include: { payments: true, lineItems: true },
     })
-    .filter((x): x is { lineItemId: string; feeName: string; excess: number } => x !== null)
 
-  // The unallocated remainder (paid but not assigned to any fee) is also
-  // effectively an overpayment against nothing in particular.
-  const unallocatedRemainder = Math.round((data.amount - allocationTotal) * 100) / 100
-  if (unallocatedRemainder > 0.01) {
-    overpayments.push({ lineItemId: '', feeName: 'Unallocated', excess: unallocatedRemainder })
-  }
+    // Duplicate guard. A bank / mobile-money transaction id (6+ chars with a
+    // digit, e.g. NB783476292362) identifies ONE real-world payment, so the same
+    // id + amount + method on this invoice is never legitimate. Without such a
+    // reference, an identical payment inside the short window is an
+    // accidental resubmit.
+    const incomingRef = (data.reference ?? '').trim().toLowerCase()
+    const isTransactionRef = incomingRef.length >= 6 && /\d/.test(incomingRef)
+    const isDuplicate = invoice.payments.some((p) => {
+      if (p.method !== data.method) return false
+      if (Math.abs(Number(p.amount) - data.amount) > 0.01) return false
+      if (isTransactionRef && (p.reference ?? '').trim().toLowerCase() === incomingRef) return true
+      return Date.now() - p.paidAt.getTime() < DUPLICATE_PAYMENT_WINDOW_MS
+    })
+    if (isDuplicate) throw new DuplicatePaymentError()
 
-  if (overpayments.length > 0 && !data.confirmOverpayment) {
-    throw new OverpaymentConfirmationRequiredError(overpayments)
-  }
+    const allocationTotal = Math.round(data.allocations.reduce((sum, a) => sum + a.amount, 0) * 100) / 100
+    if (allocationTotal > data.amount + 0.01) {
+      throw new Error(
+        `Allocated amount MWK ${allocationTotal.toLocaleString()} cannot exceed the total payment MWK ${data.amount.toLocaleString()}.`
+      )
+    }
 
-  const totalCreditToCreate = overpayments.reduce((sum, o) => sum + o.excess, 0)
-  const appliedToInvoice = Math.round((data.amount - totalCreditToCreate) * 100) / 100
+    const lineItemsById = new Map(invoice.lineItems.map((li) => [li.id, li]))
+    for (const a of data.allocations) {
+      const li = lineItemsById.get(a.lineItemId)
+      if (!li) throw new Error('One or more allocated fees do not belong to this invoice.')
+      if (li.invoiceId !== invoice.id) throw new Error('One or more allocated fees do not belong to this invoice.')
+    }
 
-  const [payment, updatedInvoice] = await prisma.$transaction(async (tx) => {
+    // Detect per-line-item overpayment (allocation > that fee's own balance).
+    const overpayments = data.allocations
+      .map((a) => {
+        const li = lineItemsById.get(a.lineItemId)!
+        const excess = Math.round((a.amount - Number(li.balance)) * 100) / 100
+        return excess > 0.01 ? { lineItemId: a.lineItemId, feeName: li.feeName, excess } : null
+      })
+      .filter((x): x is { lineItemId: string; feeName: string; excess: number } => x !== null)
+
+    // The unallocated remainder (paid but not assigned to any fee) is also
+    // effectively an overpayment against nothing in particular.
+    const unallocatedRemainder = Math.round((data.amount - allocationTotal) * 100) / 100
+    if (unallocatedRemainder > 0.01) {
+      overpayments.push({ lineItemId: '', feeName: 'Unallocated', excess: unallocatedRemainder })
+    }
+
+    // Nothing has been written yet, so throwing here rolls back nothing.
+    if (overpayments.length > 0 && !data.confirmOverpayment) {
+      throw new OverpaymentConfirmationRequiredError(overpayments)
+    }
+
+    const totalCreditToCreate = overpayments.reduce((sum, o) => sum + o.excess, 0)
+    const appliedToInvoice = Math.round((data.amount - totalCreditToCreate) * 100) / 100
+
     const p = await tx.payment.create({
       data: {
         invoiceId: data.invoiceId,
@@ -431,8 +496,9 @@ export async function recordPayment(data: RecordPaymentInput, actorUid: string, 
       where: { id: data.invoiceId },
       data: { paidAmount: newPaid, balance: newBalance, status: newStatus },
     })
-    return [p, inv] as const
+    return { invoice, payment: p, updatedInvoice: inv }
   })
+  const { invoice, payment, updatedInvoice } = result
 
   const student = await prisma.student.findUnique({
     where: { id: invoice.studentId },
@@ -459,39 +525,77 @@ export async function recordPayment(data: RecordPaymentInput, actorUid: string, 
     logger.error({ event: 'accounting.payment_posting_failed', paymentId: payment.id, invoiceId: data.invoiceId, err })
   }
 
+  // Receipt generation must never roll back a committed payment — a failure is
+  // logged and the receipt is regenerated on demand the first time someone
+  // asks to preview it (see ensurePaymentReceipt / GET /payments/:id/receipt).
   let receiptKey: string | undefined
   try {
-    if (student) {
-      const [branding, receiptPrefix] = await Promise.all([
-        getSchoolBranding(),
-        settingsService.get(SETTING_KEYS.RECEIPT_PREFIX),
-      ])
-      receiptKey = await generateReceipt(
-        payment.id,
-        { id: invoice.id, studentId: invoice.studentId, academicYear: invoice.academicYear, term: invoice.term },
-        {
-          amount: Number(payment.amount),
-          method: String(payment.method),
-          reference: payment.reference ?? null,
-          recordedAt: payment.paidAt,    // Prisma field is paidAt, not recordedAt
-        },
-        { firstName: student.firstName, lastName: student.lastName, registrationNo: student.registrationNo },
-        {
-          schoolName: branding.schoolName,
-          schoolAddress: branding.schoolAddress,
-          schoolPhone: branding.schoolPhone,
-          schoolEmail: branding.schoolEmail,
-        },
-        receiptPrefix,
-      )
-      await prisma.payment.update({ where: { id: payment.id }, data: { receiptKey } })
-    }
+    receiptKey = (await ensurePaymentReceipt(payment.id)) ?? undefined
   } catch (err) {
     logger.error({ event: 'receipt.generation_failed', paymentId: payment.id, err })
   }
 
   logger.info({ event: 'payment.recorded', paymentId: payment.id, invoiceId: data.invoiceId, amount: data.amount, method: data.method, actorUid, actorRole })
+  void algolia.updateInvoice({
+    objectID: updatedInvoice.id,
+    status:   updatedInvoice.status,
+    balance:  Number(updatedInvoice.balance),
+  })
   return { payment: { ...payment, receiptKey }, invoice: updatedInvoice }
+}
+
+/**
+ * Returns the payment's receipt file id, generating (and persisting) the PDF if
+ * it doesn't exist yet. Idempotent: an existing receiptKey is returned as-is.
+ *
+ * Why this exists: receipts are rendered by headless Chromium right after the
+ * payment commits, inside a try/catch that deliberately never fails the
+ * payment. When that render failed (cold-start timeout, Chromium unavailable),
+ * Payment.receiptKey stayed null and GET /payments/:id/receipt answered
+ * "Receipt not yet generated" FOREVER — the student and finance staff could
+ * never preview it. Calling this from the route self-heals those rows.
+ *
+ * Returns null only when the payment's student can no longer be resolved.
+ */
+export async function ensurePaymentReceipt(paymentId: string): Promise<string | null> {
+  const payment = await prisma.payment.findUniqueOrThrow({
+    where: { id: paymentId },
+    include: {
+      invoice: { select: { id: true, studentId: true, academicYear: true, term: true } },
+    },
+  })
+  if (payment.receiptKey) return payment.receiptKey
+
+  const student = await prisma.student.findUnique({
+    where: { id: payment.invoice.studentId },
+    select: { firstName: true, lastName: true, registrationNo: true },
+  })
+  if (!student) return null
+
+  const [branding, receiptPrefix] = await Promise.all([
+    getSchoolBranding(),
+    settingsService.get(SETTING_KEYS.RECEIPT_PREFIX),
+  ])
+  const receiptKey = await generateReceipt(
+    payment.id,
+    payment.invoice,
+    {
+      amount: Number(payment.amount),
+      method: String(payment.method),
+      reference: payment.reference ?? null,
+      recordedAt: payment.paidAt,    // Prisma field is paidAt, not recordedAt
+    },
+    student,
+    {
+      schoolName: branding.schoolName,
+      schoolAddress: branding.schoolAddress,
+      schoolPhone: branding.schoolPhone,
+      schoolEmail: branding.schoolEmail,
+    },
+    receiptPrefix,
+  )
+  await prisma.payment.update({ where: { id: payment.id }, data: { receiptKey } })
+  return receiptKey
 }
 
 // R19: the late-payment penalty rate is an admin-configurable percentage
@@ -521,13 +625,110 @@ export async function applyLatePenalties(penaltyRate?: number): Promise<number> 
   })
   for (const inv of overdue) {
     const penalty = Number(inv.balance) * rate
-    await prisma.invoice.update({
-      where: { id: inv.id },
-      data: { latePenalty: { increment: penalty }, totalAmount: { increment: penalty }, balance: { increment: penalty }, status: 'OVERDUE' },
+    if (penalty <= 0) continue
+    // [FIX] Previously this only bumped the invoice's own totalAmount/
+    // balance fields — nothing ever represented the penalty as a line a
+    // parent/student can see an itemised breakdown of, and (more
+    // importantly) it silently broke the invariant every other charge on
+    // an invoice honours: sum(lineItems.amount) === invoice.totalAmount.
+    // A late penalty is a real, distinct charge like any fee line, so it
+    // gets its own InvoiceLineItem, created atomically with the invoice
+    // update so the two can never drift apart (a crash between them is
+    // impossible, not just unlikely).
+    const updated = await prisma.$transaction(async (tx) => {
+      const bumped = await tx.invoice.update({
+        where: { id: inv.id },
+        data: { latePenalty: { increment: penalty }, totalAmount: { increment: penalty }, balance: { increment: penalty }, status: 'OVERDUE' },
+      })
+      await tx.invoiceLineItem.create({
+        data: {
+          invoiceId: inv.id,
+          feeStructureId: null,
+          feeName: 'Late Payment Penalty',
+          amount: penalty,
+          paidAmount: 0,
+          balance: penalty,
+        },
+      })
+      return bumped
     })
+    void algolia.updateInvoice({ objectID: updated.id, status: updated.status, balance: Number(updated.balance) })
   }
   logger.info({ event: 'late_penalties.applied', count: overdue.length, rate })
   return overdue.length
+}
+
+// [REPAIR] One-time-per-invoice backfill for invoices that already accrued
+// a late penalty before the fix above existed (applyLatePenalties() used to
+// bump invoice.totalAmount/balance with no matching InvoiceLineItem, so
+// sum(lineItems.amount) permanently under-counted totalAmount by exactly
+// the penalty). Safe to call any number of times: it only ever adds the
+// missing line once per invoice (guarded by feeName below) and only when a
+// real gap exists, so a clean invoice is always a no-op.
+export async function repairMissingLatePenaltyLineItems(): Promise<{ checked: number; repaired: number }> {
+  const candidates = await prisma.invoice.findMany({
+    where: { latePenalty: { gt: 0 } },
+    include: { lineItems: true },
+  })
+  let repaired = 0
+  for (const inv of candidates) {
+    const lineTotal = inv.lineItems.reduce((s, li) => s + Number(li.amount), 0)
+    const gap = Number(inv.totalAmount) - lineTotal
+    const alreadyRepaired = inv.lineItems.some((li) => li.feeName === 'Late Payment Penalty')
+    if (gap > 1 && !alreadyRepaired) {
+      await prisma.invoiceLineItem.create({
+        data: {
+          invoiceId: inv.id,
+          feeStructureId: null,
+          feeName: 'Late Payment Penalty',
+          amount: gap,
+          paidAmount: 0,
+          balance: gap,
+        },
+      })
+      repaired++
+    }
+  }
+  if (repaired > 0) logger.info({ event: 'late_penalties.repaired', checked: candidates.length, repaired })
+  return { checked: candidates.length, repaired }
+}
+
+// [ALGOLIA ROLLOUT — Tier 2 item 7] Bulk seed — same pattern as the other
+// entities. Loops in batches rather than one findMany, since invoices can
+// run into the thousands over a few years of history and the old route's
+// own `take: 100` cap is exactly the bug this item exists to fix — the
+// seed path must not silently repeat it.
+export async function seedAllInvoicesToAlgolia(): Promise<algolia.BulkIndexResult> {
+  const BATCH_SIZE = 500
+  let cursor: string | undefined
+  let totalIndexed = 0
+  for (;;) {
+    const invoices = await prisma.invoice.findMany({
+      take: BATCH_SIZE,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      orderBy: { id: 'asc' },
+      include: { student: { select: { firstName: true, lastName: true, registrationNo: true, class: { select: { name: true } } } } },
+    })
+    if (invoices.length === 0) break
+    const result = await algolia.bulkIndexInvoices(invoices.map((inv) => ({
+      objectID:       inv.id,
+      studentName:    `${inv.student.firstName} ${inv.student.lastName}`,
+      registrationNo: inv.student.registrationNo,
+      status:         inv.status,
+      academicYear:   inv.academicYear,
+      term:           inv.term,
+      className:      inv.student.class?.name ?? null,
+      dueDate:        inv.dueDate.toISOString(),
+      balance:        Number(inv.balance),
+      createdAt:      inv.createdAt.toISOString(),
+    })))
+    if (!result.configured) return result
+    if (result.error) return result
+    totalIndexed += result.indexed
+    cursor = invoices[invoices.length - 1]!.id
+    if (invoices.length < BATCH_SIZE) break
+  }
+  return { indexed: totalIndexed, configured: true }
 }
 
 export async function getFinanceSummary(academicYear: string, term: number) {
@@ -535,15 +736,23 @@ export async function getFinanceSummary(academicYear: string, term: number) {
     where: { academicYear, term },
     select: { totalAmount: true, paidAmount: true, balance: true },
   })
-  const totalCollected = invoices.reduce((s: number, i: { paidAmount: unknown }) => s + Number(i.paidAmount), 0)
-  const totalOutstanding = invoices.reduce((s: number, i: { balance: unknown }) => s + Number(i.balance), 0)
-  const collectionTarget = invoices.reduce((s: number, i: { totalAmount: unknown }) => s + Number(i.totalAmount), 0)
-  const collectionPercent = collectionTarget > 0 ? Math.round((totalCollected / collectionTarget) * 100) : 0
+  // Same maths as the reports overview (financeLogic.summariseInvoices), so the
+  // dashboard gauge and the report show the identical figure.
+  const s = summariseInvoices(
+    invoices.map((i) => ({ totalAmount: Number(i.totalAmount), paidAmount: Number(i.paidAmount), balance: Number(i.balance) })),
+  )
   const expenses = await prisma.expense.aggregate({
     where: { academicYear, term, status: 'APPROVED' },
     _sum: { amount: true },
   })
-  return { totalCollected, totalOutstanding, totalExpenses: Number(expenses._sum.amount ?? 0), collectionTarget, collectionPercent }
+  return {
+    totalCollected: s.collected,
+    totalOutstanding: s.outstanding,
+    totalExpenses: Number(expenses._sum.amount ?? 0),
+    collectionTarget: s.billed,
+    // null — not 0 — when nothing has been billed for the term.
+    collectionPercent: s.collectionRate,
+  }
 }
 // ─── ADD LINE TO EXISTING INVOICE ────────────────────────
 // [NEW] Append one more fee type to an EXISTING invoice -- the Invoice

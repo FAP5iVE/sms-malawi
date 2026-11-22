@@ -10,6 +10,7 @@
  */
 import { z } from 'zod'
 import { SETTING_KEYS, type SettingKey } from '../types/settings'
+import { validateIdFormat } from '../constants/malawi/registration'
 
 // ─────────────────────────────────────────────────────────
 //  INDIVIDUAL VALUE SCHEMAS
@@ -39,6 +40,17 @@ const percentSchema = (label: string) =>
     .int(`${label} must be a whole number`)
     .min(0, `${label} cannot be negative`)
     .max(100, `${label} cannot exceed 100`)
+
+// Pay percent for each leave type: 100 full pay, 50 half pay, 0 unpaid.
+const leavePayPercentSchema = z.object({
+  ANNUAL:    percentSchema('Annual leave pay'),
+  SICK:      percentSchema('Sick leave pay'),
+  MATERNITY: percentSchema('Maternity leave pay'),
+  PATERNITY: percentSchema('Paternity leave pay'),
+  STUDY:     percentSchema('Study leave pay'),
+  UNPAID:    percentSchema('Unpaid leave pay'),
+  EMERGENCY: percentSchema('Emergency leave pay'),
+})
 
 const positiveIntSchema = (label: string) =>
   z
@@ -127,6 +139,17 @@ export const SETTING_VALUE_SCHEMAS: { readonly [K in SettingKey]: z.ZodType } = 
       photoKey: z.string().optional(),
       order:    z.number().optional(),
     })).max(30),
+  // [NEW] Preview photo per fixed Discover card — cardKey is a closed union
+  // (matches DiscoverCardKey) so a typo can't create an orphaned entry the
+  // landing page's cardKey lookup will never match. At most one entry per
+  // card in practice (the settings editor upserts by cardKey), but the
+  // array itself doesn't enforce uniqueness — the editor is the source of
+  // truth for that, same trust level as SCHOOL_LEADERSHIP_TEAM above.
+  [SETTING_KEYS.SCHOOL_DISCOVER_CARDS]:
+    z.array(z.object({
+      cardKey:  z.enum(['leadership', 'academics', 'student_life', 'admissions']),
+      photoKey: z.string().optional(),
+    })).max(4),
   // Empty string is deliberately valid here (hides the footer icon) — only
   // a non-empty value must actually be a well-formed URL.
   [SETTING_KEYS.SOCIAL_FACEBOOK_URL]:  z.string().url().or(z.literal('')),
@@ -162,6 +185,16 @@ export const SETTING_VALUE_SCHEMAS: { readonly [K in SettingKey]: z.ZodType } = 
     z.string().max(200),
   [SETTING_KEYS.EXAM_MANEB_REG_DEADLINE]:
     isoDateSchema,
+  [SETTING_KEYS.EXAM_CA_AGGREGATE_ENABLED]:
+    z.boolean(),
+  [SETTING_KEYS.EXAM_CA_COUNT]:
+    positiveIntSchema('Number of continuous assessments').max(10),
+  // Per-element validity only — the cross-field rules (length === count,
+  // sum < 100) live in validateCaConfig() and are enforced by the route,
+  // because a single-key schema cannot see the sibling EXAM_CA_COUNT.
+  [SETTING_KEYS.EXAM_CA_WEIGHTS]:
+    z.array(z.number().int('Each CA weight must be a whole number').min(1, 'Each CA weight must be at least 1%').max(99, 'A single CA weight cannot exceed 99%'))
+      .min(1, 'At least one CA weight is required').max(10),
 
   // ── Promotion
   [SETTING_KEYS.PROMOTION_MIN_AVERAGE]:
@@ -182,6 +215,12 @@ export const SETTING_VALUE_SCHEMAS: { readonly [K in SettingKey]: z.ZodType } = 
     nonNegativeIntSchema('High subject-fails threshold').max(20),
   [SETTING_KEYS.RISK_SUBJECT_FAILS_MEDIUM]:
     nonNegativeIntSchema('Medium subject-fails threshold').max(20),
+  [SETTING_KEYS.RISK_LIBRARY_OVERDUE_DAYS_HIGH]:
+    positiveIntSchema('High library-overdue threshold').max(365),
+  [SETTING_KEYS.RISK_LIBRARY_OVERDUE_DAYS_MEDIUM]:
+    positiveIntSchema('Medium library-overdue threshold').max(365),
+  [SETTING_KEYS.RISK_LIBRARY_FINES_MEDIUM]:
+    mwkAmountSchema('Library-fines threshold'),
 
   // ── Finance — fees
   [SETTING_KEYS.FINANCE_LATE_PENALTY_PER_DAY]:
@@ -234,6 +273,9 @@ export const SETTING_VALUE_SCHEMAS: { readonly [K in SettingKey]: z.ZodType } = 
     positiveIntSchema('Study leave days').max(180),
   [SETTING_KEYS.HR_EMERGENCY_LEAVE_DAYS]:
     positiveIntSchema('Emergency leave days').max(30),
+  [SETTING_KEYS.HR_SICK_HALF_PAY_DAYS]:
+    nonNegativeIntSchema('Sick leave half-pay days').max(365),
+  [SETTING_KEYS.HR_LEAVE_PAY_PERCENT]: leavePayPercentSchema,
   // R15 (typecheck cleanup): SETTING_KEYS gained
   // HR_CONTRACT_EXPIRY_LOOKAHEAD_DAYS in R14 but this exhaustive
   // { [K in SettingKey] } map was never extended — a blocking type error
@@ -241,6 +283,21 @@ export const SETTING_VALUE_SCHEMAS: { readonly [K in SettingKey]: z.ZodType } = 
   // Bounds mirror the contract-alert pipeline's sensible range.
   [SETTING_KEYS.HR_CONTRACT_EXPIRY_LOOKAHEAD_DAYS]:
     positiveIntSchema('Contract expiry lookahead days').max(365),
+  // Bounded to a plausible working-life range so a typo (e.g. 6 or 600) can't
+  // mark every member of staff as already retired.
+  [SETTING_KEYS.HR_RETIREMENT_AGE]:
+    positiveIntSchema('Retirement age').min(50).max(75),
+  // ID number layouts: the same plain-language rules the Settings screen shows.
+  [SETTING_KEYS.HR_EMPLOYEE_NO_FORMAT]:
+    z.string().trim().superRefine((v, ctx) => {
+      const problem = validateIdFormat(v)
+      if (problem) ctx.addIssue({ code: z.ZodIssueCode.custom, message: problem })
+    }),
+  [SETTING_KEYS.STUDENT_REGISTRATION_NO_FORMAT]:
+    z.string().trim().superRefine((v, ctx) => {
+      const problem = validateIdFormat(v)
+      if (problem) ctx.addIssue({ code: z.ZodIssueCode.custom, message: problem })
+    }),
 
   // [PRODUCTION FIX 2026-07-27] Department name -> non-empty list of job
   // titles. Both department names and title names must be non-blank after
@@ -389,6 +446,8 @@ export const HRSettingsFormSchema = z.object({
   paternityLeaveDays:    positiveIntSchema('Paternity leave days').max(60),
   studyLeaveDays:        positiveIntSchema('Study leave days').max(180),
   emergencyLeaveDays:    positiveIntSchema('Emergency leave days').max(30),
+  sickHalfPayDays:       nonNegativeIntSchema('Sick leave half-pay days').max(365),
+  leavePayPercent:       leavePayPercentSchema,
 })
 
 export type HRSettingsFormInput = z.infer<typeof HRSettingsFormSchema>

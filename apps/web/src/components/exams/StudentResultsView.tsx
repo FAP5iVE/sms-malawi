@@ -1,24 +1,87 @@
 'use client'
+
+/**
+ * apps/web/src/components/exams/StudentResultsView.tsx
+ *
+ * [CHANGE TYPE]: MAJOR REWRITE
+ * [PURPOSE]:
+ *   1. [MSCE CORRECTION] Forms 3-4 are assessed on the MSCE 1-9 scale, whose
+ *      overall result is an AGGREGATE OF POINTS (the sum of the six best
+ *      subjects, 6-54, lower is better) — not an overall grade. This view
+ *      previously rendered `result.grade` under a hardcoded "Grade" label for
+ *      every form, so an MSCE-track student saw "Grade 7", which was the
+ *      averaged percentage re-graded on the 1-9 scale. Neither the number nor
+ *      the label was an MSCE result. The headline card now reads "Points" and
+ *      shows the real aggregate for Forms 3-4, and keeps "Grade" for Forms
+ *      1-2 (JCE), branching on the server-supplied gradingTrack/classForm
+ *      rather than guessing from the class name.
+ *   2. The student's own Average rendered as an em dash while the class
+ *      average rendered fine — `average` is a Prisma Decimal that serialises
+ *      to a STRING over JSON, so the typeof-number check in pct() always
+ *      failed. pct() now coerces numeric strings (the server also coerces at
+ *      source; this is the belt-and-braces half).
+ *   3. The pass banner said "Passed Term N" purely from passStatus, with no
+ *      indication of what the result actually was. It now states the
+ *      aggregate/grade and the subjects-passed count so the verdict is
+ *      auditable on its face.
+ *   4. [SR-3] Students can now VIEW and PRINT their own report card in the
+ *      browser, using the same PrintableReportCard modal staff get from the
+ *      student profile screen. The old "Download Report Card" button hit the
+ *      server-side PDF generate + blob upload path, which was failing for
+ *      students; the in-browser path reads the same structured data the staff
+ *      preview uses and needs no storage round-trip.
+ *   5. Colour-block status highlights replaced with font colour only — the
+ *      brand tokens are theme-aware, so they read correctly in light AND
+ *      dark mode, which `bg-green-100 text-green-700` did not.
+ * [DEPENDS ON]: @/hooks/useExams (useStudentResults, useReportCardData),
+ *   @/hooks/useSettings (useCurrentAcademicPeriod),
+ *   @/components/shared/PrintableReportCard
+ */
+
 import { useState } from 'react'
-import { useStudentResults, useGenerateMyReportCard } from '@/hooks/useExams'
-import { useCurrentAcademicPeriod } from '@/hooks/useSettings'
-import { AlertTriangle, FileDown, TrendingUp } from 'lucide-react'
+import { useStudentResults, useReportCardData } from '@/hooks/useExams'
+import { useEffectiveViewingPeriod } from '@/hooks/useViewingPeriod'
+import { PrintableReportCard } from '@/components/shared/PrintableReportCard'
+import { AlertTriangle, FileText, TrendingUp, Loader2 } from 'lucide-react'
 import type { ApiTermResult } from '@shared/types/api'
+import { Modal } from '@/components/shared/Modal'
 
-interface Props { studentId: string }
-
-/** Renders a percentage value, or an em dash if it isn't a real number yet
- *  (e.g. a subject with no marks recorded for this term). Prevents the
- *  confirmed crash from calling .toFixed() on an undefined/null average. */
-function pct(value: number | null | undefined): string {
-  return typeof value === 'number' && !Number.isNaN(value) ? `${value.toFixed(1)}%` : '—'
+interface Props {
+  studentId: string
+  /**
+   * [NEW] Whether this view renders its own bordered card around the
+   * results table. Defaults to `true` — needed for StudentDashboard's
+   * usage, which has no other panel around it. exams/page.tsx passes
+   * `false` since it already renders this inside ModuleSurface's own
+   * bg-surface/border panel, where a second nested card read as a
+   * box-within-a-box.
+   */
+  bordered?: boolean
 }
 
-export function StudentResultsView({ studentId }: Props) {
-  const { academicYear, isLoading: periodLoading } = useCurrentAcademicPeriod()
-  const [term, setTerm] = useState(1)
+/** Renders a percentage value, or an em dash if it isn't a real number.
+ *  Coerces numeric STRINGS as well as numbers: Prisma Decimal columns
+ *  (average, totalMark) arrive over JSON as strings, and the previous
+ *  typeof-number-only check silently turned every one of them into an em
+ *  dash — the confirmed cause of the blank Average card. */
+function pct(value: number | string | null | undefined): string {
+  const n = typeof value === 'string' ? Number(value) : value
+  return typeof n === 'number' && Number.isFinite(n) ? `${n.toFixed(1)}%` : '—'
+}
+
+export function StudentResultsView({ studentId, bordered = true }: Props) {
+  // Follows the universal header filter. The term pills that used to sit below
+  // wrote THROUGH to it (a second control for the same value) and are replaced
+  // by a read-only label; switch term from the header.
+  const { academicYear, term, isLoading: periodLoading } = useEffectiveViewingPeriod()
+  const [showReportCard, setShowReportCard] = useState(false)
   const { data: result, isLoading, error } = useStudentResults(studentId, academicYear ?? '', term)
-  const generateCard = useGenerateMyReportCard()
+
+  const {
+    data:      reportCardData,
+    isLoading: reportCardLoading,
+    error:     reportCardError,
+  } = useReportCardData(showReportCard ? studentId : '', academicYear ?? '', term)
 
   if (isLoading || periodLoading) return <div className="animate-pulse h-40 rounded-xl bg-surface" />
 
@@ -26,15 +89,12 @@ export function StudentResultsView({ studentId }: Props) {
   if (error) {
     const msg = (error as Error).message
     const isFeeGate = msg.includes('fee') || msg.includes('Outstanding')
-    const bgClass  = isFeeGate ? 'bg-brand-coral/8 border-brand-coral/25' : 'bg-surface border-base'
-    const iconClass = isFeeGate ? 'text-brand-coral' : 'text-muted'
-    const titleClass = isFeeGate ? 'text-brand-coral' : 'text-body'
     return (
-      <div className={`rounded-xl p-5 border flex items-start gap-3 ${bgClass}`}>
-        <AlertTriangle className={`w-5 h-5 mt-0.5 shrink-0 ${iconClass}`} />
+      <div className="rounded-xl p-5 app-tint flex items-start gap-3">
+        <AlertTriangle className={`w-5 h-5 mt-0.5 shrink-0 ${isFeeGate ? 'text-tone-coral' : 'text-muted'}`} />
         <div>
-          <p className={`font-semibold ${titleClass}`}>
-            {isFeeGate ? 'Results Unavailable — Outstanding Fee Balance' : 'Results Not Yet Released'}
+          <p className={`font-semibold ${isFeeGate ? 'text-tone-coral' : 'text-body'}`}>
+            {isFeeGate ? 'Results unavailable: outstanding fee balance' : 'Results Not Yet Released'}
           </p>
           <p className="text-sm text-muted mt-1">
             {isFeeGate
@@ -48,104 +108,209 @@ export function StudentResultsView({ studentId }: Props) {
 
   if (!result) return <div className="text-center py-12 text-muted text-sm">No results for this term.</div>
 
-  // Now result is typed as ApiTermResult
   const r = result as ApiTermResult
   const subjects = r.subjectResults
+
+  // [MSCE CORRECTION] Which of the two grading systems this student sits
+  // under. gradingTrack is written at compute time; classForm is the
+  // fallback for rows computed before that column existed. Forms 3-4 are
+  // MSCE (aggregate of points), Forms 1-2 are JCE (overall grade).
+  const isMsce = r.gradingTrack === 'MSCE' || (r.gradingTrack == null && (r.classForm ?? 0) >= 3)
+
+  const aggregateSubjects = r.aggregateSubjects ?? []
+  const subjectEntries    = Object.entries(subjects)
+  const passedCount       = subjectEntries.filter(([, d]) => d?.pass).length
+  // True when this term's marks were built from continuous assessments + exam.
+  const hasCa             = subjectEntries.some(([, d]) => !!d?.ca)
+
+  // The headline card: "Points" for MSCE, "Grade" for JCE. Never "Grade"
+  // with an averaged number behind it.
+  const headline = isMsce
+    ? {
+        label: 'Points',
+        value: r.aggregatePoints != null ? String(r.aggregatePoints) : '—',
+        hint:  r.aggregatePoints != null
+          ? 'Aggregate of your six best subjects'
+          : 'Needs six graded subjects',
+      }
+    : {
+        label: 'Grade',
+        value: r.grade || '—',
+        hint:  'Overall grade for the term',
+      }
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex gap-2">
-          {[1,2,3].map((t) => (
-            <button key={t} onClick={() => setTerm(t)}
-              className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
-                term === t ? 'bg-brand-navy text-white border-brand-navy' : 'border-base text-muted'
-              }`}>
-              Term {t}
-            </button>
-          ))}
-        </div>
+        <p className="text-sm text-muted" aria-label="Period shown">
+          <span className="font-semibold text-body">Term {term}</span>
+          {academicYear ? ` · ${academicYear}` : ''}
+          <span className="hidden sm:inline"> change the period from the header</span>
+        </p>
+        {/* SR-3: opens the same in-browser PrintableReportCard staff use,
+            which has its own Print button. Replaces the server-PDF download
+            that was erroring for students. */}
         <button
-          onClick={() => generateCard.mutate({ academicYear: academicYear ?? '', term }, {
-            onSuccess: (d) => { if (d.url) window.open(d.url, '_blank') },
-          })}
-          disabled={generateCard.isPending}
-          className="flex items-center gap-1.5 text-sm border border-base px-3 py-1.5 rounded-xl hover:bg-page transition-colors disabled:opacity-60"
+          onClick={() => setShowReportCard(true)}
+          className="flex items-center gap-1.5 text-sm border border-base px-3 py-1.5 rounded-xl hover:bg-page transition-colors"
         >
-          <FileDown className="w-4 h-4" />
-          {generateCard.isPending ? 'Generating…' : 'Download Report Card'}
+          <FileText className="w-4 h-4" />
+          View / print report card
         </button>
       </div>
 
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: 'Average',  value: pct(r.average) },
-          { label: 'Grade',    value: r.grade },
-          { label: 'Position', value: r.position ? `#${r.position}` : '—' },
-        ].map(({ label, value }) => (
-          <div key={label} className="bg-surface border border-base rounded-xl p-4 text-center">
+          { label: 'Average',       value: pct(r.average),                         hint: 'Mean of your subject scores' },
+          { label: headline.label,  value: headline.value,                          hint: headline.hint },
+          { label: 'Position',      value: r.position ? `#${r.position}` : '—',     hint: 'Rank in your class' },
+        ].map(({ label, value, hint }) => (
+          <div key={label} className="app-tint rounded-xl p-4 text-center">
             <p className="text-xl font-bold text-brand-navy">{value}</p>
             <p className="text-xs text-muted mt-1">{label}</p>
+            <p className="text-xs text-muted mt-0.5 leading-tight">{hint}</p>
           </div>
         ))}
       </div>
 
+      {/* [MSCE CORRECTION] Show WHICH subjects made the aggregate, so the
+          number is checkable rather than opaque. */}
+      {isMsce && aggregateSubjects.length > 0 && (
+        <div className="app-tint rounded-xl px-4 py-3 text-xs text-muted">
+          <span className="font-semibold text-body">Counted in your aggregate: </span>
+          {aggregateSubjects.join(', ')}
+          <span className="block mt-1 text-xs italic">
+            MSCE adds the points of your six best subjects. A lower total is better. 6 is the best possible.
+          </span>
+        </div>
+      )}
+
       {/* SR-2: class benchmark — own vs class, no other students named */}
       {(r.classAverage != null || r.classSize != null) && (
-        <div className="flex items-center gap-4 flex-wrap text-xs text-muted bg-page border border-base rounded-xl px-4 py-3">
+        <div className="flex items-center gap-4 flex-wrap text-xs text-muted app-tint rounded-xl px-4 py-3">
           {r.classAverage != null && (
             <span>Class average: <strong className="text-body">{pct(r.classAverage)}</strong></span>
+          )}
+          {isMsce && r.classAveragePoints != null && (
+            <span>Class average points: <strong className="text-body">{r.classAveragePoints}</strong></span>
           )}
           {r.position != null && r.classSize != null && (
             <span>Your position: <strong className="text-body">#{r.position} of {r.classSize}</strong></span>
           )}
-          <span className="text-[11px] italic">Benchmarks compare you to your class without naming other students.</span>
+          <span className="text-xs italic">Open the Analytics tab for your class top ten and a subject-by-subject comparison.</span>
         </div>
       )}
 
-      <div className={`rounded-xl px-4 py-3 text-sm font-semibold flex items-center gap-2 ${
-        r.passStatus
-          ? 'bg-green-50 text-green-700 border border-green-200'
-          : 'bg-brand-coral/8 text-brand-coral border border-brand-coral/20'
-      }`}>
-        <TrendingUp className="w-4 h-4" />
-        {r.passStatus
-          ? `✓ Passed Term ${term}`
-          : `✗ Below the pass mark this term`}
-        {term === 3 && (
-          <span className="ml-2 font-normal text-xs text-muted">
-            Promotion to the next class is decided after all Term 3 results are released.
+      {/* Verdict — font colour only, no colour block. Both brand tokens are
+          theme-aware and read correctly in light and dark mode. */}
+      <div className="rounded-xl px-4 py-3 text-sm app-tint flex items-start gap-2">
+        <TrendingUp className={`w-4 h-4 mt-0.5 shrink-0 ${r.passStatus ? 'text-tone-teal' : 'text-tone-coral'}`} />
+        <div>
+          <span className={`font-semibold ${r.passStatus ? 'text-tone-teal' : 'text-tone-coral'}`}>
+            {r.passStatus ? `Passed Term ${term}` : `Did not meet the pass requirement this term`}
           </span>
-        )}
+          <span className="text-muted">
+            {' — '}
+            {passedCount} of {subjectEntries.length} subject{subjectEntries.length === 1 ? '' : 's'} passed
+            {isMsce && r.aggregatePoints != null && `, aggregate ${r.aggregatePoints} points`}
+            {!isMsce && r.grade && `, overall grade ${r.grade}`}
+          </span>
+          {term === 3 && (
+            <span className="block text-xs text-muted mt-1">
+              Promotion to the next class is decided after all Term 3 results are released.
+            </span>
+          )}
+        </div>
       </div>
 
-      <div className="border border-base rounded-xl overflow-hidden">
-        <table className="w-full text-sm border-collapse">
+      <div className={bordered ? 'border border-base rounded-xl table-scroll' : 'table-scroll'}>
+        <table className="w-full text-sm border-collapse min-w-120">
           <thead>
             <tr className="bg-page border-b border-base">
-              {['Subject','Average','Grade','Result'].map((h) => (
-                <th key={h} className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase">{h}</th>
+              {[
+                'Subject',
+                // When continuous assessments were aggregated, show how the mark
+                // is made up so it can be checked: CA + Exam = Final.
+                ...(hasCa ? ['CA', 'Exam', 'Final'] : ['Average']),
+                'Grade', 'Result',
+              ].map((h) => (
+                <th key={h} className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted ">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-base">
-            {Object.entries(subjects).map(([subject, data]) => (
-              <tr key={subject} className="hover:bg-page">
-                <td className="px-4 py-3 font-medium">{subject}</td>
-                <td className="px-4 py-3">{pct(data?.average)}</td>
-                <td className="px-4 py-3 font-bold text-brand-navy">{data?.grade ?? '—'}</td>
-                <td className="px-4 py-3">
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                    data?.pass ? 'bg-green-100 text-green-700' : 'bg-brand-coral/10 text-brand-coral'
-                  }`}>
-                    {data?.pass ? 'Pass' : 'Fail'}
-                  </span>
-                </td>
-              </tr>
-            ))}
+            {subjectEntries.map(([subject, data]) => {
+              const counted = isMsce && aggregateSubjects.includes(subject)
+              return (
+                <tr key={subject} className="hover:bg-page">
+                  <td className="px-4 py-3 font-medium">
+                    {subject}
+                    {counted && (
+                      <span className="ml-2 text-xs text-tone-teal font-semibold ">
+                        in aggregate
+                      </span>
+                    )}
+                  </td>
+                  {hasCa && (
+                    <>
+                      <td className="px-4 py-3 text-muted">
+                        {data?.ca ? `${data.ca.points} / ${data.ca.weight}` : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-muted">
+                        {data?.exam ? `${data.exam.points} / ${data.exam.weight}` : '—'}
+                      </td>
+                    </>
+                  )}
+                  <td className="px-4 py-3">{pct(data?.average)}</td>
+                  {/* Per-subject grade stays "Grade" on BOTH tracks — MSCE
+                      subjects really are graded 1-9. Only the OVERALL result
+                      differs (points, not a grade). */}
+                  <td className="px-4 py-3 font-bold text-brand-navy">{data?.grade ?? '—'}</td>
+                  <td className="px-4 py-3">
+                    <span className={`text-xs font-semibold ${data?.pass ? 'text-tone-teal' : 'text-tone-coral'}`}>
+                      {data?.pass ? 'Pass' : 'Fail'}
+                    </span>
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
+
+      {/* SR-3: same modal shape as the staff-side student profile screen.
+         [PRODUCTION FIX] Portals directly under <body> — same reasoning as
+         AnnouncementForm.tsx and the other hand-built modals fixed
+         alongside this one. Only this conditional block portals (not the
+         whole component's return), since the results table above needs to
+         stay in normal page flow. */}
+      {showReportCard && (
+        <Modal
+          ariaLabel="Student report card"
+          onClose={() => setShowReportCard(false)}
+          size="2xl"
+        >
+          {reportCardLoading && (
+            <div className="flex items-center justify-center gap-2 py-16 text-muted text-sm">
+              <Loader2 className="w-4 h-4 animate-spin" /> Loading report card…
+            </div>
+          )}
+          {reportCardError && (
+            <div className="flex flex-col items-center gap-2 py-16 text-center">
+              <AlertTriangle className="w-6 h-6 text-tone-coral" />
+              <p className="text-sm text-tone-coral font-medium">
+                {reportCardError instanceof Error ? reportCardError.message : 'Failed to load report card.'}
+              </p>
+              <button onClick={() => setShowReportCard(false)} className="mt-2 text-sm text-muted hover:text-body underline">
+                Close
+              </button>
+            </div>
+          )}
+          {reportCardData && (
+            <PrintableReportCard data={reportCardData} onClose={() => setShowReportCard(false)} />
+          )}
+        </Modal>
+      )}
     </div>
   )
 }

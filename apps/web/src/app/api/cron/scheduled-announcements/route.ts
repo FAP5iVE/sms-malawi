@@ -17,20 +17,15 @@
  *   (promoteDueScheduled)
  */
 import { NextResponse } from 'next/server'
-import { headers } from 'next/headers'
+import { guardCron } from '@/lib/cronAuth'
 import { promoteDueScheduled } from '@/server/services/announcementService'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
-  if (!process.env.CRON_SECRET) {
-    return NextResponse.json({ error: 'Server misconfigured.' }, { status: 500 })
-  }
-  const h = await headers()
-  if (h.get('Authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const denied = await guardCron()
+  if (denied) return denied
   const result = await promoteDueScheduled()
   return NextResponse.json({
     ok: true,

@@ -37,6 +37,7 @@
  *   mandatory/schedule/description, StudentFeeCommitment)
  */
 import { z } from 'zod'
+import { SPONSOR_TYPES } from '../constants/malawi/demographics'
 
 export const PaymentMethodSchema = z.enum([
   'CASH',
@@ -215,7 +216,8 @@ export const BulkGenerateInvoicesSchema = z.object({
   includeEnrolledOptional: z.boolean().default(true),
   applyScholarships: z.boolean().default(true),
   consumeAdvanceCredit: z.boolean().default(true),
-  studentIds: z.array(z.string().min(1)).optional(),
+  // [Issue 6] Bounded: one request may not name an unlimited id list.
+  studentIds: z.array(z.string().min(1)).max(2000, 'A single run may name at most 2000 students.').optional(),
   // true = compute and return the roster preview (projected totals,
   // scholarship/credit/arrears figures) without creating anything --
   // the "PRE-EXECUTION DRY RUN ROSTER" step. false = actually create the
@@ -241,6 +243,9 @@ export const CreateScholarshipSchema = z.object({
   value: z.number().positive(),
   academicYear: z.string().regex(/^\d{4}\/\d{4}$/),
   notes: z.string().optional(),
+  // Who funds it. Optional: informational only, no effect on invoice maths.
+  sponsorType: z.enum(SPONSOR_TYPES).optional(),
+  sponsorName: z.string().trim().max(150).optional(),
 })
 
 // ─── INSTALLMENT PLAN ────────────────────────────────────
@@ -265,14 +270,28 @@ export const CreateBudgetSchema = z.object({
   category: ExpenseCategorySchema,
   allocated: z.number().positive(),
   description: z.string().optional(),
+  /** Optional: the budget window this allocation was raised under (same academic year). */
+  budgetWindowId: z.string().optional(),
 })
 
 // ─── LIBRARY FINE ────────────────────────────────────────
+// [R21] studentId is now optional and staffId added alongside it — a
+// manually-assessed fine (damage/loss, "+ Assess Fine" in the Library
+// Reports & Fines ledger) needs to support a staff borrower exactly like
+// library.ts's issueBorrowing()/returnBook() already do; the previous
+// studentId-only shape made staff fines impossible to record here.
 export const CreateLibraryFineSchema = z.object({
-  studentId: z.string().min(1),
+  // nullish, not optional: an API borrowing carries `studentId: null` for a staff
+  // loan (and `staffId: null` for a student loan), and JSON keeps those nulls.
+  studentId: z.string().min(1).nullish(),
+  staffId:   z.string().min(1).nullish(),
   bookTitle: z.string().min(1),
-  amount: z.number().positive(),
-  reason: z.string().min(1),
+  amount:    z.number().positive(),
+  reason:    z.string().min(1),
+  kind:      z.enum(['LATE', 'DAMAGED', 'LOST', 'OTHER']).optional(),   // omitted → the column default, OTHER
+}).refine((data) => !!data.studentId || !!data.staffId, {
+  message: 'Either studentId or staffId is required.',
+  path: ['studentId'],
 })
 
 // ─── INFERRED TYPES ──────────────────────────────────────

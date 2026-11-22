@@ -14,7 +14,7 @@
  *   2. The inline ['APPROVED','DENIED','AWAITING_ADMISSION'] literal is
  *      replaced with ApplicationStatusTransitionSchema (@shared/schemas/
  *      student), derived via .extract() from the canonical status enum.
- *   3. POST /public gains createRateLimiter('auth') (10 req/min) — this
+ *   3. POST /public gains a per-IP limiter (now rateLimit('public-application'), Redis-backed — Issue 6) — this
  *      unauthenticated endpoint previously had no rate limiting of its own.
  *   4. POST / (internal) and POST /public both now parse against the
  *      unified ApplicationSchema (safeParse, not the two former divergent
@@ -27,11 +27,12 @@
  *   ApplicationStatusTransitionSchema), apps/web/src/lib/ratelimit.ts,
  *   apps/web/src/server/services/studentService.ts (createFromApplication)
  */
-import { Router } from 'express'
+import { Router, type Request } from 'express'
 import { verifyAuth, requireRole } from '@/lib/verifyAuth'
 import { requirePermission, requireAnyPermission } from '@/server/middleware/verifyPermission'
 import { hasPermission } from '@shared/types/permissions'
-import { createRateLimiter } from '@/lib/ratelimit'
+import { rateLimit } from '@/lib/ratelimit'
+import { parsePageParams } from '@/lib/requestLimits'
 import {
   ApplicationSchema,
   ApplicationStatusTransitionSchema,
@@ -42,7 +43,14 @@ import { sendError } from '@/server/lib/sendError'
 
 export const applicationsRouter = Router()
 
-applicationsRouter.post('/public', createRateLimiter('auth'), async (req, res) => {
+// Welfare / health / special needs on an application are sensitive child data. They
+// are returned only to roles holding student.viewWelfare, exactly as on the student
+// record; for everyone else the fields are removed from the payload.
+function canSeeWelfare(req: Request): boolean {
+  return hasPermission(req.user!.role, 'student.viewWelfare', req.user!.superUser === true)
+}
+
+applicationsRouter.post('/public', rateLimit('public-application'), async (req, res) => {
   const parsed = ApplicationSchema.safeParse(req.body)
   if (!parsed.success)
     return res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() })
@@ -69,13 +77,19 @@ applicationsRouter.get(
   verifyAuth,
   requirePermission('application.view'),
   async (req, res) => {
-    const { status, page, pageSize } = req.query
+    const { status } = req.query
+    // [Issue 6] Reject an oversized pageSize up front (the service also clamps, as a backstop).
+    const { page, pageSize } = parsePageParams(req.query, { defaultSize: 20, maxSize: 100 })
     const result = await appService.listApplications(
       status ? String(status) : undefined,
-      page ? parseInt(String(page), 10) : 1,
-      pageSize ? parseInt(String(pageSize), 10) : undefined,
+      page,
+      pageSize,
     )
-    return res.json(result)
+    return res.json(
+      canSeeWelfare(req)
+        ? result
+        : { ...result, applications: result.applications.map(appService.withoutWelfare) },
+    )
   }
 )
 
@@ -88,7 +102,7 @@ applicationsRouter.get(
   async (req, res) => {
     const app = await appService.getApplicationById(String(req.params.id))
     if (!app) return res.status(404).json({ error: 'Application not found' })
-    return res.json(app)
+    return res.json(canSeeWelfare(req) ? app : appService.withoutWelfare(app))
   }
 )
 
@@ -101,7 +115,7 @@ applicationsRouter.post(
     const parsed = ApplicationSchema.safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
     const app = await appService.createApplication(parsed.data)
-    return res.status(201).json(app)
+    return res.status(201).json(canSeeWelfare(req) ? app : appService.withoutWelfare(app))
   }
 )
 
@@ -126,7 +140,7 @@ applicationsRouter.patch(
     const status = parsedStatus.data
 
     const requiredPermission = status === 'DENIED' ? 'application.deny' : 'application.approve'
-    if (!hasPermission(req.user!.role, requiredPermission)) {
+    if (!hasPermission(req.user!.role, requiredPermission, req.user!.superUser === true)) {
       return res.status(403).json({
         error: 'You do not have permission to perform this action.',
         required: requiredPermission,

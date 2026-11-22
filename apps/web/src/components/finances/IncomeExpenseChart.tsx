@@ -21,6 +21,15 @@
  *   - @/components/shared/chart (R17 Chart)
  *   - @/components/shared/ChartCard (R17 card shell)
  *   - @shared/constants/malawi (formatMWK — display consistency)
+ * 
+ *          [PRODUCTION FIX from line 71] Colours were left implicit, so ApexChartRenderer's
+           chartColorAt(index) fallback put "expenses" (index 1) on the
+           palette's green — the colour this same app uses for "good"/
+           "revenue" everywhere else (see reports/page.tsx's Financial
+           Overview panel) — while revenue itself sat on neutral navy.
+           Explicit colours tie each series to what it means: revenue is
+           the positive figure, expenses the cost, net a neutral summary
+           line.
  */
 
 'use client'
@@ -29,6 +38,7 @@ import { Chart } from '@/components/shared/chart'
 import type { ChartDataPoint } from '@/components/shared/chart'
 import { ChartCard } from '@/components/shared/ChartCard'
 import { useFinanceCashFlow } from '@/hooks/useAnalytics'
+import { ReportError } from '@/components/reports/ui/ReportStates'
 
 interface IncomeExpenseChartProps {
   academicYear: string
@@ -39,7 +49,7 @@ export function IncomeExpenseChart({
   academicYear,
   periodLoading = false,
 }: IncomeExpenseChartProps) {
-  const { data: rows = [], isLoading } = useFinanceCashFlow(academicYear)
+  const { data: rows = [], isLoading, isError, refetch } = useFinanceCashFlow(academicYear)
   const loading = periodLoading || isLoading
 
   const data: ChartDataPoint[] = rows.map((r) => ({
@@ -51,23 +61,28 @@ export function IncomeExpenseChart({
 
   return (
     <ChartCard
-      title="Income vs Expenses"
+      title="Income vs expenses"
       sub={`Revenue, expenses and net · ${academicYear}`}
       isLoading={loading}
       height={260}
     >
+      {isError ? (
+        <ReportError message="Income and expenses could not be loaded." onRetry={() => void refetch()} />
+      ) : (
       <Chart
         type="combo"
         data={data}
+
         series={[
-          { key: 'revenue', label: 'Revenue', kind: 'bar' },
-          { key: 'expenses', label: 'Expenses', kind: 'bar' },
-          { key: 'net', label: 'Net', kind: 'line' },
+          { key: 'revenue', label: 'Revenue', kind: 'bar', format: 'mwk', color: 'var(--color-brand-teal, #0e8a6a)' },
+          { key: 'expenses', label: 'Expenses', kind: 'bar', format: 'mwk', color: 'var(--color-brand-coral, #dc4f3a)' },
+          { key: 'net', label: 'Net', kind: 'line', format: 'mwk', color: 'var(--color-brand-navy, #1e3a5f)' },
         ]}
         height={260}
         emptyStateMessage="No income or expense data for this year yet."
         ariaLabel={`Income versus expenses by term for ${academicYear}, showing revenue, expenses and net`}
       />
+      )}
     </ChartCard>
   )
 }

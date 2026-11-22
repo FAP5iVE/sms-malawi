@@ -46,6 +46,13 @@ declare global {
         uid:   string
         role:  UserRole
         email: string
+        /**
+         * True only for the alpha_admin super user (Firebase custom claim
+         * `superUser === true`; see @shared/constants/superUser). Every
+         * role/permission gate lets this through. Always pass it to
+         * hasPermission()/hasAnyPermission()/hasAllPermissions().
+         */
+        superUser?: boolean
       }
 
       /**

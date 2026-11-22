@@ -319,14 +319,19 @@ export async function runScheduledSync() {
   if (!isConfigured()) return { configured: false as const }
   const results = await Promise.allSettled([syncDeployments(), syncRuntimeLogs(), syncWebAnalytics()])
   const now = new Date()
+  // Record each source's outcome (error text on failure, cleared on success)
+  // so the platform-health report can tell "synced" from "tried and failed".
+  const types = ['vercel_deployments', 'vercel_runtime_logs', 'vercel_analytics'] as const
   await Promise.all(
-    (Object.keys(SYNC_STALE_MS) as (keyof typeof SYNC_STALE_MS)[]).map((type) =>
-      prisma.monitoringSyncState.upsert({
+    types.map((type, i) => {
+      const r = results[i]
+      const lastError = r && r.status === 'rejected' ? (r.reason instanceof Error ? r.reason.message : String(r.reason)) : null
+      return prisma.monitoringSyncState.upsert({
         where: { syncType: type },
-        create: { syncType: type, lastSyncedAt: now },
-        update: { lastSyncedAt: now },
-      }),
-    ),
+        create: { syncType: type, lastSyncedAt: now, lastError },
+        update: { lastSyncedAt: now, lastError },
+      })
+    }),
   )
   return {
     configured: true as const,
@@ -392,4 +397,4 @@ export async function acknowledgeAlert(id: string) {
 
 // Exported for the cron route to do a cheap "is this even configured"
 // check before bothering to call runScheduledSync().
-export { isConfigured as isVercelMonitoringConfigured }
+export { isConfigured as isVercelMonitoringConfigured }

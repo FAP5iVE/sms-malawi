@@ -1,0 +1,9 @@
+{
+  "note": "AI-tell ratchet (RULEBOOK section 4). The numbers may only go down. Written by pnpm hills:ratchets --write.",
+  "total": 56,
+  "byRule": {
+    "abbreviation": 1,
+    "em-dash": 10,
+    "internal-word": 45
+  }
+}

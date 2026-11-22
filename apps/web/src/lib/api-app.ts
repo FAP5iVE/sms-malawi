@@ -11,7 +11,10 @@ import 'server-only'
  *   2. Helmet            — security headers (defence-in-depth alongside proxy.ts)
  *   3. express.json      — body parsing with tight 50kb global limit
  *   4. CORS              — explicit origin allowlist (no VERCEL_URL wildcards)
- *   5. createRateLimiter('standard') — express-rate-limit, in-memory store
+ *   5. rateLimit('global-ip')       — coarse per-instance volumetric backstop only;
+ *                                      real quotas are per-endpoint, per-user and
+ *                                      Redis-backed (lib/ratelimit-policies.ts)
+ *   5b. activityLogger   — audit-completeness recorder (Sessions / Audit fix)
  *   6. Routes            — all domain routers
  *   7. 404 handler       — catch-all for undefined routes
  *   8. globalErrorHandler — Prisma error mapping + production message sanitisation
@@ -85,6 +88,9 @@ import helmet from 'helmet'
 
 import { verifyAuth, requireRole } from '@/lib/verifyAuth'
 import { studentsRouter }      from '@/server/routes/students'
+import { guardiansRouter }     from '@/server/routes/guardians'
+import { parentRouter }        from '@/server/routes/parent'
+import { guardianClaimRouter } from '@/server/routes/guardianClaim'
 import { classesRouter }       from '@/server/routes/classes'
 import { applicationsRouter }  from '@/server/routes/applications'
 import { assignmentsRouter }   from '@/server/routes/assignments'
@@ -103,13 +109,17 @@ import { galleryRouter }       from '@/server/routes/gallery'
 import { authRouter }          from '@/server/routes/auth'
 import { settingsRouter }      from '@/server/routes/settings'
 import { auditRouter }         from '@/server/routes/audit'
+import { sessionsRouter }      from '@/server/routes/sessions'
 import { pendingActionsRouter }from '@/server/routes/pendingActions'
+import { approvalsRouter }      from '@/server/routes/approvals'
 import { notificationsRouter } from '@/server/routes/notifications'
 import { promotionRouter }     from '@/server/routes/promotion'
-import { createRateLimiter }   from '@/lib/ratelimit'
+import { rateLimit }           from '@/lib/ratelimit'
 import { logger }              from '@/lib/logger'
 import { globalErrorHandler }  from '@/server/middleware/inputSanitise'
+import { activityLogger }      from '@/server/middleware/activityLog'
 import { analyticsRouter }     from '@/server/routes/analytics'
+import { reportingRouter }     from '@/server/routes/reporting'
 import { searchRouter }        from '@/server/routes/search'
 import { calendarRouter }      from '@/server/routes/calendar'
 import { algoliaAdminRouter }  from '@/server/routes/algoliaAdmin'
@@ -118,6 +128,10 @@ import { holidaysRouter }      from '@/server/routes/holidays'
 import { placementsRouter }    from '@/server/routes/placements'
 import { monitoringRouter }    from '@/server/routes/monitoring'
 import { monitoringVercelRouter } from '@/server/routes/monitoring-vercel'
+import { procurementRouter }   from '@/server/routes/procurement'
+import { inventoryRouter }     from '@/server/routes/inventory'
+import { stocktakesRouter }    from '@/server/routes/stocktakes'
+import { locationsRouter }     from '@/server/routes/locations'
 
 
 
@@ -151,7 +165,9 @@ function buildCorsMiddleware() {
     // in sync until both are extracted to a shared constant in R16
     // (Constants Centralization) — the correct home for this class of fix.
     res.setHeader('Access-Control-Allow-Methods',  'GET,POST,PATCH,DELETE,OPTIONS')
-    res.setHeader('Access-Control-Allow-Headers',  'Content-Type,Authorization')
+    res.setHeader('Access-Control-Allow-Headers',  'Content-Type,Authorization,Idempotency-Key')
+    // [Issue 6] Let a cross-origin client read the back-off hint on a 429 / 503.
+    res.setHeader('Access-Control-Expose-Headers', 'Retry-After,Idempotent-Replayed')
     res.setHeader('Access-Control-Max-Age',        '86400') // 24 h preflight cache
 
     if (req.method === 'OPTIONS') {
@@ -170,10 +186,11 @@ export function createApiApp() {
 
   // ── 1. Trust proxy ────────────────────────────────────────────────────────
   // Vercel's edge is a single trusted hop. Without this, req.ip resolves to
-  // the edge's own address for every request, and express-rate-limit's
-  // default keyGenerator (which reads req.ip) can never distinguish two
-  // different clients. Must be set before any middleware that reads req.ip —
-  // in particular createRateLimiter('standard') below.
+  // the edge's own address for every request, and anything reading req.ip
+  // can never distinguish two different clients. Must be set before any
+  // middleware that reads req.ip — in particular the rate limiters below
+  // (lib/ratelimit-core.ts clientIp() prefers Vercel's own forwarded-for
+  // header and falls back to req.ip).
   app.set('trust proxy', 1)
 
   // ── 2. Security headers ───────────────────────────────────────────────────
@@ -196,14 +213,28 @@ export function createApiApp() {
   app.use(buildCorsMiddleware())
 
   // ── 5. Rate limiting ──────────────────────────────────────────────────────
-  // createRateLimiter('standard') wraps express-rate-limit with a clean
-  // three-tier config. In-memory store is correct for this stack — Firebase
-  // Auth gates every authenticated route, and the bounded school user base
-  // makes per-Lambda-instance counters acceptable. See lib/ratelimit.ts.
-  app.use(createRateLimiter('standard'))
+  // [Issue 6] This global limiter is ONLY a coarse, per-instance backstop
+  // against runaway clients — in-memory counters are per serverless instance
+  // and must not be mistaken for an abuse boundary. Anything whose abuse costs
+  // something (AI provider quota, e-mail sending, search, reports/exports,
+  // bulk jobs, uploads, public writes) carries its own named, Redis-backed
+  // policy at the route — see lib/ratelimit-policies.ts for the inventory.
+  app.use(rateLimit('global-ip'))
+
+  // ── 5b. Activity recorder ─────────────────────────────────────────────────
+  // [Sessions / Audit completeness] Makes sure every successful state-changing
+  // call by a signed-in user ends up in the audit log (and therefore under the
+  // right session in Reports > Sessions), even where a route/service never
+  // audited itself, and holds each response until its audit writes have
+  // settled so a frozen serverless instance can't drop them. Must sit after
+  // body parsing and before the routers. See server/middleware/activityLog.ts.
+  app.use(activityLogger)
 
   // ── 6. Domain routers ─────────────────────────────────────────────────────
   app.use('/students',        studentsRouter)
+  app.use('/parent',          parentRouter)       // guardian (parent) API: role 'parent' only; fenced in verifyAuth
+  app.use('/guardian-claim',  guardianClaimRouter) // PUBLIC: code -> account. See routes/guardianClaim.ts
+  app.use('/guardians',       guardiansRouter)   // guardian PORTAL access (staff). Contact cards stay under /students.
   app.use('/classes',         classesRouter)
   app.use('/applications',    applicationsRouter)
   app.use('/assignments',     assignmentsRouter)
@@ -212,7 +243,9 @@ export function createApiApp() {
   app.use('/payroll',         payrollRouter)
   app.use('/exams',           examsRouter)
   app.use('/announcements',   announcementsRouter)
-  app.use('/reports',         reportsRouter)
+  // [Issue 6] Wide aggregate reads: verified per-user limit (verifyAuth is
+  // reused by the routers' own gates, not re-run — see lib/verifyAuth.ts).
+  app.use('/reports',         verifyAuth, rateLimit('report-read'), reportsRouter)
   app.use('/users',           usersRouter)
   app.use('/health',          healthRouter)
   // R15: settings.ts's own header documents this exact mount shape
@@ -224,7 +257,10 @@ export function createApiApp() {
   // SETTING_KEYS-driven header term badge and dashboard year/term reads.
   app.use('/settings',        verifyAuth, settingsRouter)
   app.use('/audit',           auditRouter)
+  app.use('/sessions',        sessionsRouter)
   app.use('/pending-actions', pendingActionsRouter)
+  // [Approvals Hub] unified inbox across every module's approval workflow.
+  app.use('/approvals', approvalsRouter)
   app.use('/notifications',   notificationsRouter)
   app.use('/promotion',       verifyAuth, requireRole(['admin', 'exam_officer', 'high_rank']), promotionRouter)
   app.use('/hr',              hrRouter)
@@ -232,7 +268,8 @@ export function createApiApp() {
   app.use('/assets',          assetsRouter)
   app.use('/gallery',         galleryRouter)
   app.use('/auth',            authRouter)
-  app.use('/analytics',       analyticsRouter)
+  app.use('/analytics',       verifyAuth, rateLimit('report-read'), analyticsRouter)
+  app.use('/reporting',       verifyAuth, rateLimit('report-read'), reportingRouter)
   app.use('/search',          searchRouter)
   app.use('/calendar',        calendarRouter)
   app.use('/algolia-admin',   algoliaAdminRouter)
@@ -241,6 +278,11 @@ export function createApiApp() {
   app.use('/placements',      placementsRouter)
   app.use('/monitoring',      monitoringRouter)
   app.use('/monitoring/vercel', monitoringVercelRouter)
+  // R22 — Assets/Inventory/Procurement redesign (additive; /assets above is untouched)
+  app.use('/procurement',     procurementRouter)
+  app.use('/inventory',       inventoryRouter)
+  app.use('/stocktakes',      stocktakesRouter)
+  app.use('/locations',       locationsRouter)
 
   // ── 7. 404 fallback ───────────────────────────────────────────────────────
   app.use((_req: Request, res: Response) => {

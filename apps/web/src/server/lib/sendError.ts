@@ -52,9 +52,49 @@ interface SendErrorOptions {
   extraFields?: Record<string, unknown>
 }
 
+/**
+ * [Issue 7 — error behaviour] Decides what text a client may see.
+ *
+ * `err.message` is only ever safe to return when the thrower MEANT it for the
+ * user — i.e. a deliberate 4xx carrying an explicit `.status` (404 "Not
+ * found", 409 "already approved", RequestCostError, SelfReviewError, …).
+ * Everything else is an unexpected failure whose text can contain SQL / table
+ * and column names (Prisma), provider response bodies (Appwrite, Algolia,
+ * Resend, Firebase) or internal paths, so it is replaced by a fixed message.
+ * The real error still goes to Sentry and the (redacted) server log.
+ */
+const GENERIC_SERVER_MESSAGE = 'An internal server error occurred.'
+const GENERIC_REQUEST_MESSAGE = 'The request could not be completed.'
+
+function isInfrastructureError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false
+  const name = (err as { name?: unknown }).name
+  const code = (err as { code?: unknown }).code
+  return (
+    (typeof name === 'string' && /^(PrismaClient|FirebaseError|AppwriteException|ResendError)/.test(name)) ||
+    // firebase-admin / google-gax style codes, e.g. "auth/…", "app/…"
+    (typeof code === 'string' && /^(auth|app|messaging|storage)\//.test(code))
+  )
+}
+
+export function clientMessageFor(
+  err: unknown,
+  status: number,
+  opts: Pick<SendErrorOptions, 'publicMessage' | 'fallbackMessage'> = {},
+): string {
+  if (opts.publicMessage) return opts.publicMessage
+  if (!(err instanceof Error)) return opts.fallbackMessage ?? 'Unexpected error.'
+  if (isInfrastructureError(err)) return status >= 500 ? GENERIC_SERVER_MESSAGE : GENERIC_REQUEST_MESSAGE
+  // 4xx errors (explicit `.status`, or the route's own `defaultStatus` for
+  // validation-style catch-alls) were written to be shown. A 5xx never is,
+  // outside local development.
+  if (status < 500) return err.message
+  return process.env.NODE_ENV === 'development' ? err.message : GENERIC_SERVER_MESSAGE
+}
+
 export function sendError(res: Response, err: unknown, opts: SendErrorOptions = {}): Response {
   const status = (err as { status?: number } | null)?.status ?? opts.defaultStatus ?? 500
-  const message = opts.publicMessage ?? (err instanceof Error ? err.message : (opts.fallbackMessage ?? 'Unexpected error.'))
+  const message = clientMessageFor(err, status, opts)
 
   if (status >= 500) {
     // 5xx = a genuine, unexpected failure — worth an on-call's attention.

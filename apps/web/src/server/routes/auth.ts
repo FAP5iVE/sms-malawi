@@ -12,10 +12,26 @@
  *   calls right after a sign-in attempt succeeds or fails, to actually
  *   produce the data the graph has been querying for all along.
  * [DEPENDS ON]: W/server/services/auditService.ts
+ *
+ * [CHANGE TYPE]: TARGETED EDIT (Sessions tab, Reports > Admin). Adds three
+ *   endpoints powering sessionService's UserSession rows — the write side
+ *   of "who's logged in now" / force logout / duration tracking:
+ *     - log-login-success now also opens a UserSession row (unchanged
+ *       AuditLog write kept exactly as-is, same reasoning as above).
+ *     - POST /auth/heartbeat — pinged every ~4 min (visible tabs only) by useSessionHeartbeat.ts
+ *       while a tab is open, bumping the session's lastSeenAt so "active
+ *       now" reflects real recent activity, not just "never logged out".
+ *     - POST /auth/log-logout — called by AuthProvider's logout() BEFORE
+ *       signOut(auth), same sequencing as its FCM-unregister-before-
+ *       signout fix and for the same reason: this needs a still-valid
+ *       token to authenticate.
  */
 import { Router } from 'express'
 import { verifyAuth } from '@/lib/verifyAuth'
 import * as auditService from '@/server/services/auditService'
+import * as sessionService from '@/server/services/sessionService'
+import * as loginTelemetryService from '@/server/services/loginTelemetryService'
+import { rateLimit } from '@/lib/ratelimit'
 
 export const authRouter = Router()
 
@@ -23,6 +39,26 @@ export const authRouter = Router()
 // actually succeeded, so a valid ID token exists and verifyAuth can
 // resolve the real uid/role.
 authRouter.post('/log-login-success', verifyAuth, async (req, res) => {
+  // [PRODUCTION FIX — Sessions tab] recordLogin() runs BEFORE the audit
+  // write, not after. Both use their table's own @default(now()), and
+  // this handler awaits each in turn rather than firing them together —
+  // so whichever call is made second is guaranteed a strictly later
+  // timestamp. With the audit write second, this LOGIN_SUCCESS entry's
+  // createdAt is always >= the session's own loginAt, so
+  // sessionService.getSessionActivity()'s dateFrom: loginAt bound
+  // (queryByActor's `gte`) is guaranteed to include it. The previous
+  // order did this backwards — the audit entry (written first) landed a
+  // few milliseconds BEFORE loginAt (written second), so every session's
+  // own opening LOGIN_SUCCESS event fell just outside its own activity
+  // window and silently never appeared there.
+  await sessionService.recordLogin({
+    uid: req.user!.uid,
+    role: req.user!.role,
+    userAgent: req.headers['user-agent'],
+    // req.ip reads Vercel's edge hop unless 'trust proxy' is set — it is,
+    // in api-app.ts's createApiApp() (R4 fix, same reasoning applies here).
+    ipAddress: req.ip,
+  })
   await auditService.log({
     action:     'LOGIN_SUCCESS',
     entityType: 'Auth',
@@ -33,19 +69,49 @@ authRouter.post('/log-login-success', verifyAuth, async (req, res) => {
   res.status(204).end()
 })
 
-// POST /auth/log-login-failed — deliberately unauthenticated (a failed
-// sign-in has no valid token to verify). Payload is minimal by design —
-// this only ever records that an attempt failed, for the security
-// dashboard's trend graph, not who specifically attempted it beyond the
-// email they typed.
-authRouter.post('/log-login-failed', async (req, res) => {
-  const email = typeof req.body?.email === 'string' ? req.body.email.slice(0, 200) : 'unknown'
-  await auditService.log({
-    action:     'LOGIN_FAILED',
-    entityType: 'Auth',
-    entityId:   email,
-    actorUid:   email,
-    actorRole:  'unknown',
+// POST /auth/heartbeat — bumps the caller's open session's lastSeenAt.
+// Fire-and-forget from the client's perspective; failures here must never
+// surface as a user-facing error, so the client hook (useSessionHeartbeat)
+// swallows rejections same as the FCM registration path does.
+authRouter.post('/heartbeat', verifyAuth, async (req, res) => {
+  // Passing the opener lets heartbeat() start a session for a signed-in
+  // user who has none at all (signed in before tracking existed).
+  await sessionService.heartbeat(req.user!.uid, {
+    role: req.user!.role,
+    userAgent: req.headers['user-agent'],
+    ipAddress: req.ip,
   })
+  res.status(204).end()
+})
+
+// POST /auth/log-logout — closes the caller's open session cleanly
+// (endReason: 'logout', as opposed to an admin's forced 'forced' or a
+// fresh login's 'new_login'). Called from AuthProvider.logout() before
+// signOut(auth) actually clears the Firebase session.
+authRouter.post('/log-logout', verifyAuth, async (req, res) => {
+  await sessionService.recordLogout(req.user!.uid)
+  res.status(204).end()
+})
+
+// POST /auth/log-login-failed — deliberately unauthenticated (a failed
+// sign-in has no valid token to verify), so EVERYTHING in the request is
+// untrusted input. [Issue 5] Hardened:
+//   • per-IP limiter (rateLimit('login-telemetry'), Redis-backed — Issue 6) BEFORE any work is done;
+//   • strict body schema — only `email` (≤254 chars) is accepted; unknown
+//     fields such as actorUid / role / severity / timestamp are rejected;
+//   • loginTelemetryService assigns the action, actor, severity and time
+//     itself, records a masked email + fingerprint (never the raw address as
+//     an "actor"), caps writes per identifier and per instance, and never
+//     touches the account the email belongs to;
+//   • a well-formed request always gets the same 204 whether the event was
+//     stored, throttled, or failed to write — no account-existence or
+//     auth-stage signal, and no way to tell "dropped" from "recorded".
+authRouter.post('/log-login-failed', rateLimit('login-telemetry'), async (req, res) => {
+  const parsed = loginTelemetryService.FailedLoginBodySchema.safeParse(req.body)
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid request.' })
+    return
+  }
+  await loginTelemetryService.recordFailedLogin(parsed.data.email)
   res.status(204).end()
 })

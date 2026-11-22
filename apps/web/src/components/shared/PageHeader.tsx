@@ -6,7 +6,7 @@
  * Responsive page header with distinct mobile and desktop variants.
  *
  * Mobile layout (< md, h-14):
- *   [BookOpen logo] — [Current page title — animated] — [Search icon | Bell icon]
+ *   [School logo] — [Current page title — animated] — [Search icon | Bell icon]
  *   • Page title derived from pathname matched against all role-visible nav items.
  *   • Search icon → full-width slide-down overlay with auto-focused input.
  *   • Bell icon → fixed notification panel anchored below header.
@@ -63,14 +63,15 @@
  *   @shared/types/roles (ROLE_LABELS)
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { SchoolMark } from '@/components/shared/SchoolMark'
 import { usePathname, useRouter }       from 'next/navigation'
 import { AnimatePresence, motion }       from 'framer-motion'
 import {
   Bell,
-  BookOpen,
   ChevronDown,
   LogOut,
+  MessageSquareWarning,
   Search,
   Settings,
   User,
@@ -82,7 +83,7 @@ import { useNavigation }         from '@/hooks/useNavigation'
 import { useMotionEnabled }      from '@/store/motionStore'
 import { useNotificationFeed }   from '@/hooks/useNotificationFeed'
 import type { FeedNotification } from '@/hooks/useNotificationFeed'
-import { useCurrentAcademicPeriod } from '@/hooks/useSettings'
+import { PeriodSwitcher }       from '@/components/shared/PeriodSwitcher'
 import { ModeToggle }            from '@/components/shared/ModeToggle'
 import {
   FADE_DOWN_VARIANTS,
@@ -94,6 +95,10 @@ import {
 } from '@/lib/motion'
 import { ROLE_LABELS }   from '@shared/types/roles'
 import { GlobalSearch }  from '@/components/shared/GlobalSearch'
+import { ReportProblemModal } from '@/components/shared/ReportProblemModal'
+import { AttentionBadge } from '@/components/shared/AttentionBadge'
+import { attentionNoun } from '@/lib/hills/attention'
+import { getMoreSheetOpen, setMoreSheetOpen, subscribeMoreSheet } from '@/lib/hills/moreSheet'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SHARED PANEL MOTION (R15 — de-duplicates the identical variant/transition
@@ -170,6 +175,12 @@ function NotificationList({
   onClose,
   onViewAll,
 }: NotificationListProps) {
+  const router = useRouter()
+  // [2026-10-27] Feed items that carry an in-app link (e.g. a new assignment ->
+  // /classes/<id>?tab=assignments&assignment=<id>) open it on click. Only
+  // same-site paths are followed.
+  const safeLink = (url: string | null): string | null =>
+    url && url.startsWith('/') && !url.startsWith('//') ? url : null
   return (
     <>
       <div className="max-h-72 overflow-y-auto divide-y divide-base">
@@ -197,12 +208,33 @@ function NotificationList({
             </p>
           </div>
         ) : (
-          notifications.map((n) => (
+          notifications.map((n) => {
+            const link = safeLink(n.actionUrl)
+            const open = () => {
+              if (!link) return
+              onClose()
+              router.push(link)
+            }
+            return (
             <div
               key={n.id}
+              {...(link
+                ? {
+                    role: 'link' as const,
+                    tabIndex: 0,
+                    onClick: open,
+                    onKeyDown: (e: React.KeyboardEvent) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        open()
+                      }
+                    },
+                  }
+                : {})}
               className={[
                 'flex items-start gap-2.5 px-4 py-3',
                 'hover:bg-page transition-colors',
+                link ? 'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal/40' : '',
                 n.unread ? 'bg-brand-teal/5' : '',
               ].join(' ')}
             >
@@ -221,11 +253,12 @@ function NotificationList({
                   {n.body}
                 </p>
                 {n.time && (
-                  <p className="text-[10px] text-muted mt-1 font-sans">{n.time}</p>
+                  <p className="text-xs text-muted mt-1 font-sans">{n.time}</p>
                 )}
               </div>
             </div>
-          ))
+            )
+          })
         )}
       </div>
 
@@ -236,7 +269,7 @@ function NotificationList({
             onClose()
             onViewAll()
           }}
-          className="text-xs text-brand-teal font-heading font-semibold hover:underline"
+          className="text-xs text-tone-teal font-heading font-semibold app-action"
         >
           View all announcements
         </button>
@@ -447,16 +480,17 @@ export function PageHeader() {
     isLoading: notifLoading,
   } = useNotificationFeed()
 
-  // Real academic-term badge source (R15 — replaces the hardcoded
-  // 'Term 1 — 2025/2026' literal)
-  const { academicYear, term, isLoading: periodLoading } = useCurrentAcademicPeriod()
-
   const displayName = user?.displayName ?? user?.email?.split('@')[0] ?? 'User'
   const initials    = displayName.slice(0, 2).toUpperCase()
+
+  // Shared with MobileBottomNav: the avatar and the "More" slot open the same sheet.
+  const moreSheetOpen = useSyncExternalStore(subscribeMoreSheet, getMoreSheetOpen, () => false)
 
   // Desktop dropdown open states
   const [bellOpen,  setBellOpen]  = useState(false)
   const [userOpen,  setUserOpen]  = useState(false)
+  // "Report a problem" dialog — available to every role from the user menu.
+  const [reportOpen, setReportOpen] = useState(false)
 
   // Mobile overlay states
   const [searchOpen,     setSearchOpen]     = useState(false)
@@ -545,19 +579,17 @@ export function PageHeader() {
             ════════════════════════════════════════════════════════════════════ */}
         <div className="flex items-center h-14 px-4 gap-2 md:hidden">
 
-          {/* Left: Logo icon — taps navigate to dashboard */}
+          {/* Left: school logo — taps navigate to dashboard.
+              Same school mark the desktop Sidebar renders (SchoolMark), with
+              no tinted placeholder behind it, so the two shells stay in sync.
+              44×44 hit area (touch-target minimum) around a 40px mark. */}
           <button
             type="button"
             onClick={() => router.push('/dashboard')}
-            className="
-              shrink-0 w-8 h-8 rounded-xl
-              bg-brand-teal/10
-              flex items-center justify-center
-              transition-colors hover:bg-brand-teal/20
-            "
+            className="shrink-0 w-11 h-11 -ml-1.5 flex items-center justify-center rounded-xl active:bg-page transition-colors"
             aria-label="Go to Dashboard"
           >
-            <BookOpen className="w-4 h-4 text-brand-teal" aria-hidden />
+            <SchoolMark kind="emblem" width={40} height={40} priority className="w-10 h-10 object-contain" />
           </button>
 
           {/* Center: Animated page title — fills remaining space */}
@@ -565,7 +597,9 @@ export function PageHeader() {
             <PageTitle title={pageTitle} motionEnabled={motionEnabled} />
           </div>
 
-          {/* Right: Search + Bell */}
+          {/* Right: Search + Bell + Avatar (R5.4). The period switcher now lives in the
+              More sheet; the strip under this header still warns when the viewing
+              period is not the live one. */}
           <div className="flex items-center gap-0.5 shrink-0">
             <button
               type="button"
@@ -573,7 +607,7 @@ export function PageHeader() {
                 setSearchOpen(true)
                 setMobileBellOpen(false)
               }}
-              className="p-2 rounded-lg text-muted hover:text-body hover:bg-page transition-colors"
+              className="touch-target rounded-lg text-muted hover:text-body hover:bg-page transition-colors"
               aria-label="Open search"
               aria-expanded={searchOpen}
             >
@@ -583,51 +617,48 @@ export function PageHeader() {
             <button
               type="button"
               onClick={openMobileBell}
-              className="relative p-2 rounded-lg text-muted hover:text-body hover:bg-page transition-colors"
+              className="relative touch-target rounded-lg text-muted hover:text-body hover:bg-page transition-colors"
               aria-label={bellAriaLabel}
               aria-expanded={mobileBellOpen}
             >
               <Bell className="w-[18px] h-[18px]" aria-hidden />
               {unreadCount > 0 && (
-                <span
-                  className="
-                    absolute top-1 right-1
-                    min-w-[14px] h-3.5
-                    bg-brand-coral rounded-full
-                    text-white text-[8px] font-heading font-bold
-                    flex items-center justify-center px-0.5 leading-none
-                  "
-                  aria-hidden
-                >
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </span>
+                <AttentionBadge
+                  count={unreadCount}
+                  noun={attentionNoun('notificationsUnread')}
+                  className="absolute right-0.5 top-1"
+                />
               )}
+            </button>
+
+            {/* Avatar: opens the same "More" sheet as the bottom bar's last slot
+                (account, viewing period, report a problem, sign out, theme). */}
+            <button
+              type="button"
+              onClick={() => setMoreSheetOpen(true)}
+              className="touch-target rounded-lg transition-colors hover:bg-page"
+              aria-label="Account and menu"
+              aria-haspopup="dialog"
+              aria-expanded={moreSheetOpen}
+              aria-controls="mobile-more-sheet"
+            >
+              <span className="flex size-8 items-center justify-center rounded-full bg-brand-deep text-xs font-bold font-heading text-white">
+                {initials}
+              </span>
             </button>
           </div>
         </div>
 
         {/* ════════════════════════════════════════════════════════════════════
             DESKTOP LAYOUT (md+, h-16)
-            Two-zone: [Term badge left] [Actions right]
+            Two-zone: [Period switcher left] [Actions right]
             ════════════════════════════════════════════════════════════════════ */}
         <div className="hidden md:flex items-center justify-between h-16 px-6">
 
-          {/* Left: Academic term badge — real SETTING_KEYS values (R15).
-              A quiet skeleton pill while the two settings resolve; nothing
-              is shown at all if they fail, rather than a fake year. */}
-          {periodLoading ? (
-            <span
-              className="h-4 w-32 rounded bg-page animate-pulse"
-              role="status"
-              aria-label="Loading academic term"
-            />
-          ) : academicYear && term ? (
-            <span className="text-sm font-semibold font-heading text-body">
-              Term {term} — {academicYear}
-            </span>
-          ) : (
-            <span aria-hidden />
-          )}
+          {/* Left: universal academic year + term filter. Replaces the old
+              read-only badge: picking a period here drives every
+              period-scoped tab in the app (see hooks/useViewingPeriod). */}
+          <PeriodSwitcher variant="desktop" />
 
           {/* Right: Search + Bell + ModeToggle + User */}
           <div className="flex items-center gap-1.5">
@@ -649,18 +680,11 @@ export function PageHeader() {
               >
                 <Bell className="w-5 h-5" aria-hidden />
                 {unreadCount > 0 && (
-                  <span
-                    className="
-                      absolute top-1 right-1
-                      min-w-[16px] h-4
-                      bg-brand-coral rounded-full
-                      text-white text-[9px] font-heading font-bold
-                      flex items-center justify-center px-1 leading-none
-                    "
-                    aria-hidden
-                  >
-                    {unreadCount > 99 ? '99+' : unreadCount}
-                  </span>
+                  <AttentionBadge
+                    count={unreadCount}
+                    noun={attentionNoun('notificationsUnread')}
+                    className="absolute -right-1 -top-1"
+                  />
                 )}
               </button>
 
@@ -722,7 +746,7 @@ export function PageHeader() {
                 aria-label={`User menu — ${displayName}`}
               >
                 {/* Avatar */}
-                <div className="w-8 h-8 rounded-full bg-brand-navy flex items-center justify-center shrink-0">
+                <div className="w-8 h-8 rounded-full bg-brand-deep flex items-center justify-center shrink-0">
                   <span className="text-white text-xs font-bold font-heading">
                     {initials}
                   </span>
@@ -803,6 +827,18 @@ export function PageHeader() {
                         <Settings className="w-4 h-4 shrink-0" aria-hidden />
                         Settings
                       </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          setUserOpen(false)
+                          setReportOpen(true)
+                        }}
+                        className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-muted hover:text-body hover:bg-page transition-colors"
+                      >
+                        <MessageSquareWarning className="w-4 h-4 shrink-0" aria-hidden />
+                        Report a problem
+                      </button>
                     </div>
 
                     {/* Sign out */}
@@ -811,7 +847,7 @@ export function PageHeader() {
                         type="button"
                         role="menuitem"
                         onClick={handleSignOut}
-                        className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-brand-coral hover:bg-brand-coral/5 transition-colors"
+                        className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-tone-coral hover:bg-brand-coral/5 transition-colors"
                       >
                         <LogOut className="w-4 h-4 shrink-0" aria-hidden />
                         Sign out
@@ -840,6 +876,8 @@ export function PageHeader() {
         notifications={notifications}
         isLoading={notifLoading}
       />
+
+      {reportOpen && <ReportProblemModal onClose={() => setReportOpen(false)} />}
     </>
   )
 }

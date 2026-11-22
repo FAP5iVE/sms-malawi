@@ -55,6 +55,15 @@
  *   those routes on it explicitly. finance receives it because its own
  *   fee-statement lookup by studentId is the same capability applied to the
  *   finance domain; no other role does.
+ *
+ *   [2026-10 — Attendance visibility] adds 'class.viewAttendance' (read-only
+ *   view of a class's attendance register) and grants it to every role
+ *   that already holds class.viewAnalytics: admin, high_rank, lower_rank,
+ *   academic, exam_officer. Previously GET /attendance/class/:id was gated
+ *   by class.markAttendance (academic only) PLUS a teacher-ownership check,
+ *   so even *viewing* a register 403'd for everyone except that class's own
+ *   teacher. Viewing is now separated from marking: class.markAttendance
+ *   (and the ownership check on POST) is unchanged.
  * [DEPENDS ON]: none
  */
 import type { UserRole } from './roles'
@@ -85,6 +94,28 @@ export type Permission =
   // reach the student list (including library and HR) saw it. Distinct
   // from viewFeeStatus since risk is broader than just money owed.
   | 'student.viewRiskStatus'         // See computed risk level on student record
+  // Welfare data (orphan status, vulnerability, special/learning-support needs).
+  // Deliberately its own permission: this is sensitive information about
+  // children, so it is NOT folded into viewRiskStatus and is NEVER an input to
+  // the risk score (that would label children). Class teachers get none of it;
+  // support needs reach them only as an aggregated count (see welfare service).
+  | 'student.viewWelfare'            // See orphan/vulnerability/special-needs records
+  | 'student.editWelfare'            // Record or change welfare data
+
+  // ── GUARDIAN PORTAL (staff side) ─────────────────────
+  // Who may manage parent/guardian ACCESS to students. Distinct from the
+  // student.* guardian CONTACT-CARD edits (student.edit): a contact card never
+  // grants portal access, only a verified GuardianLink does. Registrar work
+  // (lower_rank) is to view, propose and hand over invitations; deciding who gets
+  // access to a child (approve / restrict / merge / backfill) is admin + high_rank.
+  | 'guardian.view'                  // See guardian profiles, links and invitation status
+  | 'guardian.propose'               // Propose a link, record verification evidence
+  | 'guardian.invite'                // Issue/reissue a claim invitation for an ACTIVE link
+  | 'guardian.approve'               // Approve or reject proposed links, reinstate access
+  | 'guardian.restrict'              // Change capabilities, suspend, revoke a link
+  | 'guardian.merge'                 // Merge two guardian profiles (also needs a second approver)
+  | 'guardian.backfill'              // Run onboarding batches over existing contact cards
+  | 'guardian.viewAccessLog'         // See what guardians opened (safeguarding audit)
 
   // ── CLASS ────────────────────────────────────────────
   | 'class.view'                     // View class data
@@ -94,7 +125,17 @@ export type Permission =
   | 'class.hardDelete'               // Hard delete — admin only
   | 'class.approvePendingAction'     // Approve pending class changes
   | 'class.assignTeacher'            // Assign class teacher
-  | 'class.assignSubject'            // Assign subjects to a class
+  | 'class.assignSubject'            // Assign subjects to a class (subject-teacher pairing — ClassSubjectAssignment)
+  // [NEW 2026-09-16 — Class Subject Presets] Set/change the list of
+  // subjects a class offers (ClassSubjectPreset) — distinct from
+  // class.assignSubject above, which pairs a teacher to one already-
+  // offered subject. Deliberately its own permission rather than an
+  // overload of class.assignSubject: exam_officer holds that permission
+  // for subject-teacher pairing but is explicitly NOT one of the roles
+  // that may set a class's subject list (admin/high_rank/lower_rank only,
+  // per the intended workflow) — reusing class.assignSubject here would
+  // have over-granted exam_officer this capability.
+  | 'class.manageSubjectPresets'     // Set a class's preset subject list (locks 5 days after first set)
   | 'class.assignRoom'               // Assign a classroom
   | 'class.bookLab'                  // Book lab session for a class
   | 'class.makeAnnouncement'         // Post class-level announcement
@@ -102,7 +143,8 @@ export type Permission =
   | 'class.viewAssignments'          // View class assignments
   | 'class.submitAssignment'         // Submit an assignment (student)
   | 'class.viewAnalytics'            // View class analytics panel
-  | 'class.markAttendance'           // Mark and view attendance for a class (R6)
+  | 'class.markAttendance'           // Mark attendance for a class — the class's own assigned teacher only (per-class ownership is enforced in attendance.ts)
+  | 'class.viewAttendance'           // View a class's attendance register, READ-ONLY (no marking) — oversight roles and non-owning teachers
 
   // ── APPLICATION ──────────────────────────────────────
   | 'application.view'               // View admission applications
@@ -257,6 +299,32 @@ export type Permission =
   | 'assets.viewAdvances'            // View procurement advances made against requisitions
   | 'assets.manageAdvances'          // Record/reconcile/write off procurement advances
 
+  // ── R22 — Locations, Budget Windows, Procurement, Inventory ────
+  // New domain sitting alongside assets.*, not replacing it. AssetRequest/
+  // AssetAdvance keep using assets.requestItem/approveRequest/viewAdvances/
+  // manageAdvances above unchanged — these are additive.
+  | 'location.view'                   // View departments / buildings / rooms
+  | 'location.manage'                 // Create/edit departments, buildings, rooms; assign room custodians
+
+  | 'finance.manageBudgetWindows'       // Open/close a budget submission window
+  | 'finance.manageBudgetCommitments'   // Release/cancel a budget commitment (reserve/consume happen automatically inside the procurement flow)
+
+  | 'procurement.createRequisition'     // Submit a purchase requisition
+  | 'procurement.viewRequisitions'      // View requisitions — service layer scopes to own/department for non-finance roles
+  | 'procurement.reviewRequisition'     // Approve / reject / return a submitted requisition
+  | 'procurement.manageRFQ'             // Issue RFQs; record and select supplier quotations
+  | 'procurement.manageSuppliers'       // Create/edit the supplier register (incl. bank details — restrict at UI level)
+  | 'procurement.managePurchaseOrders'  // Create, approve and send purchase orders
+  | 'procurement.receiveGoods'          // Record a goods receipt against a purchase order
+
+  | 'inventory.view'                  // View inventory items and transaction history
+  | 'inventory.manageItems'           // Create/edit InventoryItem catalog entries
+  | 'inventory.receive'               // Record a stock receipt
+  | 'inventory.issue'                 // Record a stock issue
+  | 'inventory.transfer'              // Record a stock transfer between rooms
+  | 'inventory.performStocktake'      // Open a stocktake, record counts, submit for review
+  | 'inventory.resolveVariance'       // Resolve or write off a stocktake variance
+
   // ── HR ───────────────────────────────────────────────
   | 'hr.viewOwnProfile'              // View own staff profile
   | 'hr.editOwnLimitedFields'        // Edit own limited fields (phone, address)
@@ -264,6 +332,10 @@ export type Permission =
   | 'hr.createStaff'                 // Create a new staff record
   | 'hr.editStaff'                   // Edit any staff member's details
   | 'hr.terminateStaff'              // Terminate a staff member's employment
+  // Staff identity and compliance data (date of birth, NRB, TPIN, next of kin,
+  // TCM licence, qualifications, computed retirement date). Held by the roles
+  // that manage staff; the HR profile endpoint is already limited to them.
+  | 'hr.viewStaffSensitive'          // See staff identity/compliance/retirement data
   | 'hr.assignRole'                  // Assign / change a staff member's role
   | 'hr.promoteStaff'                // Promote or demote a staff member
   | 'hr.applyLeave'                  // Submit own leave request
@@ -357,8 +429,8 @@ export type Permission =
   //    the "Malawi Higher Education Placement & Advisory" reference module) ──
   | 'placement.viewOwn'             // A graduated student views their own claim/placement status
   | 'placement.recordOwnChoice'     // A graduated student submits their own placement claim (Student Claim Portal)
-  | 'placement.view'                // View the Placement Registry & Analytics tab, and run the MSCE Advisory calculator (ALL roles, incl. student)
-  | 'placement.viewAnalytics'       // View cohort placement analytics (all roles, incl. student)
+  | 'placement.view'                // Run the MSCE Advisory calculator and see the catalogue (ALL roles, incl. student). Does NOT grant the registry — that is placement.viewAnalytics
+  | 'placement.viewAnalytics'       // View the cohort placement registry (named candidates, MSCE numbers/points) and cohort analytics (all staff roles — NOT student)
   | 'placement.manage'              // Record an official staff placement entry (Staff Placement Entry tab) (admin, high_rank)
   | 'placement.recordOutcome'       // Record an official staff placement entry (Staff Placement Entry tab) (also lower_rank — admissions-desk clerks)
   | 'placement.verifyOutcome'       // Approve or reject a student's claim (Claims Verification Desk) (admin, high_rank only)
@@ -366,7 +438,7 @@ export type Permission =
    // ── MONITORING (Sentry-backed admin dashboard) ─────────
   | 'monitoring.view'                // View the Sentry-backed monitoring dashboard (admin/high_rank only)
   | 'monitoring.manage'              // Acknowledge/resolve issues & toggle alerts from our own UI
-  | 'monitoring.submitFeedback'      // Submit in-app "report a problem" feedback (Sentry User Feedback) — every role
+  | 'monitoring.submitFeedback'      // Submit an in-app "Report a problem" (header / More menu) — granted to EVERY role
 
 // ─────────────────────────────────────────────────────────
 //  ROLE → PERMISSION MAP
@@ -383,6 +455,10 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
   // payments, issuing books) — those belong to domain roles.
   // Exception: admin.unlockMarks (technical maintenance for exam module).
   admin: new Set<Permission>([
+  // Guardian portal (staff side)
+    'guardian.view', 'guardian.propose', 'guardian.invite', 'guardian.approve',
+    'guardian.restrict', 'guardian.merge', 'guardian.backfill', 'guardian.viewAccessLog',
+
     // Students — oversight only
     'student.view',                 // View any student record
    'student.viewOwn',                // Student views own record only
@@ -395,12 +471,17 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
    'student.viewFeeStatus',          // See fee status on student record
    'student.viewLibraryStatus',      // See library borrowing status on student record
    'student.viewAttendance',         // See attendance records for any student
+   'student.viewRiskStatus',         // See computed risk level on student record
+    'student.viewWelfare',
+    'student.editWelfare',
 
     // Classes — oversight only
     'class.view',
     'class.approvePendingAction',
     'class.assignSubject',   // manage subject-teacher assignments (class structure, not results)
+    'class.manageSubjectPresets', // set a class's preset subject list (with high_rank/lower_rank)
     'class.viewAnalytics',
+    'class.viewAttendance',
 
     // Applications — oversight
     'application.view',
@@ -454,13 +535,30 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'assets.viewInventoryReports',
     'assets.viewAdvances',
 
-    // HR — system account management only (no HR data logic)
+    // R22 — oversight only, same philosophy as assets.* above
+    'location.view',
+    'inventory.view',
+    'procurement.viewRequisitions',
+
+    // HR — system account management, plus self-service payslip access.
+    // [PRODUCTION FIX, user-requested] admin previously held none of the
+    // payroll permissions at all, including hr.viewOwnPayslips — the
+    // matrix's own comment framed this as "admin doesn't perform business
+    // operations," but that's a category error: whether admin *manages*
+    // payroll is a business-operation question (rightly no — finance/hr
+    // own that); whether an admin/IT staff member *receives* a salary
+    // is not a business-operation question at all, it's just a fact about
+    // that person's employment. This grants only the self-service view —
+    // admin still can't manage salary structures, run payroll, approve,
+    // lock, or view anyone else's payslips; none of that changes.
+    'hr.viewOwnPayslips',
     'hr.viewAnyProfile',
     'hr.viewHRReports',
     'hr.viewAnyProfile',
     'hr.createStaff',
     'hr.editStaff',
     'hr.terminateStaff',
+    'hr.viewStaffSensitive',
     'hr.assignRole',
 
     // Exams — view / oversight / export only; NO result-editing capability
@@ -527,6 +625,10 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
   // Cannot do: record payments, enter marks (business operations that
   // belong strictly to the accountable domain role).
   high_rank: new Set<Permission>([
+  // Guardian portal (staff side)
+    'guardian.view', 'guardian.propose', 'guardian.invite', 'guardian.approve',
+    'guardian.restrict', 'guardian.merge', 'guardian.backfill', 'guardian.viewAccessLog',
+
     // Students — full management + approvals
     'student.view',
     'student.create',
@@ -538,6 +640,8 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'student.viewLibraryStatus',
     'student.viewAttendance',
     'student.viewRiskStatus',
+    'student.viewWelfare',
+    'student.editWelfare',
 
     // Classes — full management
     'class.view',
@@ -547,8 +651,10 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'class.approvePendingAction',
     'class.assignTeacher',
     'class.assignSubject',
+    'class.manageSubjectPresets',
     'class.assignRoom',
     'class.viewAnalytics',
+    'class.viewAttendance',
 
     // Applications — full access
     'application.view',
@@ -635,6 +741,14 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'assets.approveRequest',
     'assets.viewAdvances',
 
+    // R22 — reviews requisitions and controls when departments may submit
+    // budget bids, same authority level as assets.approveRequest above
+    'location.view',
+    'inventory.view',
+    'procurement.viewRequisitions',
+    'procurement.reviewRequisition',
+    'finance.manageBudgetWindows',
+
     // HR — full management authority
     'hr.viewOwnProfile',
     'hr.editOwnLimitedFields',
@@ -642,6 +756,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'hr.createStaff',
     'hr.editStaff',
     'hr.terminateStaff',
+    'hr.viewStaffSensitive',
     'hr.assignRole',
     'hr.promoteStaff',
     'hr.applyLeave',
@@ -667,6 +782,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'exam.view',
     'exam.create',
     'exam.edit',
+    'exam.delete',              // Ownership + lock rules enforced in examService.deleteExam
     'exam.unlockMarks',
     'exam.correctMarksInReview',
     'exam.authorizeRelease',
@@ -723,6 +839,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
 
     // Announcements — own only
     'announcement.view',
+    'monitoring.submitFeedback',     // "Report a problem" — every role, incl. those without monitoring.view
     'announcement.createWithApproval',
     'announcement.editOwn',
     'announcement.deleteOwn',
@@ -806,7 +923,36 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'assets.viewAdvances',
     'assets.manageAdvances',
 
-    // HR — self-service only
+    // R22 — finance runs the full Assets/Inventory/Procurement operation,
+    // same full-operational-owner role it already has for assets.* above
+    'location.view',
+    'location.manage',
+    'finance.manageBudgetWindows',
+    'finance.manageBudgetCommitments',
+    'procurement.createRequisition',
+    'procurement.viewRequisitions',
+    'procurement.reviewRequisition',
+    'procurement.manageRFQ',
+    'procurement.manageSuppliers',
+    'procurement.managePurchaseOrders',
+    'procurement.receiveGoods',
+    'inventory.view',
+    'inventory.manageItems',
+    'inventory.receive',
+    'inventory.issue',
+    'inventory.transfer',
+    'inventory.performStocktake',
+    'inventory.resolveVariance',
+
+    // HR — self-service, plus viewing any staff member's payslips
+    // [PRODUCTION FIX, user-requested] finance already holds
+    // finance.manageSalaryStructure and finance.viewPayrollRuns (sees
+    // every payroll run's totals), but had no way to drill into one
+    // specific person's My Pay view the way hr/high_rank's "Viewing
+    // Employee" picker already lets them — a real gap against how finance
+    // actually needs to work day to day (a staff member calls about their
+    // payslip, finance should be able to just look).
+    'hr.viewAnyPayslips',
     'hr.viewOwnProfile',
     'hr.editOwnLimitedFields',
     'hr.applyLeave',
@@ -847,6 +993,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     // Announcements — own only. [CONFIRMED 2026-08] library requires
     // approval like lower_rank — publishDirect intentionally excluded.
     'announcement.view',
+    'monitoring.submitFeedback',     // "Report a problem" — every role, incl. those without monitoring.view
     'announcement.createWithApproval',
     'announcement.editOwn',
     'announcement.deleteOwn',
@@ -925,6 +1072,10 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
   // Can initiate many actions but most require approval from
   // admin or high_rank before taking effect.
   lower_rank: new Set<Permission>([
+  // Guardian portal (staff side)
+    // Registrar work: view, propose and hand over invitations. NOT approve/restrict/merge.
+    'guardian.view', 'guardian.propose', 'guardian.invite',
+
     // Students — create/edit/soft-delete with approval required
     'student.view',
     'student.create',
@@ -940,7 +1091,9 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'class.create',
     'class.edit',
     'class.softDelete',
+    'class.manageSubjectPresets', // set a class's preset subject list (with admin/high_rank)
     'class.viewAnalytics',
+    'class.viewAttendance',
 
     // Applications — partial access with approval limits
     'application.view',
@@ -951,6 +1104,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     // or lower_rank staff) [SEC-001][N3]. [CONFIRMED 2026-08] lower_rank
     // must always require approval — publishDirect intentionally excluded.
     'announcement.view',
+    'monitoring.submitFeedback',     // "Report a problem" — every role, incl. those without monitoring.view
     'announcement.createWithApproval',
     'announcement.approvePublish',
     'announcement.reject',
@@ -1024,12 +1178,14 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'class.giveAssignment',
     'class.viewAssignments',
     'class.viewAnalytics',
+    'class.viewAttendance',
     'class.markAttendance',
 
     // Applications — no access (§3.8.1.6)
 
     // Announcements — own plus class approval authority
     'announcement.view',
+    'monitoring.submitFeedback',     // "Report a problem" — every role, incl. those without monitoring.view
     'announcement.createWithApproval',
     'announcement.editOwn',
     'announcement.deleteOwn',
@@ -1068,6 +1224,13 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'assets.requestItem',
     'assets.viewOwnAssigned',
 
+    // R22 — HODs/teaching staff can submit departmental purchase
+    // requisitions and see their own department's inventory; they do not
+    // review, approve, or move stock (that stays with finance)
+    'procurement.createRequisition',
+    'procurement.viewRequisitions',
+    'inventory.view',
+
     // HR — self-service only
     'hr.viewOwnProfile',
     'hr.editOwnLimitedFields',
@@ -1083,6 +1246,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'exam.view',
     'exam.create',
     'exam.edit',
+    'exam.delete',              // Own (class, subject) only — enforced in examService.deleteExam
     'exam.enterOwnClassMarks',
     'exam.finalizeMarks',
     'exam.computeResults',
@@ -1110,12 +1274,14 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
   hr: new Set<Permission>([
     // Students — view only
     'student.view',
+    'student.viewWelfare',
 
     // Classes — view only
     'class.view',
 
     // Announcements — own only, pending approval
     'announcement.view',
+    'monitoring.submitFeedback',     // "Report a problem" — every role, incl. those without monitoring.view
     'announcement.createWithApproval',
     'announcement.editOwn',
     'announcement.deleteOwn',
@@ -1150,6 +1316,10 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     // Assets — self-service only
     'assets.viewOwnAssigned',
 
+    // R22 — HR can raise its own department's requisitions (e.g. office
+    // supplies, recruitment costs) but has no review/operational role
+    'procurement.createRequisition',
+
     // HR — full management
     'hr.viewOwnProfile',
     'hr.editOwnLimitedFields',
@@ -1157,6 +1327,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'hr.createStaff',
     'hr.editStaff',
     'hr.terminateStaff',
+    'hr.viewStaffSensitive',
     'hr.assignRole',
     'hr.promoteStaff',
     'hr.applyLeave',
@@ -1207,10 +1378,12 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     // Classes — view and analytics
     'class.view',
     'class.viewAnalytics',
+    'class.viewAttendance',
     'class.assignSubject',
 
     // Announcements — own only, pending approval
     'announcement.view',
+    'monitoring.submitFeedback',     // "Report a problem" — every role, incl. those without monitoring.view
     'announcement.createWithApproval',
     'announcement.editOwn',
     'announcement.deleteOwn',
@@ -1295,6 +1468,13 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
   // Results visibility is subject to the fee-balance gate enforced
   // at the service layer — this permission map does not capture that;
   // it only defines what the student is structurally allowed to request.
+  // Parent / guardian: deliberately EMPTY. A parent's access comes from a verified
+  // GuardianLink evaluated per request (never from this table), and the default-deny
+  // fence in verifyAuth keeps the account away from every staff and student router.
+  // Adding anything here would also widen what a parent token can do on any route
+  // that checks permissions, so it needs a security review.
+  parent: new Set<Permission>([]),
+
   student: new Set<Permission>([
     // Students — own record only
     'student.viewOwn',
@@ -1307,6 +1487,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
 
     // Announcements — view all, create for own class (pending teacher approval)
     'announcement.view',
+    'monitoring.submitFeedback',     // "Report a problem" — every role, incl. those without monitoring.view
     'announcement.createWithApproval',
     'announcement.editOwn',
     'announcement.deleteOwn',
@@ -1344,23 +1525,38 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'settings.viewPersonal',
     'settings.updateNotifPrefs',
 
-    // Placement — own placement self-service + cohort/analytics visibility (R18)
+    // Placement — own placement self-service + the advisory calculator (R18).
+    // Deliberately NO 'placement.viewAnalytics': the cohort registry and
+    // analytics carry other students' names, MSCE candidate numbers and points,
+    // so a student only ever reads their own record (/placements/me and
+    // /reporting/student/placement).
     'placement.viewOwn',
     'placement.recordOwnChoice',
     'placement.view',
-    'placement.viewAnalytics',
   ]),
 } as const
 
 // ─────────────────────────────────────────────────────────
 //  HELPER UTILITIES
+//
+//  Every helper takes an optional trailing `superUser` flag (the `superUser`
+//  Firebase claim — see @shared/constants/superUser). When true the check
+//  always passes: the super user (alpha_admin) holds EVERY permission,
+//  including any permission that is declared in the `Permission` union but
+//  not granted to any role. Callers pass `req.user.superUser` (server) or the
+//  auth store's `superUser` (client); omitting it keeps the old behaviour.
 // ─────────────────────────────────────────────────────────
 
 /**
  * Check whether a given role has a specific permission.
  * O(1) — uses Set.prototype.has() internally.
  */
-export function hasPermission(role: UserRole, permission: Permission): boolean {
+export function hasPermission(
+  role: UserRole,
+  permission: Permission,
+  superUser = false
+): boolean {
+  if (superUser) return true
   return (ROLE_PERMISSIONS[role] as ReadonlySet<Permission>).has(permission)
 }
 
@@ -1370,8 +1566,10 @@ export function hasPermission(role: UserRole, permission: Permission): boolean {
  */
 export function hasAllPermissions(
   role: UserRole,
-  permissions: readonly Permission[]
+  permissions: readonly Permission[],
+  superUser = false
 ): boolean {
+  if (superUser) return true
   const set = ROLE_PERMISSIONS[role] as ReadonlySet<Permission>
   return permissions.every((p) => set.has(p))
 }
@@ -1382,17 +1580,34 @@ export function hasAllPermissions(
  */
 export function hasAnyPermission(
   role: UserRole,
-  permissions: readonly Permission[]
+  permissions: readonly Permission[],
+  superUser = false
 ): boolean {
+  if (superUser) return true
   const set = ROLE_PERMISSIONS[role] as ReadonlySet<Permission>
   return permissions.some((p) => set.has(p))
 }
 
 /**
+ * Every permission granted to at least one role — the union of all nine
+ * role sets. Used to list what the super user holds. (The super user also
+ * passes checks for permissions in no role's set; see hasPermission.)
+ */
+export const ALL_GRANTED_PERMISSIONS: readonly Permission[] = Array.from(
+  new Set<Permission>(
+    (Object.values(ROLE_PERMISSIONS) as ReadonlySet<Permission>[]).flatMap((set) =>
+      Array.from(set)
+    )
+  )
+)
+
+/**
  * Return the full permission set for a role as a plain array.
  * Useful for debugging and audit log enrichment — not for runtime checks
  * (use hasPermission / hasAllPermissions / hasAnyPermission instead).
+ * For the super user this is the union of every role's permissions.
  */
-export function getPermissionsForRole(role: UserRole): Permission[] {
+export function getPermissionsForRole(role: UserRole, superUser = false): Permission[] {
+  if (superUser) return [...ALL_GRANTED_PERMISSIONS]
   return Array.from(ROLE_PERMISSIONS[role] as ReadonlySet<Permission>)
 }

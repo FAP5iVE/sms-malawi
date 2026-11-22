@@ -22,9 +22,15 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { RoleGuard } from '@/components/shared/RoleGuard'
+import { ModuleSurface } from '@/components/shared/ModuleSurface'
 import { apiFetch, queryKeys } from '@/lib/api-client'
+import { notifySuccess, notifyError, getErrorMessage } from '@/lib/feedback'
 import { uploadFileDirectly } from '@/lib/directUpload'
 import { Images, ImagePlus, Loader2, Trash2, X } from 'lucide-react'
+// [NEW] Click-a-photo-to-view-full-size — grid itself is unchanged (kept
+// exactly as it was), this only adds the viewer.
+import { PhotoLightbox } from '@/components/shared/PhotoLightbox'
+import { Modal, MODAL_BTN_PRIMARY, MODAL_BTN_SECONDARY } from '@/components/shared/Modal'
 
 interface GalleryPhoto {
   id: string
@@ -87,93 +93,94 @@ function UploadForm({ onDone }: { onDone: () => void }) {
         }),
       })
       onDone()
+      notifySuccess('Photo uploaded')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to upload photo. Please try again.')
+      setError(getErrorMessage(err, 'Failed to upload photo. Please try again.'))
+      notifyError('Could not upload the photo', err)
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-      <div className="bg-surface rounded-2xl w-full max-w-md shadow-xl max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 z-10 bg-surface flex items-center justify-between px-6 py-4 border-b border-base">
-          <h2 className="font-heading font-bold text-brand-navy">Add Photo</h2>
-          <button onClick={onDone} className="p-1.5 hover:bg-page rounded-lg" aria-label="Close">
-            <X className="w-4 h-4 text-muted" />
+    <Modal
+      title="Add photo"
+      onClose={onDone}
+      size="m"
+      onSubmit={handleSubmit}
+      busy={loading}
+      bodyClassName="space-y-4"
+      footer={
+        <>
+          <button
+            type="button"
+            onClick={onDone}
+            className={MODAL_BTN_SECONDARY}
+          >
+            Cancel
           </button>
-        </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-body mb-1.5">Photo</label>
-            {preview ? (
-              <div className="relative">
-                {/* eslint-disable-next-line @next/next/no-img-element -- local blob: preview */}
-                <img src={preview} alt="Selected" className="w-full h-40 object-cover rounded-xl border border-base" />
-                <button
-                  type="button"
-                  onClick={() => { setFile(null); setPreview(null) }}
-                  className="absolute top-2 right-2 bg-black/60 text-white rounded-full w-7 h-7 flex items-center justify-center"
-                  aria-label="Remove photo"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ) : (
-              <label className="flex flex-col items-center justify-center gap-1.5 border-2 border-dashed border-base rounded-xl h-32 cursor-pointer hover:border-brand-teal transition-colors text-muted">
-                <ImagePlus className="w-6 h-6" aria-hidden />
-                <span className="text-xs">Choose a photo</span>
-                <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
-              </label>
-            )}
-          </div>
-          <div>
-            <label htmlFor="gallery-caption" className="block text-sm font-medium text-body mb-1.5">Description</label>
-            <textarea
-              id="gallery-caption"
-              value={caption}
-              onChange={(e) => setCaption(e.target.value)}
-              required
-              rows={2}
-              placeholder="e.g. Form 3 students at Sports Day, August 2026"
-              className="w-full border border-base rounded-xl px-4 py-2.5 text-sm bg-page resize-none focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
-            />
-          </div>
-          <div>
-            <label htmlFor="gallery-category" className="block text-sm font-medium text-body mb-1.5">
-              Category <span className="text-muted font-normal">(optional)</span>
-            </label>
-            <input
-              id="gallery-category"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              placeholder="e.g. Sports Day, Assembly, Graduation"
-              className="w-full border border-base rounded-xl px-4 py-2.5 text-sm bg-page focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
-            />
-          </div>
-          {error && (
-            <p role="alert" className="text-xs text-brand-coral">{error}</p>
-          )}
-          <div className="flex justify-end gap-3 pt-2">
+          <button
+            type="submit"
+            disabled={loading}
+            className={MODAL_BTN_PRIMARY}
+          >
+            {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            Add to gallery
+          </button>
+        </>
+      }
+    >
+      <div>
+        <label className="block text-sm font-medium text-body mb-1.5">Photo</label>
+        {preview ? (
+          <div className="relative">
+            {/* eslint-disable-next-line @next/next/no-img-element -- local blob: preview */}
+            <img src={preview} alt="Selected" className="w-full h-40 object-cover rounded-xl border border-base" />
             <button
               type="button"
-              onClick={onDone}
-              className="px-5 py-2 text-sm border border-base rounded-xl hover:bg-page min-h-[44px]"
+              onClick={() => { setFile(null); setPreview(null) }}
+              className="absolute top-2 right-2 bg-black/60 text-white rounded-full w-7 h-7 flex items-center justify-center"
+              aria-label="Remove photo"
             >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-5 py-2 text-sm bg-brand-teal text-white rounded-xl font-semibold flex items-center gap-2 disabled:opacity-60 min-h-[44px]"
-            >
-              {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              Add to Gallery
+              <X className="w-3.5 h-3.5" />
             </button>
           </div>
-        </form>
+        ) : (
+          <label className="flex flex-col items-center justify-center gap-1.5 border-2 border-dashed border-base rounded-xl h-32 cursor-pointer hover:border-brand-teal transition-colors text-muted">
+            <ImagePlus className="w-6 h-6" aria-hidden />
+            <span className="text-xs">Choose a photo</span>
+            <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+          </label>
+        )}
       </div>
-    </div>
+      <div>
+        <label htmlFor="gallery-caption" className="block text-sm font-medium text-body mb-1.5">Description</label>
+        <textarea
+          id="gallery-caption"
+          value={caption}
+          onChange={(e) => setCaption(e.target.value)}
+          required
+          rows={2}
+          placeholder="Form 3 students at Sports Day, August 2026"
+          className="w-full border border-base rounded-xl px-4 py-2.5 text-sm bg-page resize-none focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+        />
+      </div>
+      <div>
+        <label htmlFor="gallery-category" className="block text-sm font-medium text-body mb-1.5">
+          Category <span className="text-muted font-normal">(optional)</span>
+        </label>
+        <input
+          id="gallery-category"
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          placeholder="Sports Day, Assembly, Graduation"
+          className="w-full border border-base rounded-xl px-4 py-2.5 text-sm bg-page focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+        />
+      </div>
+      {error && (
+        <p role="alert" className="text-xs text-tone-coral">{error}</p>
+      )}
+    </Modal>
   )
 }
 
@@ -183,6 +190,8 @@ function GalleryContent() {
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  // [NEW] Which photo (index into `photos`) is open full-size, if any.
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
 
   const { data: photos = [], isLoading, error } = useQuery({
     queryKey: queryKeys.gallery.all(),
@@ -201,30 +210,33 @@ function GalleryContent() {
       await apiFetch(`/gallery/${id}`, { method: 'DELETE' })
       await queryClient.invalidateQueries({ queryKey: queryKeys.gallery.all() })
       setConfirmId(null)
-    } catch {
-      setDeleteError('Failed to delete photo. Please try again.')
+      notifySuccess('Photo deleted')
+    } catch (err) {
+      setDeleteError(getErrorMessage(err, 'Failed to delete photo. Please try again.'))
+      notifyError('Could not delete the photo', err)
     } finally {
       setDeletingId(null)
     }
   }
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+    <div className="space-y-5">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-2">
-          <Images className="w-5 h-5 text-brand-teal" aria-hidden="true" />
+          <Images className="w-5 h-5 text-tone-teal" aria-hidden="true" />
           <h1 className="font-heading font-bold text-xl text-brand-navy">Gallery</h1>
         </div>
         <button
           onClick={() => setShowUpload(true)}
-          className="flex items-center gap-2 bg-brand-teal text-white px-4 py-2 rounded-xl text-sm font-heading font-semibold hover:bg-brand-teal-light transition-colors min-h-[44px]"
+          className="flex items-center gap-2 bg-btn-brand text-btn-brand-fg px-4 py-2 rounded-xl text-sm font-heading font-semibold hover:bg-brand-teal-light transition-colors min-h-[44px]"
         >
-          <ImagePlus className="w-4 h-4" aria-hidden="true" /> Add Photo
+          <ImagePlus className="w-4 h-4" aria-hidden="true" /> Add photo
         </button>
       </div>
 
+      <ModuleSurface contentClassName="">
       {deleteError && (
-        <p role="alert" className="text-xs text-brand-coral mb-4">{deleteError}</p>
+        <p role="alert" className="text-xs text-tone-coral mb-4">{deleteError}</p>
       )}
 
       {isLoading ? (
@@ -234,24 +246,34 @@ function GalleryContent() {
           ))}
         </div>
       ) : error ? (
-        <div className="flex flex-col items-center justify-center py-16 text-brand-coral">
+        <div className="flex flex-col items-center justify-center py-16 text-tone-coral">
           <Images className="w-10 h-10 mb-3 opacity-40" aria-hidden="true" />
           <p className="text-sm">Failed to load gallery photos.</p>
         </div>
       ) : photos.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-muted">
           <Images className="w-10 h-10 mb-3 opacity-30" aria-hidden="true" />
-          <p className="text-sm">No photos yet — add the first one.</p>
+          <p className="text-sm">No photos yet: add the first one.</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-          {photos.map((p) => (
+          {photos.map((p, i) => (
             <div key={p.id} className="group relative rounded-xl overflow-hidden border border-base bg-surface">
-              {/* eslint-disable-next-line @next/next/no-img-element -- remote Appwrite view URL, not a local/optimizable asset */}
-              <img src={p.url} alt={p.caption ?? 'Gallery photo'} className="w-full aspect-square object-cover" />
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-3">
+              {/* [NEW] Photo itself is now a click-to-view-full-size trigger
+                  — a real <button> (not just an onClick on the <img>) so it
+                  stays keyboard-reachable. Grid/card layout is unchanged. */}
+              <button
+                type="button"
+                onClick={() => setLightboxIndex(i)}
+                aria-label={`View ${p.caption ?? 'photo'} full size`}
+                className="block w-full"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element -- remote Appwrite view URL, not a local/optimizable asset */}
+                <img src={p.url} alt={p.caption ?? 'Gallery photo'} className="w-full aspect-square object-cover" />
+              </button>
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-3">
                 {p.category && (
-                  <span className="inline-block text-[10px] font-heading font-bold text-white/90 bg-white/20 rounded-full px-2 py-0.5 mb-1">
+                  <span className="mb-1 block text-xs font-heading font-bold text-white/90">
                     {p.category}
                   </span>
                 )}
@@ -278,7 +300,7 @@ function GalleryContent() {
                     <button
                       onClick={() => handleDelete(p.id)}
                       disabled={deletingId === p.id}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-brand-coral text-white rounded-lg disabled:opacity-60"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-btn-danger text-btn-danger-fg rounded-lg disabled:opacity-60"
                     >
                       {deletingId === p.id && <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" />}
                       Delete
@@ -292,6 +314,19 @@ function GalleryContent() {
       )}
 
       {showUpload && <UploadForm onDone={refresh} />}
+
+      <PhotoLightbox
+        photos={photos.map((p) => ({
+          id: p.id,
+          url: p.url,
+          alt: p.caption ?? 'Gallery photo',
+          caption: p.caption,
+          category: p.category,
+        }))}
+        index={lightboxIndex}
+        onIndexChange={setLightboxIndex}
+      />
+      </ModuleSurface>
     </div>
   )
 }

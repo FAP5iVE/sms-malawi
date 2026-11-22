@@ -49,13 +49,16 @@
  *   - Role badge footer, item tooltips in collapsed mode
  */
 
-import Link                    from 'next/link'
+import { SchoolMark } from '@/components/shared/SchoolMark'
+import { AttentionBadge } from '@/components/shared/AttentionBadge'
+import Link                     from 'next/link'
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ChevronsLeft, ChevronsRight } from 'lucide-react'
 import { useAuthStore }          from '@/store/authStore'
 import { useMotionEnabled }      from '@/store/motionStore'
 import { useNavigation }         from '@/hooks/useNavigation'
+import { usePublicSchoolInfo }   from '@/hooks/usePublic'
 import {
   SIDEBAR_WIDTH_VARIANTS,
   SIDEBAR_LABEL_VARIANTS,
@@ -68,6 +71,8 @@ import {
   EASE,
 } from '@/lib/motion'
 import { ROLE_LABELS } from '@shared/types/roles'
+import { attentionNoun } from '@/lib/hills/attention'
+import { groupNavItems } from '@/lib/hills/navGroups'
 import { LG_BREAKPOINT } from '@shared/constants/breakpoints'
 
 // lg breakpoint in px — must match Tailwind's lg: 1024px
@@ -80,6 +85,7 @@ export function Sidebar() {
   const { role }      = useAuthStore()
   const motionEnabled = useMotionEnabled()
   const { items }     = useNavigation()
+  const { data: schoolInfo } = usePublicSchoolInfo()
 
   // collapsed: true  → 60px icon rail
   //            false → 240px expanded panel
@@ -203,11 +209,12 @@ export function Sidebar() {
         role="navigation"
       >
         {/* ── Brand / logo row ──────────────────────────────────────────────── */}
-        <div className="h-16 flex items-center justify-between px-3 border-b border-base shrink-0">
+        <div className={`h-16 flex items-center border-b border-base shrink-0 ${collapsed ? 'justify-center px-0' : 'justify-between px-3'}`}>
 
-          {/* Brand icon — always visible */}
+          {/* School logo — the same live application mark used by the public page.
+              No coloured/rounded placeholder sits behind it. */}
           <motion.div
-            className="w-8 h-8 rounded-lg bg-brand-navy flex items-center justify-center shrink-0"
+            className="w-14 h-14 flex items-center justify-center shrink-0"
             whileHover={motionEnabled ? { scale: 1.06 } : undefined}
             transition={reducedMotionTransition(motionEnabled, {
               type: 'spring',
@@ -215,7 +222,7 @@ export function Sidebar() {
               damping: 40,
             })}
           >
-            <span className="text-white text-sm font-bold font-heading">S</span>
+            <SchoolMark kind="emblem" width={40} height={40} className="w-14 h-14 object-contain" />
           </motion.div>
 
           {/* Brand name + collapse button — animated out when collapsing */}
@@ -230,7 +237,7 @@ export function Sidebar() {
                   exit="hidden"
                   className="font-heading font-bold text-sm text-brand-navy truncate flex-1 ml-2.5"
                 >
-                  SMS Malawi
+                  {schoolInfo?.schoolName ?? ''}
                 </motion.span>
 
                 <motion.button
@@ -279,8 +286,22 @@ export function Sidebar() {
 
         {/* ── Navigation list ───────────────────────────────────────────────── */}
         <nav className="flex-1 overflow-y-auto py-3" aria-label="Page navigation">
-          {items.map((item, index) => {
+          {groupNavItems(items).map((group) => (
+           <div
+             key={group.label ?? 'top'}
+             role={group.label ? 'group' : undefined}
+             aria-label={group.label ?? undefined}
+           >
+            {/* Group heading (wide sidebar) or a thin divider (icon rail). Same links, same order within a group. */}
+            {group.label !== null &&
+              (collapsed ? (
+                <div className="mx-4 my-2 border-t border-base" aria-hidden />
+              ) : (
+                <p className="px-5 pb-1 pt-4 font-heading text-xs font-semibold text-muted">{group.label}</p>
+              ))}
+          {group.items.map((item) => {
             const Icon = item.icon
+            const index = items.indexOf(item)
 
             return (
               <motion.div
@@ -309,8 +330,8 @@ export function Sidebar() {
                       : 'px-5 py-2.5 border-l-2',
                     item.active
                       ? collapsed
-                        ? 'bg-brand-teal/10 text-brand-teal'
-                        : 'border-brand-teal bg-brand-teal/8 text-brand-teal font-semibold'
+                        ? 'bg-brand-teal/10 text-tone-teal'
+                        : 'border-brand-teal bg-brand-teal/8 text-tone-teal font-semibold'
                       : collapsed
                         ? 'text-muted hover:bg-page hover:text-body'
                         : 'border-transparent text-muted hover:bg-page hover:text-body',
@@ -329,12 +350,11 @@ export function Sidebar() {
                   <span className="relative shrink-0">
                     <Icon className="w-4 h-4" aria-hidden />
                     {collapsed && item.badgeCount !== undefined && (
-                      <span
-                        className="absolute -top-1 -right-1 min-w-[14px] h-3.5 bg-brand-coral rounded-full text-white text-[8px] font-heading font-bold flex items-center justify-center px-0.5 leading-none"
-                        aria-label={`${item.badgeCount} pending`}
-                      >
-                        {item.badgeCount > 99 ? '99+' : item.badgeCount}
-                      </span>
+                      <AttentionBadge
+                        count={item.badgeCount}
+                        noun={attentionNoun('approvalsAwaitingMe')}
+                        className="absolute -top-2 -right-2.5"
+                      />
                     )}
                   </span>
 
@@ -354,12 +374,7 @@ export function Sidebar() {
                         </span>
 
                         {item.badgeCount !== undefined && (
-                          <span
-                            className="shrink-0 min-w-[18px] h-[18px] bg-brand-coral rounded-full text-white text-[9px] font-heading font-bold flex items-center justify-center px-1 leading-none"
-                            aria-label={`${item.badgeCount} pending`}
-                          >
-                            {item.badgeCount > 99 ? '99+' : item.badgeCount}
-                          </span>
+                          <AttentionBadge count={item.badgeCount} noun={attentionNoun('approvalsAwaitingMe')} />
                         )}
                       </motion.span>
                     )}
@@ -368,6 +383,8 @@ export function Sidebar() {
               </motion.div>
             )
           })}
+           </div>
+          ))}
         </nav>
 
         {/* ── Role badge footer ─────────────────────────────────────────────── */}
@@ -382,7 +399,7 @@ export function Sidebar() {
               className="px-4 py-4 border-t border-base shrink-0"
             >
               <div className="bg-page rounded-xl px-3 py-2.5">
-                <p className="text-[10px] font-heading font-semibold text-muted uppercase tracking-widest mb-0.5">
+                <p className="text-xs font-heading font-semibold text-muted mb-0.5">
                   Signed in as
                 </p>
                 <p className="text-xs font-heading font-semibold text-body truncate">

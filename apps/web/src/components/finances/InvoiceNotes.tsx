@@ -46,8 +46,8 @@ export function InvoiceNotes({ invoiceId }: { invoiceId: string }) {
   return (
     <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
       <div className="flex items-center gap-2">
-        <StickyNote className="w-4 h-4 text-brand-amber" />
-        <p className="font-heading font-semibold text-sm text-brand-navy">Transaction Notes</p>
+        <StickyNote className="w-4 h-4 text-tone-amber" />
+        <p className="font-heading font-semibold text-sm text-brand-navy">Transaction notes</p>
       </div>
 
       {isLoading ? (

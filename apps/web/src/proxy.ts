@@ -16,16 +16,38 @@
  *   (4) BYPASS_PREFIXES drops '/fonts/' and '/images/' — both are already
  *       excluded by config.matcher's own negative-lookahead pattern below;
  *       keeping them here was a harmless but confusing double-exclusion.
+ *
+ *   [PRODUCTION FIX] PUBLIC_PATHS gains '/notices' and
+ *   '/academic-advertisements' — the exact same bug class the
+ *   2026-07-28 fix above already found and fixed for /news, /events,
+ *   /gallery, etc.: both pages live under app/(public)/, have no
+ *   page-level auth check, and read from the fully unauthenticated
+ *   GET /public/announcements and /public/academic-advertisements routes
+ *   (filtered server-side on status === 'PUBLISHED' &&
+ *   publicWebsite === true) — but neither was ever added here, so Layer 3
+ *   below ("every non-public, non-bypassed path requires a session")
+ *   redirected anonymous visitors straight to /login before the page's
+ *   own (already-correct) no-auth data flow ever ran. This is why
+ *   announcements/adverts marked public still appeared gated end-to-end
+ *   despite every other layer already being right. isPublicPath()'s
+ *   prefix match covers the /notices/:id and /academic-advertisements/:id
+ *   detail routes too, same as it already does for /news/:id and
+ *   /events/:id.
  * [DEPENDS ON]: none
  */
 import { NextRequest, NextResponse } from 'next/server'
 import type { UserRole } from '@shared/types/roles'
-import { getAllowedRolesForPath } from '@shared/constants/pageAccess'
+import { PAGE_ACCESS, homePathForRole, pageAccessRedirect } from '@shared/constants/pageAccess'
 
 // ─── COOKIE NAMES ─────────────────────────────────────────
 // These constants must stay in sync with AuthProvider.tsx
 export const SESSION_COOKIE = 'sms_session' // Firebase UID — presence = logged in
 export const ROLE_COOKIE = 'sms_role'       // UserRole string — for route protection
+// '1' only for the alpha_admin super user (claim `superUser`) — lets the edge
+// skip the per-page role gate. UX routing only: every API call is still
+// authorised server-side from the verified token, so forging this cookie
+// reveals page shells, never data.
+export const SUPER_COOKIE = 'sms_super'
 
 // ─── SECURITY RESPONSE HEADERS ────────────────────────────
 // Applied to every non-static response.
@@ -41,6 +63,27 @@ const SECURITY_HEADERS: Record<string, string> = {
     'camera=(), microphone=(), geolocation=(), payment=()',
   // HSTS — only meaningful over HTTPS; ignored by browsers on HTTP
   'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload',
+  // [Guardian portal] Content-Security-Policy in REPORT-ONLY mode. The portal
+  // puts the app in front of members of the public on shared devices, so an XSS
+  // would now reach a much larger audience. This policy cannot block anything: it
+  // only makes the browser log what WOULD be blocked, so it can be tuned against
+  // real traffic (shadcn/Recharts inline scripts, Firebase, Appwrite) and then
+  // promoted to `Content-Security-Policy`. Do not enforce it before reviewing
+  // the console reports for /login, /parent and a staff dashboard.
+  'Content-Security-Policy-Report-Only': [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.gstatic.com https://apis.google.com",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' data: https://fonts.gstatic.com",
+    "img-src 'self' data: blob: https:",
+    "media-src 'self' blob: https:",
+    "connect-src 'self' https: wss:",
+    "frame-src 'self' blob: https://*.firebaseapp.com https://accounts.google.com",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+  ].join('; '),
 }
 
 function applySecurityHeaders(response: NextResponse): NextResponse {
@@ -57,6 +100,7 @@ const PUBLIC_PATHS = [
   '/login',
   '/apply',
   '/forgot-password',
+  '/reset-password',   // [SEO FIX] emailed reset links land here while signed out
   '/change-password',
   '/privacy',
   '/terms',
@@ -74,6 +118,13 @@ const PUBLIC_PATHS = [
   '/academics',
   '/student-life',
   '/admissions',
+  // [PRODUCTION FIX] Same bug, same fix, just missed in the first pass —
+  // see this file's header comment. Both are public-only content (forced
+  // publicWebsite=true server-side; see AnnouncementForm.tsx) with no
+  // page-level auth check, reading the unauthenticated /public/* routes.
+  '/notices',
+  '/academic-advertisements',
+  '/placement-results', // [SEO FIX] linked from the landing-page nav; was redirecting visitors to /login
   '/',           // landing page
 ] as const
 
@@ -100,6 +151,23 @@ const BYPASS_PREFIXES = [
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some(
+    (p) => pathname === p || pathname.startsWith(`${p}/`)
+  )
+}
+
+/**
+ * [SEO FIX] True for the signed-in portal's own pages (the keys of
+ * PAGE_ACCESS, which covers every folder under app/(auth)). Only these send
+ * an anonymous visitor to /login. Any other unknown URL is passed through so
+ * Next.js can render the real 404 page; previously a mistyped or dead link
+ * redirected to /login, which showed visitors a login form for a page that
+ * does not exist and told search engines the URL was valid.
+ *
+ * Adding a page under app/(auth)/ requires adding it to PAGE_ACCESS (the
+ * navigation already needs that), and proxy.test.ts fails if one is missed.
+ */
+function isPortalPath(pathname: string): boolean {
+  return Object.keys(PAGE_ACCESS).some(
     (p) => pathname === p || pathname.startsWith(`${p}/`)
   )
 }
@@ -136,34 +204,39 @@ export function proxy(request: NextRequest): NextResponse {
 
   const session = request.cookies.get(SESSION_COOKIE)?.value
   const roleRaw = request.cookies.get(ROLE_COOKIE)?.value as UserRole | undefined
+  const isSuperUser = request.cookies.get(SUPER_COOKIE)?.value === '1'
 
   // ── Layer 2: Public paths
   if (isPublicPath(pathname)) {
     // Authenticated user visiting login → send to dashboard
     if (pathname.startsWith('/login') && session) {
-      return buildRedirect(request, '/dashboard')
+      // Each role's own home: a parent has no /dashboard (see pageAccess.ts).
+      return buildRedirect(request, homePathForRole(roleRaw))
     }
     return applySecurityHeaders(NextResponse.next())
   }
 
   // ── Layer 3: Authentication gate
-  // Every path that is NOT public and NOT bypassed requires a session
+  // Every portal path requires a session. Paths that belong to neither the
+  // public site nor the portal fall through to Next.js's 404 page.
   if (!session) {
+    if (!isPortalPath(pathname)) {
+      return applySecurityHeaders(NextResponse.next())
+    }
     return buildLoginRedirect(request)
   }
 
   // ── Layer 4: Role-based page access
   // If the page has a role restriction, check the sms_role cookie.
   // This is UX-level only — the API enforces real authorisation.
-  const allowedRoles = getAllowedRolesForPath(pathname)
-
-  if (allowedRoles !== null) {
-    if (!roleRaw || !allowedRoles.includes(roleRaw)) {
-      // Authenticated but wrong role — send to dashboard (their home)
-      // Do NOT send to login (they are logged in) or a 403 page
-      // (confusing UX — the API will 403 any data requests anyway).
-      return buildRedirect(request, '/dashboard')
-    }
+  // alpha_admin may open every portal page regardless of the role list.
+  // Authenticated but wrong role: send them to THEIR OWN home (a parent's is
+  // /parent, everyone else's /dashboard) — a fixed /dashboard would loop for a
+  // role that is not allowed there. Do NOT send to login (they are logged in)
+  // or a 403 page; the API will 403 any data requests anyway.
+  const redirectTo = pageAccessRedirect(pathname, roleRaw, isSuperUser)
+  if (redirectTo !== null) {
+    return buildRedirect(request, redirectTo)
   }
 
   // ── Layer 5: Pass through with security headers

@@ -65,6 +65,6 @@ describe('DataTable', () => {
 
   it('shows a loading skeleton when isLoading is true', () => {
     render(<DataTable columns={columns} data={[]} rowKey="name" isLoading />)
-    expect(document.querySelector('.animate-pulse')).toBeTruthy()
+    expect(document.querySelector('.skeleton')).toBeTruthy()
   })
 })

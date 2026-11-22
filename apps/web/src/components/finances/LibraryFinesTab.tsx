@@ -37,11 +37,13 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { formatMWK } from '@shared/constants/malawi'
-import { CheckCircle, XCircle, AlertTriangle } from 'lucide-react'
+import { CheckCircle, XCircle, AlertTriangle, Loader2 } from 'lucide-react'
 import { usePermissions } from '@/hooks/usePermissions'
 import { apiFetch, queryKeys } from '@/lib/api-client'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import type { ApiLibraryFine } from '@shared/types/api'
+import { StatusText } from '@/components/shared/StatusText'
+import { statusWord } from '@/lib/hills/statusWord'
 
 function fineStudentName(fine: ApiLibraryFine): string {
   return fine.student ? `${fine.student.firstName} ${fine.student.lastName}` : '—'
@@ -61,11 +63,13 @@ export function LibraryFinesTab() {
   })
 
   const markPaid = useMutation({
+    meta: { successMessage: 'Fine marked as paid', failureTitle: 'Could not mark the fine as paid' },
     mutationFn: (id: string) => apiFetch(`/finances/library-fines/${id}/pay`, { method: 'PATCH' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.finances.libraryFines() }),
   })
 
   const waive = useMutation({
+    meta: { successMessage: 'Fine waived', failureTitle: 'Could not waive the fine' },
     mutationFn: (id: string) =>
       apiFetch(`/finances/library-fines/${id}/waive`, { method: 'PATCH' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.finances.libraryFines() }),
@@ -76,8 +80,8 @@ export function LibraryFinesTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 mb-4">
-        <AlertTriangle className="w-4 h-4 text-brand-amber" />
-        <h3 className="font-heading font-semibold text-brand-navy">Library Fines</h3>
+        <AlertTriangle className="w-4 h-4 text-tone-amber" />
+        <h3 className="font-heading font-semibold text-brand-navy">Library fines</h3>
         <span className="text-xs text-muted ml-auto">
           {fines.filter((f) => f.status === 'PENDING').length} pending
         </span>
@@ -86,37 +90,31 @@ export function LibraryFinesTab() {
       {fines.length === 0 ? (
         <p className="text-center text-muted text-sm py-8">No library fines recorded.</p>
       ) : (
-        <div className="divide-y divide-base border border-base rounded-xl overflow-hidden bg-surface">
+        <div className="divide-y divide-base overflow-hidden">
           {fines.map((fine) => (
             <div key={fine.id} className="flex items-center gap-4 px-5 py-3">
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-body truncate">{fineStudentName(fine)}</p>
-                <p className="text-xs text-muted truncate">{fine.bookTitle} — {fine.reason}</p>
+                <p className="text-xs text-muted truncate">{fine.bookTitle} - {fine.reason}</p>
               </div>
               <p className="text-sm font-heading font-bold text-brand-navy shrink-0">
                 {formatMWK(fine.amount)}
               </p>
-              <span
-                className={`text-[10px] font-bold px-2.5 py-1 rounded-full shrink-0 ${
-                  fine.status === 'PAID'
-                    ? 'bg-brand-teal/15 text-brand-teal'
-                    : fine.status === 'WAIVED'
-                      ? 'bg-base text-muted'
-                      : 'bg-brand-amber/15 text-brand-amber'
-                }`}
-              >
-                {fine.status}
-              </span>
+              <StatusText tone={fine.status === 'PAID' ? 'success' : fine.status === 'WAIVED' ? 'neutral' : 'warning'} className="shrink-0">{statusWord(fine.status)}</StatusText>
               {fine.status === 'PENDING' && (canPay || canWaive) && (
                 <div className="flex gap-2 shrink-0">
                   {canPay && (
                     <button
                       onClick={() => markPaid.mutate(fine.id)}
-                      className="p-1 text-brand-teal hover:text-brand-teal-light transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+                      disabled={markPaid.isPending}
+                      aria-busy={markPaid.isPending && markPaid.variables === fine.id}
+                      className="p-1 text-tone-teal hover:text-brand-teal-light transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center disabled:opacity-50"
                       aria-label="Mark as paid"
                       title="Mark paid"
                     >
-                      <CheckCircle className="w-4 h-4" />
+                      {markPaid.isPending && markPaid.variables === fine.id
+                        ? <Loader2 className="w-4 h-4 animate-spin" />
+                        : <CheckCircle className="w-4 h-4" />}
                     </button>
                   )}
                   {canWaive && (
@@ -143,14 +141,16 @@ export function LibraryFinesTab() {
         title="Waive this fine?"
         description={
           pendingWaive
-            ? `The ${formatMWK(pendingWaive.amount)} fine for ${fineStudentName(pendingWaive)} (${pendingWaive.bookTitle}) will be permanently waived — the amount will no longer be collectable.`
+            ? `The ${formatMWK(pendingWaive.amount)} fine for ${fineStudentName(pendingWaive)} (${pendingWaive.bookTitle}) will be permanently waived. The amount will no longer be collectable.`
             : ''
         }
-        confirmLabel="Waive Fine"
+        confirmLabel="Waive fine"
+        confirmingLabel="Waiving…"
+        confirming={waive.isPending}
         destructive
         onConfirm={() => {
-          if (pendingWaive) waive.mutate(pendingWaive.id)
-          setPendingWaive(null)
+          // Stays open with a spinner until the server answers.
+          if (pendingWaive) waive.mutate(pendingWaive.id, { onSettled: () => setPendingWaive(null) })
         }}
         onCancel={() => setPendingWaive(null)}
       />

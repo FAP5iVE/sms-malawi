@@ -25,8 +25,9 @@
 
 import { useMemo, useState } from 'react'
 import { RoleGuard } from '@/components/shared/RoleGuard'
+import { ModuleSurface } from '@/components/shared/ModuleSurface'
 import { useStudentMe } from '@/hooks/useStudents'
-import { useCurrentAcademicPeriod } from '@/hooks/useSettings'
+import { useEffectiveViewingPeriod } from '@/hooks/useViewingPeriod'
 import { useOwnAttendance } from '@/hooks/useAnalytics'
 import { useStudentAttendance } from '@/hooks/useAttendance'
 import {
@@ -46,16 +47,19 @@ export default function AttendancePage() {
 type Status = 'PRESENT' | 'ABSENT' | 'LATE'
 
 const STATUS_STYLE: Record<Status, { dot: string; bg: string; text: string }> = {
-  PRESENT: { dot: 'bg-emerald-500', bg: 'bg-emerald-500/10', text: 'text-emerald-700 dark:text-emerald-400' },
-  ABSENT:  { dot: 'bg-brand-coral', bg: 'bg-brand-coral/10', text: 'text-brand-coral' },
-  LATE:    { dot: 'bg-brand-amber', bg: 'bg-brand-amber/10', text: 'text-brand-amber' },
+  PRESENT: { dot: 'bg-emerald-500', bg: 'app-tint', text: 'text-status-success' },
+  ABSENT:  { dot: 'bg-brand-coral', bg: 'app-tint', text: 'text-tone-coral' },
+  LATE:    { dot: 'bg-brand-amber', bg: 'app-tint', text: 'text-tone-amber' },
 }
+// Each status also has its own icon, so the calendar never relies on colour alone (R2.4).
+const STATUS_ICON = { PRESENT: CheckCircle2, ABSENT: XCircle, LATE: Clock3 }
 
 function AttendanceContent() {
   const { data: me } = useStudentMe()
-  const { academicYear: defaultYear, term: defaultTerm } = useCurrentAcademicPeriod()
-  const [term, setTerm] = useState<number | null>(null)
-  const activeTerm = term ?? defaultTerm ?? 1
+  // Year/term come only from the universal header filter. The page's own term
+  // select was a second control writing through to the same value; it is now a
+  // read-only label so the summary still says which period it describes.
+  const { academicYear: defaultYear, term: activeTerm } = useEffectiveViewingPeriod()
 
   const { data: summary, isLoading: summaryLoading } = useOwnAttendance(
     me?.id ?? '', defaultYear ?? '', activeTerm,
@@ -82,24 +86,20 @@ function AttendanceContent() {
     <div className="space-y-6">
       <div>
         <h1 className="font-heading text-2xl font-bold text-brand-navy dark:text-white flex items-center gap-2">
-          <CalendarDays className="w-6 h-6 text-brand-teal" aria-hidden />
-          My Attendance
+          <CalendarDays className="w-6 h-6 text-tone-teal" aria-hidden />
+          My attendance
         </h1>
-        <p className="text-sm text-muted mt-0.5">Your own attendance record — no other student&apos;s data is shown here.</p>
+        <p className="text-sm text-muted mt-0.5">Your own attendance record. No other student&apos;s data is shown here.</p>
       </div>
 
+      <ModuleSurface>
       {/* ── Term summary ─────────────────────────────────────────────── */}
       <div className="bg-surface rounded-xl p-5">
         <div className="flex items-center justify-between mb-4">
-          <p className="font-heading font-semibold text-sm text-body">Term Summary</p>
-          <select
-            value={activeTerm}
-            onChange={(e) => setTerm(Number(e.target.value))}
-            className="border border-base rounded-lg px-3 py-1.5 text-sm bg-page min-h-[36px]"
-            aria-label="Select term"
-          >
-            {[1, 2, 3].map((t) => <option key={t} value={t}>Term {t}</option>)}
-          </select>
+          <p className="font-heading font-semibold text-sm text-body">Term summary</p>
+          <span className="text-xs text-muted" aria-label="Period shown">
+            Term {activeTerm} · {defaultYear}
+          </span>
         </div>
         {summaryLoading ? (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -109,18 +109,18 @@ function AttendanceContent() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="p-3 rounded-lg bg-page">
               <p className="text-xs text-muted mb-1">Present</p>
-              <p className="text-2xl font-heading font-bold text-emerald-600 dark:text-emerald-400">{summary?.daysPresent ?? 0}</p>
+              <p className="text-2xl font-heading font-bold text-status-success">{summary?.daysPresent ?? 0}</p>
             </div>
             <div className="p-3 rounded-lg bg-page">
               <p className="text-xs text-muted mb-1">Absent</p>
-              <p className="text-2xl font-heading font-bold text-brand-coral">{summary?.daysAbsent ?? 0}</p>
+              <p className="text-2xl font-heading font-bold text-tone-coral">{summary?.daysAbsent ?? 0}</p>
             </div>
             <div className="p-3 rounded-lg bg-page">
               <p className="text-xs text-muted mb-1">Late</p>
-              <p className="text-2xl font-heading font-bold text-brand-amber">{summary?.daysLate ?? 0}</p>
+              <p className="text-2xl font-heading font-bold text-tone-amber">{summary?.daysLate ?? 0}</p>
             </div>
             <div className="p-3 rounded-lg bg-page">
-              <p className="text-xs text-muted mb-1">Attendance Rate</p>
+              <p className="text-xs text-muted mb-1">Attendance rate</p>
               <p className="text-2xl font-heading font-bold text-brand-navy dark:text-white">{summary?.attendanceRate ?? 0}%</p>
             </div>
           </div>
@@ -156,7 +156,7 @@ function AttendanceContent() {
           <>
             <div className="grid grid-cols-7 gap-1.5 mb-1.5">
               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
-                <div key={d} className="text-center text-[11px] font-heading font-semibold text-muted uppercase py-1">{d}</div>
+                <div key={d} className="text-center text-xs font-heading font-semibold text-muted py-1">{d}</div>
               ))}
             </div>
             <div className="grid grid-cols-7 gap-1.5">
@@ -165,15 +165,16 @@ function AttendanceContent() {
                 const key = format(day, 'yyyy-MM-dd')
                 const status = recordByDate.get(key)
                 const style = status ? STATUS_STYLE[status] : null
+                const StatusIcon = status ? STATUS_ICON[status] : null
                 return (
                   <div
                     key={key}
                     className={`aspect-square rounded-lg flex flex-col items-center justify-center gap-0.5 text-xs
-                      ${style ? style.bg : 'bg-page'}
+                      ${style ? style.bg : 'app-tint'}
                       ${isToday(day) ? 'ring-2 ring-brand-teal' : ''}`}
                   >
                     <span className={`font-medium ${style ? style.text : 'text-muted'}`}>{format(day, 'd')}</span>
-                    {status && <span className={`w-1.5 h-1.5 rounded-full ${style!.dot}`} aria-hidden />}
+                    {StatusIcon && <StatusIcon className={`w-3.5 h-3.5 ${style!.text}`} aria-hidden />}
                   </div>
                 )
               })}
@@ -182,12 +183,13 @@ function AttendanceContent() {
         )}
 
         <div className="flex items-center gap-4 mt-4 pt-4 border-t border-base flex-wrap">
-          <span className="flex items-center gap-1.5 text-xs text-muted"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Present</span>
-          <span className="flex items-center gap-1.5 text-xs text-muted"><XCircle className="w-3.5 h-3.5 text-brand-coral" /> Absent</span>
-          <span className="flex items-center gap-1.5 text-xs text-muted"><Clock3 className="w-3.5 h-3.5 text-brand-amber" /> Late</span>
-          <span className="flex items-center gap-1.5 text-xs text-muted"><span className="w-3.5 h-3.5 rounded bg-page border border-base inline-block" /> No record</span>
+          <span className="flex items-center gap-1.5 text-xs text-muted"><CheckCircle2 className="w-3.5 h-3.5 text-status-success" /> Present</span>
+          <span className="flex items-center gap-1.5 text-xs text-muted"><XCircle className="w-3.5 h-3.5 text-tone-coral" /> Absent</span>
+          <span className="flex items-center gap-1.5 text-xs text-muted"><Clock3 className="w-3.5 h-3.5 text-tone-amber" /> Late</span>
+          <span className="flex items-center gap-1.5 text-xs text-muted"><span className="w-3.5 h-3.5 rounded app-tint inline-block" aria-hidden /> No record</span>
         </div>
       </div>
+      </ModuleSurface>
     </div>
   )
 }

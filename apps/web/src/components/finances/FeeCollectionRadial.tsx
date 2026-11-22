@@ -42,12 +42,13 @@ export function FeeCollectionRadial({
   const { data: summary, isLoading } = useFinanceSummary(academicYear, term)
   const loading = periodLoading || isLoading
 
-  const percent = summary?.collectionPercent ?? 0
-  const data: ChartDataPoint[] = summary ? [{ x: 'Collection', collection: percent }] : []
+  // null = nothing billed for the term: show the empty state, never a 0% gauge.
+  const percent = summary?.collectionPercent ?? null
+  const data: ChartDataPoint[] = percent !== null ? [{ x: 'Collection', collection: percent }] : []
 
   return (
     <ChartCard
-      title="Fee Collection vs Target"
+      title="Fee collection vs target"
       sub={term ? `Term ${term} · ${academicYear}` : academicYear}
       isLoading={loading}
       height={220}
@@ -57,11 +58,11 @@ export function FeeCollectionRadial({
         data={data}
         series={[{ key: 'collection', label: 'Collection %' }]}
         height={220}
-        emptyStateMessage="No collection data for this term yet."
+        emptyStateMessage="No fees billed for this term yet."
         ariaLabel={
-          summary
+          percent !== null
             ? `Fee collection is ${Math.round(percent)} percent of target for term ${term}, ${academicYear}`
-            : 'Fee collection chart — no data available'
+            : 'Fee collection chart: no data available'
         }
       />
     </ChartCard>

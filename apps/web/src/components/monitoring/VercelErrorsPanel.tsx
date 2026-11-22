@@ -14,6 +14,7 @@ import { DataTable } from '@/components/shared/DataTable'
 import type { DataColumn } from '@/components/shared/DataTable'
 import { useVercelErrors } from '@/hooks/useVercelMonitoring'
 import type { ApiVercelErrorLog } from '@shared/types/vercel-monitoring'
+import { chipClass } from '@/lib/hills/chip'
 
 const LEVELS = ['warning', 'error', 'fatal'] as const
 
@@ -29,13 +30,13 @@ export function VercelErrorsPanel() {
     {
       key: 'level', label: 'Level', priority: 'critical',
       render: (row) => (
-        <span className={`border-l-2 pl-2 font-semibold uppercase text-xs ${LEVEL_BORDER[row.level] ?? ''}`}>
+        <span className={`border-l-2 pl-2 font-semibold text-xs ${LEVEL_BORDER[row.level] ?? ''}`}>
           {row.level}
         </span>
       ),
     },
     { key: 'message', label: 'Message', priority: 'critical' },
-    { key: 'requestPath', label: 'Route', priority: 'optional', render: (row) => row.requestPath ?? '—' },
+    { key: 'requestPath', label: 'Route', priority: 'optional', render: (row) => row.requestPath ?? '-' },
     { key: 'timestamp', label: 'Time', priority: 'important', render: (row) => new Date(row.timestamp).toLocaleString() },
   ]
 
@@ -43,12 +44,12 @@ export function VercelErrorsPanel() {
     <div className="space-y-4">
       <div className="flex items-center gap-2">
         <button type="button" onClick={() => setLevel(undefined)}
-          className={`px-3 py-1.5 rounded-full text-xs font-semibold ${!level ? 'bg-brand-navy text-white' : 'bg-page text-muted'}`}>
+          className={chipClass(!level)}>
           All
         </button>
         {LEVELS.map((l) => (
           <button key={l} type="button" onClick={() => setLevel(l)}
-            className={`px-3 py-1.5 rounded-full text-xs font-semibold capitalize ${level === l ? 'bg-brand-navy text-white' : 'bg-page text-muted'}`}>
+            className={`${chipClass(level === l)} capitalize`}>
             {l}
           </button>
         ))}
@@ -59,7 +60,8 @@ export function VercelErrorsPanel() {
         isLoading={isLoading}
         rowKey="id"
         columns={columns}
-        emptyMessage="No runtime errors in the captured window. Note: Vercel's free tier only retains 1 hour of runtime logs, so gaps longer than that between syncs may miss data — see docs/vercel-native-monitoring-research.md §1.12."
+        emptyMessage="No runtime errors in the captured window. Note: Vercel's free tier only retains 1 hour of runtime logs, so gaps longer than that between syncs may miss data. See docs/vercel-native-monitoring-research.md §1.12."
+        bordered={false}
       />
     </div>
   )

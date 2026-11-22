@@ -59,8 +59,10 @@ import { logger }   from '@/lib/logger'
 import { getSignedViewUrl } from '@/lib/storage'
 import { differenceInDays }   from 'date-fns'
 import type { CreateBookInput, IssueBorrowingInput, ReturnBorrowingInput, CreateDigitalResourceInput } from '@shared/schemas/library'
+import { recordDigitalResourceView } from './digitalViewRecorder'
 import * as algolia from '@/server/services/algoliaService'
 import * as settingsService from '@/server/services/settingsService'
+import * as notificationFeedService from '@/server/services/notificationFeedService'
 import { SETTING_KEYS } from '@shared/types/settings'
 
 // ─── CATALOG ─────────────────────────────────────────────
@@ -94,7 +96,20 @@ export async function listBooks(filters: {
 export async function getBook(id: string) {
   return prisma.book.findUniqueOrThrow({
     where: { id },
-    include: { borrowings: { where: { status: 'ACTIVE' }, orderBy: { issuedAt: 'desc' } } },
+    // [R21] BookDetailModal's "Currently on loan" list needs a real
+    // borrower name (borrowerLabel() reads .student/.staff) — this
+    // previously only included the raw Borrowing rows with opaque
+    // studentId/staffId strings.
+    include: {
+      borrowings: {
+        where: { status: 'ACTIVE' },
+        orderBy: { issuedAt: 'desc' },
+        include: {
+          student: { select: { firstName: true, lastName: true, registrationNo: true, class: { select: { name: true } } } },
+          staff:   { select: { firstName: true, lastName: true, employeeNo: true, department: true } },
+        },
+      },
+    },
   })
 }
 
@@ -114,6 +129,9 @@ export async function updateBook(id: string, data: import('@shared/schemas/libra
     category:        book.category,
     availableCopies: book.availableCopies,
     totalCopies:     book.totalCopies,
+    publisher:       book.publisher ?? null,
+    publishedYear:   book.publishedYear ?? null,
+    shelf:           book.shelf ?? null,
   })
   return book
 }
@@ -157,6 +175,17 @@ export async function listFines(status?: string) {
 
   return fines.map((f) => ({
     ...f,
+    // [FIX] LibraryFine.amount is a Prisma Decimal — serialized through
+    // res.json() it arrives client-side as a STRING (Decimal.toJSON()),
+    // not a number. Per-row display still looked correct because
+    // formatMWK() internally does ToNumber() coercion, but any client-side
+    // arithmetic (e.g. summing pending/paid/assessed totals with the `+`
+    // operator) silently did STRING CONCATENATION instead of addition —
+    // "7500.00" + "14500.00" → "7500.0014500.00" — which is exactly the
+    // absurd multi-quadrillion-Kwacha totals reported on the ledger's
+    // summary cards. Coercing to a real number here fixes it for every
+    // consumer, not just this one screen.
+    amount: Number(f.amount),
     borrowerName: f.studentId ? studentById.get(f.studentId) ?? 'Unknown student'
       : f.staffId ? staffById.get(f.staffId) ?? 'Unknown staff' : 'Unknown',
   }))
@@ -181,6 +210,7 @@ export async function createBook(data: CreateBookInput, actorUid: string) {
       totalCopies:   data.totalCopies,
       availableCopies: data.totalCopies,
       barcode:       data.barcode ?? null,
+      shelf:         data.shelf ?? null,
     },
   })
   logger.info({ event: 'book.create', bookId: book.id, actorUid })
@@ -192,6 +222,9 @@ export async function createBook(data: CreateBookInput, actorUid: string) {
     category:       book.category,
     totalCopies:    book.totalCopies,
     availableCopies: book.availableCopies,
+    publisher:      book.publisher ?? null,
+    publishedYear:  book.publishedYear ?? null,
+    shelf:          book.shelf ?? null,
   })
   return book
 }
@@ -237,9 +270,16 @@ export async function issueBorrowing(data: IssueBorrowingInput, actorUid: string
 export async function returnBook(borrowingId: string, data: ReturnBorrowingInput, actorUid: string) {
   const borrowing = await prisma.borrowing.findUniqueOrThrow({
     where: { id: borrowingId },
-    include: { book: true },
+    include: {
+      book:    true,
+      student: { select: { firebaseUid: true } },
+      staff:   { select: { uid: true } },
+    },
   })
   if (borrowing.status === 'RETURNED') throw new Error('Book already returned.')
+  // A lost loan is closed. Returning it again would restore a copy the collection no
+  // longer counts and, now that a return can carry a charge, bill the borrower twice.
+  if (borrowing.status === 'LOST') throw new Error('This loan is already recorded as lost.')
 
   const finePerDayMwk = await settingsService.get(SETTING_KEYS.LIBRARY_FINE_PER_DAY)
 
@@ -247,12 +287,21 @@ export async function returnBook(borrowingId: string, data: ReturnBorrowingInput
   const overdueDays = Math.max(0, differenceInDays(now, borrowing.dueDate))
   const fineAmount  = overdueDays * finePerDayMwk
 
-  let fineId: string | undefined
+  const condition = data.condition ?? 'GOOD'
+  // The damage / loss charge is typed by the librarian; it only applies to a copy that
+  // came back DAMAGED or was LOST. Kept separate from the computed overdue (LATE) fine.
+  const conditionFee = condition === 'GOOD' ? 0 : Math.round((data.fee ?? 0) * 100) / 100
+  const conditionNote = data.notes?.trim()
 
+  let fineId: string | undefined
+  let conditionFeeId: string | undefined
+
+  // [FIX] The return and BOTH charges are written in one transaction. Previously the
+  // damage / loss fee was a second HTTP call made by the browser after the return had
+  // succeeded; that call was rejected by validation (null studentId/staffId) and the
+  // error was swallowed, so a copy was marked lost/damaged with no charge ever saved.
   await prisma.$transaction(async (tx) => {
-    // Create fine in LibraryFine table if overdue (bridges to Finance module)
-    // — a STUDENT and a STAFF borrower both accrue a real fine row; there
-    // is no borrower-type gate here any more (R12).
+    // Overdue fine — a STUDENT and a STAFF borrower both accrue a real fine row.
     if (fineAmount > 0) {
       const fine = await tx.libraryFine.create({
         data: {
@@ -260,6 +309,7 @@ export async function returnBook(borrowingId: string, data: ReturnBorrowingInput
           staffId:       borrowing.staffId,
           bookTitle:     borrowing.book.title,
           borrowingId:   borrowing.id,
+          kind:          'LATE',
           amount:        fineAmount,
           reason:        `${overdueDays} overdue day(s) at MWK ${finePerDayMwk}/day`,
           markedByUid:   actorUid,
@@ -268,15 +318,33 @@ export async function returnBook(borrowingId: string, data: ReturnBorrowingInput
       fineId = fine.id
     }
 
-    const status    = data.condition === 'LOST' ? 'LOST' : 'RETURNED'
-    const condition = data.condition ?? 'GOOD'
+    // Damage / loss fine — linked to the same loan (borrowingId is no longer unique).
+    if (conditionFee > 0 && condition !== 'GOOD') {
+      const fee = await tx.libraryFine.create({
+        data: {
+          studentId:     borrowing.studentId,
+          staffId:       borrowing.staffId,
+          bookTitle:     borrowing.book.title,
+          borrowingId:   borrowing.id,
+          kind:          condition,
+          amount:        conditionFee,
+          reason:        conditionNote || `Book returned ${condition.toLowerCase()}.`,
+          markedByUid:   actorUid,
+        },
+      })
+      conditionFeeId = fee.id
+    }
 
+    const status = condition === 'LOST' ? 'LOST' : 'RETURNED'
+
+    // Borrowing.fineAmount / fineId describe the overdue (LATE) fine only, as before;
+    // the damage / loss fine is reachable through LibraryFine.borrowingId.
     await tx.borrowing.update({
       where: { id: borrowingId },
       data: { returnedAt: now, status, condition, fineAmount: fineAmount || null, fineId: fineId ?? null, notes: data.notes ?? null },
     })
 
-    if (data.condition === 'LOST') {
+    if (condition === 'LOST') {
       // A lost copy leaves the collection entirely — decrement both
       // totalCopies and (implicitly, by not restoring it) availableCopies,
       // so getLibraryStats().totalBooks stops overstating the collection.
@@ -293,24 +361,322 @@ export async function returnBook(borrowingId: string, data: ReturnBorrowingInput
     }
   })
 
-  logger.info({ event: 'book.returned', borrowingId, overdueDays, fineAmount, condition: data.condition ?? 'GOOD', actorUid })
-  return { overdueDays, fineAmount, fineId }
+  logger.info({ event: 'book.returned', borrowingId, overdueDays, fineAmount, conditionFee, condition, actorUid })
+
+  // Tell the borrower what was charged and why. Best-effort: the return is already saved,
+  // and pushToFeed never throws, but a notification must not be able to fail a return.
+  const borrowerUid = borrowing.student?.firebaseUid ?? borrowing.staff?.uid
+  if (borrowerUid && (fineId || conditionFeeId)) {
+    try {
+      await notificationFeedService.pushToFeed(borrowerUid, {
+        title: 'Library fine added',
+        body: describeReturnCharges({
+          bookTitle: borrowing.book.title,
+          condition,
+          overdueDays,
+          lateFine: fineId ? fineAmount : 0,
+          conditionFee: conditionFeeId ? conditionFee : 0,
+        }),
+        type: 'WARNING',
+        category: 'library_fine',
+        actionUrl: borrowing.studentId ? '/reports?tab=library' : '/library',
+      })
+    } catch (err) {
+      logger.error({ err, borrowingId }, '[library] fine notification failed')
+    }
+  }
+
+  return { overdueDays, fineAmount, fineId, conditionFee, conditionFeeId }
 }
 
+/** One plain sentence per charge, for the borrower's notification. */
+export function describeReturnCharges(p: {
+  bookTitle: string
+  condition: 'GOOD' | 'DAMAGED' | 'LOST'
+  overdueDays: number
+  lateFine: number
+  conditionFee: number
+}): string {
+  const mwk = (n: number) => `MWK ${n.toLocaleString('en-GB')}`
+  const parts: string[] = []
+  if (p.conditionFee > 0) {
+    parts.push(`${mwk(p.conditionFee)} for "${p.bookTitle}" — ${p.condition === 'LOST' ? 'recorded as lost' : 'returned damaged'}.`)
+  }
+  if (p.lateFine > 0) {
+    parts.push(`${mwk(p.lateFine)} late fee for "${p.bookTitle}" — ${p.overdueDays} day${p.overdueDays === 1 ? '' : 's'} overdue.`)
+  }
+  return parts.join(' ')
+}
+
+// [PRODUCTION FIX — R21] The redesigned Borrowings tab (Active Borrowings)
+// needs three things the previous filter set couldn't do at all:
+//   1. A real borrower name/registration/class/department in the row —
+//      previously only book was included; studentId/staffId were opaque
+//      ids with no join anywhere in this function.
+//   2. A single search box across borrower name, student ID, book title,
+//      and barcode (the screenshot's "Search borrower name, student ID,
+//      book title, or barcode…") — done as one OR clause across the real
+//      Student/Staff/Book relations (Borrowing.student/.staff/.book are
+//      all declared @relation fields, unlike LibraryFine's plain-string
+//      ids, so this is a direct Prisma filter, not a batch-lookup
+//      workaround).
+//   3. `unreturned` (ACTIVE+OVERDUE, i.e. every currently-out loan — the
+//      "All Loans" chip) and `dueSoon` (ACTIVE and due within 3 days —
+//      the "Due Soon" chip) — neither existed as a queryable shape before;
+//      `overdue` (dueDate < now) is kept for backward compatibility with
+//      existing callers (LibraryDashboard's overdue-count usage).
 export async function listBorrowings(filters: {
   studentId?: string; staffId?: string; status?: string; overdue?: boolean
+  unreturned?: boolean; dueSoon?: boolean; search?: string
 } = {}) {
   const now = new Date()
+  const dueSoonEnd = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000)
   return prisma.borrowing.findMany({
     where: {
       ...(filters.studentId  ? { studentId: filters.studentId } : {}),
       ...(filters.staffId   ? { staffId: filters.staffId } : {}),
       ...(filters.status     ? { status: filters.status as never } : {}),
       ...(filters.overdue    ? { dueDate: { lt: now }, status: 'ACTIVE' } : {}),
+      ...(filters.unreturned  ? { status: { in: ['ACTIVE', 'OVERDUE'] } } : {}),
+      ...(filters.dueSoon    ? { status: 'ACTIVE', dueDate: { gte: now, lte: dueSoonEnd } } : {}),
+      ...(filters.search    ? {
+        OR: [
+          { book:    { title:  { contains: filters.search, mode: 'insensitive' } } },
+          { book:    { barcode: { contains: filters.search, mode: 'insensitive' } } },
+          { student: { firstName: { contains: filters.search, mode: 'insensitive' } } },
+          { student: { lastName:  { contains: filters.search, mode: 'insensitive' } } },
+          { student: { registrationNo: { contains: filters.search, mode: 'insensitive' } } },
+          { staff:   { firstName: { contains: filters.search, mode: 'insensitive' } } },
+          { staff:   { lastName:  { contains: filters.search, mode: 'insensitive' } } },
+          { staff:   { employeeNo: { contains: filters.search, mode: 'insensitive' } } },
+        ],
+      } : {}),
     },
-    include: { book: { select: { title: true, author: true, isbn: true } } },
+    include: {
+      book:    { select: { title: true, author: true, isbn: true, barcode: true } },
+      student: { select: { firstName: true, lastName: true, registrationNo: true, class: { select: { name: true } } } },
+      staff:   { select: { firstName: true, lastName: true, employeeNo: true, department: true } },
+    },
     orderBy: { dueDate: 'asc' },
   })
+}
+
+// ─── A BORROWER'S OWN LOANS AND FINES ────────────────────
+// Students and staff who hold no library-desk permissions still need to see what THEY
+// have borrowed and what THEY owe (library.viewOwnBorrowings / library.viewOwnFines — held
+// by every student and staff role, but until now used by no endpoint). These are scoped
+// to the signed-in person by their auth uid; no id is ever taken from the request.
+
+/** The Student or StaffProfile row that belongs to an auth uid, if either. */
+async function resolveBorrower(uid: string): Promise<{ studentId: string } | { staffId: string } | null> {
+  const student = await prisma.student.findUnique({ where: { firebaseUid: uid }, select: { id: true } })
+  if (student) return { studentId: student.id }
+  const staff = await prisma.staffProfile.findUnique({ where: { uid }, select: { id: true } })
+  return staff ? { staffId: staff.id } : null
+}
+
+export type MyBorrowingStatus = 'ACTIVE' | 'OVERDUE' | 'RETURNED' | 'LOST'
+
+export async function listMyBorrowings(uid: string) {
+  const finePerDay = await settingsService.get(SETTING_KEYS.LIBRARY_FINE_PER_DAY)
+  const who = await resolveBorrower(uid)
+  if (!who) return { finePerDay, loans: [] }
+
+  const loans = await prisma.borrowing.findMany({
+    where: who,
+    include: {
+      book:         { select: { title: true, author: true, barcode: true } },
+      libraryFines: { select: { amount: true, status: true } },
+    },
+    orderBy: { issuedAt: 'desc' },
+  })
+
+  const now = new Date()
+  return {
+    finePerDay,
+    loans: loans.map((l) => {
+      const open = l.returnedAt === null && l.status !== 'LOST'
+      // Same rule returnBook() charges by: full 24-hour days past the due date.
+      const daysOverdue = open ? Math.max(0, differenceInDays(now, l.dueDate)) : 0
+      const status: MyBorrowingStatus = open && now > l.dueDate ? 'OVERDUE' : (l.status === 'OVERDUE' ? 'ACTIVE' : l.status)
+      const charged = l.libraryFines.reduce((sum, f) => sum + Number(f.amount), 0)
+      const chargedPending = l.libraryFines.filter((f) => f.status === 'PENDING').reduce((sum, f) => sum + Number(f.amount), 0)
+      return {
+        id:             l.id,
+        bookTitle:      l.book.title,
+        author:         l.book.author,
+        barcode:        l.book.barcode ?? null,
+        issuedAt:       l.issuedAt.toISOString(),
+        dueDate:        l.dueDate.toISOString(),
+        returnedAt:     l.returnedAt?.toISOString() ?? null,
+        status,
+        condition:      l.condition,
+        daysOverdue,
+        // Building up on a book still out — not charged until it is returned.
+        accruedLateFee: daysOverdue * finePerDay,
+        chargedTotal:   charged,
+        chargedPending,
+      }
+    }),
+  }
+}
+
+export async function listMyFines(uid: string) {
+  const who = await resolveBorrower(uid)
+  if (!who) return []
+  const fines = await prisma.libraryFine.findMany({
+    where: who,
+    include: { waiverRequests: { orderBy: { createdAt: 'desc' }, take: 1 } },
+    orderBy: { createdAt: 'desc' },
+  })
+  return fines.map((f) => {
+    const w = f.waiverRequests[0]
+    return {
+      id:          f.id,
+      bookTitle:   f.bookTitle,
+      kind:        f.kind,
+      amount:      Number(f.amount),
+      reason:      f.reason,
+      status:      f.status,
+      borrowingId: f.borrowingId ?? null,
+      createdAt:   f.createdAt.toISOString(),
+      settledAt:   (f.paidAt ?? f.waivedAt)?.toISOString() ?? null,
+      // The latest waiver request on this fine, so the person sees where it stands.
+      waiver: w
+        ? { id: w.id, status: w.status as 'PENDING' | 'APPROVED' | 'REJECTED', reason: w.reason, reviewNotes: w.reviewNotes ?? null, createdAt: w.createdAt.toISOString() }
+        : null,
+    }
+  })
+}
+
+/** True when the fine is charged to the person behind this auth uid. */
+export async function fineBelongsTo(uid: string, fineId: string): Promise<boolean> {
+  const who = await resolveBorrower(uid)
+  if (!who) return false
+  const found = await prisma.libraryFine.findFirst({ where: { id: fineId, ...who }, select: { id: true } })
+  return found !== null
+}
+
+// [PRODUCTION FIX — R21] "Renew (+14d)" had no backend at all — a
+// librarian could only Return a loan, never extend its due date. Renewing
+// resets the window to 14 days from the moment of renewal (not from the
+// old due date), which also naturally clears an OVERDUE status back to
+// ACTIVE — a book renewed today is, by definition, no longer overdue.
+// Blocked once a copy is already RETURNED or LOST, since there is no live
+// loan left to extend.
+export async function renewBorrowing(borrowingId: string, actorUid: string, days = 14) {
+  const borrowing = await prisma.borrowing.findUniqueOrThrow({ where: { id: borrowingId } })
+  if (borrowing.status === 'RETURNED' || borrowing.status === 'LOST') {
+    throw new Error('This loan has already been closed out and cannot be renewed.')
+  }
+  const now = new Date()
+  const newDueDate = new Date(now.getTime() + days * 24 * 60 * 60 * 1000)
+  // The count and date are stored on the loan so reports can state how often loans are renewed.
+  const updated = await prisma.borrowing.update({
+    where: { id: borrowingId },
+    data: { dueDate: newDueDate, status: 'ACTIVE', renewalCount: { increment: 1 }, lastRenewedAt: now },
+  })
+  logger.info({ event: 'book.renewed', borrowingId, newDueDate, actorUid, renewalCount: updated.renewalCount })
+  return updated
+}
+
+// [PRODUCTION FIX — R21] "no where to see how many and what books are
+// lost, damaged" — Borrowing.condition (DAMAGED/LOST) was set on return
+// but never surfaced anywhere. This reads it back with the book title and
+// borrower name attached, for the Reports & Fines ledger's new
+// "Damaged & Lost Books" panel.
+export async function getConditionReport() {
+  const [returnRows, catalogRows] = await Promise.all([
+    prisma.borrowing.findMany({
+      where: { condition: { in: ['DAMAGED', 'LOST'] } },
+      include: {
+        book:    { select: { title: true } },
+        student: { select: { firstName: true, lastName: true } },
+        staff:   { select: { firstName: true, lastName: true } },
+      },
+      orderBy: { returnedAt: 'desc' },
+    }),
+    // [R21.2] Shelf copies marked damaged/lost directly from the
+    // Catalog (markBookCondition()) — no borrower involved, so no
+    // student/staff join here.
+    prisma.bookConditionLog.findMany({
+      include: { book: { select: { title: true } } },
+      orderBy: { createdAt: 'desc' },
+    }),
+  ])
+  const fromReturns = returnRows.map((b) => ({
+    id:           b.id,
+    bookId:       b.bookId,
+    bookTitle:    b.book.title,
+    condition:    b.condition as 'DAMAGED' | 'LOST',
+    notes:        b.notes ?? undefined,
+    returnedAt:   b.returnedAt ?? undefined,
+    borrowerName: b.student ? `${b.student.firstName} ${b.student.lastName}`
+                : b.staff   ? `${b.staff.firstName} ${b.staff.lastName}`
+                : 'Unknown',
+    source:       'RETURN' as const,
+  }))
+  const fromCatalog = catalogRows.map((c) => ({
+    id:           c.id,
+    bookId:       c.bookId,
+    bookTitle:    c.book.title,
+    condition:    c.condition as 'DAMAGED' | 'LOST',
+    notes:        c.notes ?? undefined,
+    returnedAt:   c.createdAt,
+    borrowerName: c.copies > 1 ? `${c.copies} copies — marked from catalog` : 'Marked from catalog',
+    source:       'CATALOG' as const,
+  }))
+  return [...fromReturns, ...fromCatalog].sort(
+    (a, b) => new Date(b.returnedAt ?? 0).getTime() - new Date(a.returnedAt ?? 0).getTime(),
+  )
+}
+
+// [R21.2] "no where to change [a book's] status" outside of the return
+// flow — this is the standalone path: mark a shelf copy (never checked
+// out, or found damaged/lost independent of any loan) directly from the
+// Catalog. Caps `copies` at the book's current availableCopies — a copy
+// that's out with a borrower is marked via the return flow instead,
+// which already has this covered and correctly attributes it to that
+// loan. DAMAGED only removes the copy from availableCopies (presumed
+// repairable, still owned); LOST removes it from both availableCopies
+// and totalCopies (a write-off).
+export async function markBookCondition(
+  bookId: string,
+  input: { condition: 'DAMAGED' | 'LOST'; copies: number; notes?: string },
+  actorUid: string,
+) {
+  const book = await prisma.book.findUniqueOrThrow({ where: { id: bookId } })
+  if (input.copies > book.availableCopies) {
+    throw new Error(
+      `Only ${book.availableCopies} cop${book.availableCopies === 1 ? 'y' : 'ies'} of this title are currently on the shelf. ` +
+      'A copy that is out on loan can only be marked damaged or lost when it is returned.',
+    )
+  }
+  const [updatedBook, log] = await prisma.$transaction([
+    prisma.book.update({
+      where: { id: bookId },
+      data: {
+        availableCopies: { decrement: input.copies },
+        ...(input.condition === 'LOST' ? { totalCopies: { decrement: input.copies } } : {}),
+      },
+    }),
+    prisma.bookConditionLog.create({
+      data: {
+        bookId,
+        condition: input.condition,
+        copies: input.copies,
+        notes: input.notes ?? null,
+        recordedByUid: actorUid,
+      },
+    }),
+  ])
+  logger.info({ event: 'book.condition.marked', bookId, condition: input.condition, copies: input.copies, actorUid })
+  void algolia.updateBook({
+    objectID: updatedBook.id,
+    availableCopies: updatedBook.availableCopies,
+    totalCopies: updatedBook.totalCopies,
+  })
+  return { book: updatedBook, log }
 }
 
 // ─── OVERDUE CHECK (called by cron job) ──────────────────
@@ -370,17 +736,43 @@ export async function recordDigitalResource(
 }
 
 export async function approveDigitalResource(resourceId: string, actorUid: string) {
+  const resource = await prisma.digitalResource.findUniqueOrThrow({ where: { id: resourceId } })
+  if (resource.approved) return resource // already approved: nothing to change, and the approval date stays as first recorded
+  if (resource.rejectedAt) {
+    throw Object.assign(new Error('This resource was rejected. Ask for a corrected copy to be uploaded instead.'), { status: 409 })
+  }
   return prisma.digitalResource.update({
     where: { id: resourceId },
     data: { approved: true, approvedByUid: actorUid, approvedAt: new Date() },
   })
 }
 
-export async function getDigitalResourceViewUrl(resourceId: string, actorRole: string): Promise<string> {
+/**
+ * Turns down an uploaded resource. The row is kept (not deleted) with who rejected it, when and why, so the
+ * uploader can be told and the reports can count rejections. A rejected resource stays hidden from students.
+ */
+export async function rejectDigitalResource(resourceId: string, actorUid: string, reason: string) {
+  const trimmed = reason.trim()
+  if (!trimmed) throw Object.assign(new Error('Give a reason for rejecting this resource.'), { status: 400 })
+  const resource = await prisma.digitalResource.findUniqueOrThrow({ where: { id: resourceId } })
+  if (resource.approved) throw Object.assign(new Error('This resource is already approved, so it cannot be rejected.'), { status: 409 })
+  if (resource.rejectedAt) throw Object.assign(new Error('This resource has already been rejected.'), { status: 409 })
+  const updated = await prisma.digitalResource.update({
+    where: { id: resourceId },
+    data: { rejectedAt: new Date(), rejectedByUid: actorUid, rejectionReason: trimmed },
+  })
+  logger.info({ event: 'digital_resource.rejected', resourceId, actorUid })
+  return updated
+}
+
+export async function getDigitalResourceViewUrl(resourceId: string, actorRole: string, viewerUid?: string): Promise<string> {
   const resource = await prisma.digitalResource.findUniqueOrThrow({ where: { id: resourceId } })
   if (!resource.approved && actorRole === 'student')
     throw Object.assign(new Error('Resource not yet approved.'), { status: 403 })
-  return getSignedViewUrl(resource.fileKey)
+  const url = await getSignedViewUrl(resource.fileKey)
+  // A librarian previewing a resource that is still awaiting approval is review work, not use.
+  if (viewerUid && resource.approved) await recordDigitalResourceView(resource.id, viewerUid)
+  return url
 }
 
 // ─── LIBRARY REPORTS ─────────────────────────────────────
@@ -417,14 +809,24 @@ export async function getOverdueByClass() {
 }
 
 export async function getLibraryStats() {
-  const [totalBooks, activeBorrowings, overdueBorrowings, pendingFines, digitalCount] = await prisma.$transaction([
+  const [totalBooks, activeBorrowings, overdueBorrowings, pendingFines, pendingFinesSum, digitalCount] = await prisma.$transaction([
     prisma.book.aggregate({ _sum: { totalCopies: true } }),
     prisma.borrowing.count({ where: { status: 'ACTIVE' } }),
     prisma.borrowing.count({ where: { status: 'OVERDUE' } }),
     prisma.libraryFine.count({ where: { status: 'PENDING' } }),
+    // [R21] The summary tile needs the MK amount outstanding, not just a
+    // count — pendingFines (count) is kept for existing callers.
+    prisma.libraryFine.aggregate({ where: { status: 'PENDING' }, _sum: { amount: true } }),
     prisma.digitalResource.count({ where: { approved: true } }),
   ])
-  return { totalBooks: totalBooks._sum.totalCopies ?? 0, activeBorrowings, overdueBorrowings, pendingFines, digitalCount }
+  return {
+    totalBooks: totalBooks._sum.totalCopies ?? 0,
+    activeBorrowings,
+    overdueBorrowings,
+    pendingFines,
+    pendingFinesAmount: Number(pendingFinesSum._sum.amount ?? 0),
+    digitalCount,
+  }
 }
 
 // [PRODUCTION FIX 2026-07-28] Most-borrowed book, most-read digital
@@ -449,7 +851,10 @@ export async function getCatalogReportStats() {
     prisma.book.groupBy({
       by: ['category'],
       _count: { category: true },
-      _sum: { totalCopies: true },
+      // [R21] Catalog Distribution's redesigned cards show an
+      // "In-Shelf Available: X / Y" bar per category — availableCopies
+      // wasn't summed before, only totalCopies.
+      _sum: { totalCopies: true, availableCopies: true },
     }),
   ])
 
@@ -471,6 +876,7 @@ export async function getCatalogReportStats() {
       category: c.category,
       titleCount: c._count.category,
       copyCount: c._sum.totalCopies ?? 0,
+      availableCount: c._sum.availableCopies ?? 0,
     })),
   }
-}
+}

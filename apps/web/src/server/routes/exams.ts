@@ -87,15 +87,20 @@
  *     real callers); now ReportCardGenerator.tsx (this same phase) is
  *     wired into the live app as a real caller.
  */
-import { Router }              from 'express'
+import { Router, type Request, type Response } from 'express'
+import { hasPermission }       from '@shared/types/permissions'
 import { verifyAuth, requireRole } from '@/lib/verifyAuth'
 import { requirePermission }   from '@/server/middleware/verifyPermission'
-import { CreateExamSchema, UpdateExamSchema, BulkMarkEntrySchema, CreateManebRecordSchema } from '@shared/schemas/exam'
+import { rateLimit }           from '@/lib/ratelimit'
+import { idempotent }          from '@/server/middleware/idempotency'
+import { CreateExamSchema, UpdateExamSchema, BulkMarkEntrySchema, FinalizeMarksSchema, CreateManebRecordSchema } from '@shared/schemas/exam'
 import * as examService        from '@/server/services/examService'
 import { getSignedViewUrl, canReadFile } from '@/lib/storage'
 import { prisma }              from '@/lib/prisma'
 import * as reportCardService  from '@/server/services/reportCardService'
+import { generateAndUploadTranscript } from '@/server/services/transcriptService'
 import { sendError } from '@/server/lib/sendError'
+import { serializeDecimals } from '@/lib/serialize'
 
 export const examsRouter = Router()
 
@@ -151,7 +156,9 @@ examsRouter.get('/', verifyAuth, requirePermission('exam.view'),
   async (req, res) => {
     const { classId, academicYear, term } = req.query as Record<string, string | undefined>
     if (!academicYear || !term) return res.status(400).json({ error: 'academicYear and term are required' })
-    return res.json(await examService.listExams(classId, academicYear, Number(term), { uid: req.user!.uid, role: req.user!.role }))
+    // serializeDecimals: Prisma Decimals (maxMark, weightPercent) otherwise
+    // reach the browser as STRINGS despite ApiExam typing them as numbers.
+    return res.json(serializeDecimals(await examService.listExams(classId, academicYear, Number(term), { uid: req.user!.uid, role: req.user!.role })))
   })
 
 
@@ -160,7 +167,7 @@ examsRouter.post('/', verifyAuth, requirePermission('exam.create'),
   async (req, res) => {
     const parsed = CreateExamSchema.safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
-    return res.status(201).json(await examService.createExam(parsed.data, { uid: req.user!.uid, role: req.user!.role }))
+    return res.status(201).json(serializeDecimals(await examService.createExam(parsed.data, { uid: req.user!.uid, role: req.user!.role })))
   })
 
 // PATCH /exams/:id — subject-ownership-scoped; blocked once results are
@@ -171,11 +178,12 @@ examsRouter.patch('/:id', verifyAuth, requirePermission('exam.edit'),
     const id = String(req.params.id)
     const parsed = UpdateExamSchema.safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
-    return res.json(await examService.updateExam(id, parsed.data, { uid: req.user!.uid, role: req.user!.role }))
+    return res.json(serializeDecimals(await examService.updateExam(id, parsed.data, { uid: req.user!.uid, role: req.user!.role })))
   })
 
-// DELETE /exams/:id — subject-ownership-scoped; blocked once marks exist or
-// results are locked (enforced in examService.deleteExam).
+// DELETE /exams/:id — subject-ownership-scoped; allowed until the teacher
+// confirms (finalizes) the marks, locked from then on (enforced in
+// examService.deleteExam). Unconfirmed draft marks go with the exam.
 examsRouter.delete('/:id', verifyAuth, requirePermission('exam.delete'),
   async (req, res) => {
     const id = String(req.params.id)
@@ -187,13 +195,23 @@ examsRouter.post('/:id/marks', verifyAuth, requirePermission('exam.enterOwnClass
   async (req, res) => {
     const parsed = BulkMarkEntrySchema.safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
-    return res.json(await examService.enterMarks(parsed.data, { uid: req.user!.uid, role: req.user!.role }))
+    // Path param wins over whatever the body claims: marks can only ever be
+    // written to the exam the URL names.
+    const examId = String(req.params.id)
+    if (parsed.data.entries.some((e) => e.examId !== examId)) {
+      return res.status(400).json({ error: 'The marks submitted do not belong to this exam.' })
+    }
+    return res.json(serializeDecimals(await examService.enterMarks(parsed.data, { uid: req.user!.uid, role: req.user!.role })))
   })
 
 // GET /exams/:id/marks — read back previously-saved marks (draft-restore)
 examsRouter.get('/:id/marks', verifyAuth, requirePermission('exam.viewDraftMarks'),
   async (req, res) => {
-    return res.json(await examService.getMarksForExam(String(req.params.id), { uid: req.user!.uid, role: req.user!.role }))
+    // serializeDecimals is the draft-restore fix: `mark` is a Prisma Decimal,
+    // which JSON-serializes to a STRING ("45"). The sheet then sent that string
+    // back on Save/Finalize, the numeric schema rejected it, and the click
+    // appeared to do nothing.
+    return res.json(serializeDecimals(await examService.getMarksForExam(String(req.params.id), { uid: req.user!.uid, role: req.user!.role })))
   })
 
 // POST /exams/:id/correct-marks — RW-1: exam_officer/high_rank correct
@@ -202,7 +220,7 @@ examsRouter.post('/:id/correct-marks', verifyAuth, requirePermission('exam.corre
   async (req, res) => {
     const parsed = BulkMarkEntrySchema.safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
-    return res.json(await examService.correctMarksInReview(String(req.params.id), parsed.data.entries, { uid: req.user!.uid, role: req.user!.role }))
+    return res.json(serializeDecimals(await examService.correctMarksInReview(String(req.params.id), parsed.data.entries, { uid: req.user!.uid, role: req.user!.role })))
   })
 
 // GET /exams/fee-blocked?classId=&academicYear=&term= — RW-2: which students are
@@ -224,10 +242,17 @@ examsRouter.post('/release-term', verifyAuth, requirePermission('exam.authorizeR
     return res.json(await examService.releaseTermEndResults(academicYear, Number(term), { uid: req.user!.uid, role: req.user!.role }))
   })
 
-// POST /exams/:id/finalize — teacher finalizes marks
+// POST /exams/:id/finalize — teacher confirms (finalizes) marks. The optional
+// body carries the sheet itself so save + confirm is one atomic step.
 examsRouter.post('/:id/finalize', verifyAuth, requirePermission('exam.finalizeMarks'),
   async (req, res) => {
-    await examService.finalizeMarks(String(req.params.id), { uid: req.user!.uid, role: req.user!.role })
+    const parsed = FinalizeMarksSchema.safeParse(req.body ?? {})
+    if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
+    const examId = String(req.params.id)
+    if (parsed.data.entries?.some((e) => e.examId !== examId)) {
+      return res.status(400).json({ error: 'The marks submitted do not belong to this exam.' })
+    }
+    await examService.finalizeMarks(examId, { uid: req.user!.uid, role: req.user!.role }, parsed.data.entries)
     return res.json({ success: true })
   })
 
@@ -259,6 +284,31 @@ examsRouter.post('/:id/unlock', verifyAuth, requirePermission('exam.unlockMarks'
   })
 
 // GET /exams/results/:studentId — student views their results (FEE GATE)
+/**
+ * [Issue 7] Role/permission gate for the per-student results endpoints.
+ *   student → must hold exam.viewOwnResults (ownership is then checked on the id)
+ *   staff   → must hold exam.viewAllResults (admin / high_rank / exam_officer)
+ * Returns false after sending the 403 so the caller can simply `return`.
+ */
+function assertResultsAccess(req: Request, res: Response, message: string): boolean {
+  const user = req.user!
+  const permission = user.role === 'student' ? 'exam.viewOwnResults' : 'exam.viewAllResults'
+  if (!hasPermission(user.role, permission, user.superUser === true)) {
+    res.status(403).json({ error: message })
+    return false
+  }
+  // Period params are optional here (the service falls back), but when they ARE
+  // sent they must be well-formed — never passed raw into a query.
+  const { academicYear, term } = req.query as { academicYear?: unknown; term?: unknown }
+  const yearOk = academicYear === undefined || academicYear === '' || (typeof academicYear === 'string' && /^\d{4}\/\d{4}$/.test(academicYear))
+  const termOk = term === undefined || term === '' || (typeof term === 'string' && /^[123]$/.test(term))
+  if (!yearOk || !termOk) {
+    res.status(400).json({ error: 'academicYear must look like 2026/2027 and term must be 1, 2 or 3.' })
+    return false
+  }
+  return true
+}
+
 // R15: :studentId is a Prisma Student.id — getStudentResults() queries
 // TermResult.studentId with it. The previous student-role ownership check
 // compared req.user.uid (a Firebase UID) directly against that param, so a
@@ -271,6 +321,10 @@ examsRouter.get('/results/:studentId', verifyAuth,
   async (req, res) => {
     const { academicYear, term } = req.query as { academicYear: string; term: string }
     const sid = String(req.params.studentId)
+    // [Issue 7] Staff need exam.viewAllResults. This route used to check
+    // ownership for students only, so ANY authenticated staff role (library,
+    // hr, finance, lower_rank ...) could read any student's results by id.
+    if (!assertResultsAccess(req, res, 'You do not have permission to view student results.')) return
     if (req.user!.role === 'student') {
       const own = await prisma.student.findUnique({
         where:  { firebaseUid: req.user!.uid },
@@ -287,12 +341,48 @@ examsRouter.get('/results/:studentId', verifyAuth,
     }
   })
 
+// GET /exams/results/:studentId/class-standing — a student's standing inside
+// their OWN class: the class top ten plus best / average / lowest comparison,
+// overall and per subject. Same ownership rule and fee gate as /results/:id.
+// Never returns a bottom-ten list, and the lowest figures carry no name.
+examsRouter.get('/results/:studentId/class-standing', verifyAuth,
+  async (req, res) => {
+    const { academicYear, term } = req.query as { academicYear: string; term: string }
+    if (!academicYear || !term) return res.status(400).json({ error: 'academicYear and term are required' })
+    const sid = String(req.params.studentId)
+    if (!assertResultsAccess(req, res, 'You do not have permission to view class standing.')) return
+    if (req.user!.role === 'student') {
+      const own = await prisma.student.findUnique({
+        where:  { firebaseUid: req.user!.uid },
+        select: { id: true },
+      })
+      if (!own || own.id !== sid)
+        return res.status(403).json({ error: 'You can only view your own class standing.' })
+    }
+    try {
+      return res.json(await examService.getStudentClassStanding(sid, academicYear, Number(term)))
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'exams', route: 'class-standing' } })
+    }
+  })
+
 // POST /exams/compute — trigger term result computation
 examsRouter.post('/compute', verifyAuth, requirePermission('exam.computeResults'),
   async (req, res) => {
-    const { classId, academicYear, term } = req.body as { classId: string; academicYear: string; term: number }
+    const { classId, academicYear, term, allowIncompleteCa } = req.body as {
+      classId: string; academicYear: string; term: number; allowIncompleteCa?: boolean
+    }
     if (!classId || !academicYear || !term) return res.status(400).json({ error: 'classId, academicYear and term are required' })
-    return res.json(await examService.computeTermResults(classId, academicYear, term, req.user!.uid))
+    try {
+      // allowIncompleteCa: only meaningful when continuous-assessment aggregation
+      // is on - see examService.ComputeTermResultsOptions.
+      return res.json(await examService.computeTermResults(
+        classId, academicYear, Number(term), req.user!.uid, { allowIncompleteCa: allowIncompleteCa === true },
+      ))
+    } catch (err: unknown) {
+      const e = err as Error & { missingCa?: string[] }
+      return sendError(res, err, { tags: { module: 'exams', route: 'compute' }, extraFields: e.missingCa ? { missingCa: e.missingCa } : undefined })
+    }
   })
 
 // GET /exams/report-card/:studentId — download a generated report card.
@@ -360,6 +450,7 @@ examsRouter.get('/report-card/:studentId/data', verifyAuth,
 // replaces the route this same name had before R7 removed it (that one
 // called examService.ts's now-removed generateReportCard()).
 examsRouter.post('/report-card', verifyAuth, requireRole(['admin', 'exam_officer']),
+  rateLimit('export-generate'), idempotent(),
   async (req, res) => {
     const { studentId, academicYear, term } = req.body as { studentId: string; academicYear: string; term: number }
     if (!studentId || !academicYear || !term) {
@@ -378,6 +469,7 @@ examsRouter.post('/report-card', verifyAuth, requireRole(['admin', 'exam_officer
 // students previously got 403). Resolves the caller's studentId from their
 // firebaseUid and applies the same fee gate as the results view.
 examsRouter.post('/report-card/mine', verifyAuth,
+  rateLimit('export-generate'), idempotent(),
   async (req, res) => {
     const { academicYear, term } = req.body as { academicYear: string; term: number }
     if (!academicYear || !term) return res.status(400).json({ error: 'academicYear and term are required' })
@@ -398,6 +490,29 @@ examsRouter.post('/report-card/mine', verifyAuth,
     return res.status(201).json(result)
   })
 
+// POST /exams/transcript — build a student's academic transcript PDF (every
+// term on record) and return its signed link. Same gate as the staff report
+// card POST above: admin or exam_officer, rate limited, idempotent. The file is
+// stored under FILE_PREFIX.TRANSCRIPT, whose read roles are admin, high_rank,
+// exam_officer and the student themselves. Added 2026-11-20 at the owner's
+// request: the transcript builder existed but nothing could call it.
+examsRouter.post('/transcript', verifyAuth, requireRole(['admin', 'exam_officer']),
+  rateLimit('export-generate'), idempotent(),
+  async (req, res) => {
+    const { studentId } = req.body as { studentId?: string }
+    if (!studentId) return res.status(400).json({ error: 'studentId is required' })
+
+    const student = await prisma.student.findUnique({ where: { id: studentId }, select: { id: true } })
+    if (!student) return res.status(404).json({ error: 'Student not found.' })
+
+    try {
+      const { fileId, url } = await generateAndUploadTranscript(student.id)
+      return res.status(201).json({ fileId, url })
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'exams', route: 'transcript' } })
+    }
+  })
+
 // GET /exams/analytics/class
 examsRouter.get('/analytics/class', verifyAuth, requireRole(['admin','high_rank','academic','exam_officer']),
   async (req, res) => {
@@ -411,13 +526,21 @@ examsRouter.get('/analytics/class', verifyAuth, requireRole(['admin','high_rank'
 // teacher is scoped by the service to classes they teach.
 examsRouter.get('/analytics/top-bottom', verifyAuth, requirePermission('exam.viewClassAnalytics'),
   async (req, res) => {
-    const { classId, subject, academicYear, term, limit } = req.query as Record<string, string>
+    const { classId, form, subject, academicYear, term, limit } = req.query as Record<string, string>
     if (!academicYear || !term) return res.status(400).json({ error: 'academicYear and term are required' })
-    return res.json(await examService.getExamAnalytics(
-      academicYear, Number(term),
-      { classId: classId || undefined, subject: subject || undefined, limit: limit ? Number(limit) : undefined },
-      { uid: req.user!.uid, role: req.user!.role },
-    ))
+    const formNum = form ? Number(form) : undefined
+    if (formNum !== undefined && (!Number.isInteger(formNum) || formNum < 1 || formNum > 4)) {
+      return res.status(400).json({ error: 'form must be 1, 2, 3 or 4' })
+    }
+    try {
+      return res.json(await examService.getExamAnalytics(
+        academicYear, Number(term),
+        { classId: classId || undefined, form: formNum, subject: subject || undefined, limit: limit ? Number(limit) : undefined },
+        { uid: req.user!.uid, role: req.user!.role },
+      ))
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'exams', route: 'analytics-top-bottom' } })
+    }
   })
 
 // MANEB
@@ -440,6 +563,7 @@ examsRouter.post('/maneb', verifyAuth, requirePermission('exam.manageManebRecord
 // sole MANEB write path). Returns { created, errors } so partial success is
 // visible; a duplicate candidateNo fails only its own row.
 examsRouter.post('/maneb/bulk', verifyAuth, requirePermission('exam.manageManebRecords'),
+  rateLimit('bulk-mutation'), idempotent(),
   async (req, res) => {
     const parsed = CreateManebRecordSchema.array().min(1).max(500).safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
@@ -450,6 +574,7 @@ examsRouter.post('/maneb/bulk', verifyAuth, requirePermission('exam.manageManebR
 // from stored subjectGrades for all MANEB records in a year (one-time after
 // the GR-1 rollout; new records are computed on create/import).
 examsRouter.post('/maneb/recompute', verifyAuth, requirePermission('exam.manageManebRecords'),
+  rateLimit('bulk-mutation'), idempotent(),
   async (req, res) => {
     const academicYear = typeof req.body?.academicYear === 'string' ? req.body.academicYear : undefined
     if (!academicYear) return res.status(400).json({ error: 'academicYear is required' })

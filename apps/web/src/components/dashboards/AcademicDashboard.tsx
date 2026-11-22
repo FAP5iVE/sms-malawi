@@ -34,39 +34,35 @@
  */
 
 import {
-  Users,
-  BookOpen,
-  GraduationCap,
-  CheckSquare,
   ClipboardCheck,
   PenLine,
   Clock,
   Bell,
 } from 'lucide-react'
-import { StatCard, StatCardGrid, statValue } from '@/components/shared/StatCard'
 import { QuickActions } from '@/components/shared/QuickActions'
 import { ListCard } from '@/components/shared/ListCard'
 import { TodaysTimetableList } from '@/components/shared/TodaysTimetableList'
-import { useStudents, useHighRiskStudents } from '@/hooks/useStudents'
-import { useClasses, useMyTimetableToday } from '@/hooks/useClasses'
-import { useExams } from '@/hooks/useExams'
-import { useCurrentAcademicPeriod } from '@/hooks/useSettings'
+import { useHighRiskStudents } from '@/hooks/useStudents'
+import { useMyTimetableToday } from '@/hooks/useClasses'
+import { useAcademicOverview, useAcademicAttention } from '@/hooks/reporting/useAcademicReporting'
+import { DashboardAttention } from './DashboardReport'
+import { PrimaryOverviewKpis, ReportLinks, SecondaryKpis } from './DashboardSections'
+import type { ReportLink } from './DashboardSections'
+import { useViewingPeriod } from '@/hooks/useViewingPeriod'
 import { StudentRiskBadge } from '@/components/shared/StudentRiskBadge'
 import Link from 'next/link'
 import type { QuickAction } from '@/components/shared/QuickActions'
-import type { ApiClass } from '@shared/types/api'
-import { examsInNextSevenDays, examsAwaitingMarks } from '@/lib/examFilters'
 
 const QUICK_ACTIONS: QuickAction[] = [
   {
-    label: 'Mark Attendance',
+    label: 'Mark attendance',
     href: '/classes',
     icon: ClipboardCheck,
     color: 'bg-brand-teal/10',
-    text: 'text-brand-teal',
+    text: 'text-tone-teal',
   },
   {
-    label: 'Enter Marks',
+    label: 'Enter marks',
     // R15: marks entry lives in the Exams tab (page reads ?tab= as of this phase)
     href: '/exams?tab=exams',
     icon: PenLine,
@@ -74,11 +70,11 @@ const QUICK_ACTIONS: QuickAction[] = [
     text: 'text-blue-600',
   },
   {
-    label: 'View Timetable',
+    label: 'View timetable',
     href: '/timetable',
     icon: Clock,
     color: 'bg-brand-amber/10',
-    text: 'text-brand-amber',
+    text: 'text-tone-amber',
   },
   {
     label: 'Announcements',
@@ -89,86 +85,58 @@ const QUICK_ACTIONS: QuickAction[] = [
   },
 ]
 
+/** Lead with how the classes are doing; the rest sit in "More figures". */
+const PREFERRED = ['average', 'passRate', 'attendance', 'marks']
+
+const REPORT_LINKS: ReportLink[] = [
+  { label: 'Teaching overview', href: '/reports?tab=teaching', description: 'Results and attendance for your classes' },
+  { label: 'Students needing support', href: '/reports?tab=students', description: 'Low average, absence, decline' },
+  { label: 'Assignments', href: '/reports?tab=assignments', description: 'Completion and overdue work' },
+  { label: 'Marks', href: '/reports?tab=marks', description: 'Entered and missing marks' },
+  { label: 'Exam readiness', href: '/reports?tab=readiness', description: 'Upcoming exams and preparation' },
+]
+
 export function AcademicDashboard() {
-  const { academicYear, term, isLoading: periodLoading } = useCurrentAcademicPeriod()
+  const { academicYear, term } = useViewingPeriod()
 
-  const { data: studentsData, isLoading: studentsLoading } =
-    useStudents({ status: 'ACTIVE' })
-  const { data: classesData, isLoading: classesLoading } =
-    useClasses(academicYear)
-  const { data: examsData, isLoading: examsLoading } = useExams(
-    undefined,
-    academicYear ?? '',
-    term ?? 0,
-  )
+  const period = { academicYear: academicYear ?? '', term: term ?? undefined }
+  const overview = useAcademicOverview(period)
+  const attention = useAcademicAttention(period)
 
-  const classes = classesData as ApiClass[] | undefined
-  const exams   = examsData ?? []
-
-  const { data: timetableToday, isLoading: timetableLoading } = useMyTimetableToday()
-  const { data: riskData, isLoading: riskLoading } = useHighRiskStudents(6)
+  const { data: timetableToday, isLoading: timetableLoading, isError: timetableError, refetch: refetchTimetable } = useMyTimetableToday()
+  const { data: riskData, isLoading: riskLoading, isError: riskError, refetch: refetchRisk } = useHighRiskStudents(6)
   const highRiskStudents = riskData?.students ?? []
 
-  const examsThisWeek = examsInNextSevenDays(exams).length
-  const marksPending  = examsAwaitingMarks(exams).length
-  const examsLoadingAll = periodLoading || examsLoading
-
   return (
-    <div className="space-y-6">
-      <StatCardGrid className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard
-          label="Active Classes"
-          value={statValue(periodLoading || classesLoading, classes?.length)}
-          icon={BookOpen}
-          trend="neutral"
-          trendLabel="this year"
-          iconColor="bg-brand-navy/8"
-          iconText="text-brand-navy"
-        />
-        <StatCard
-          label="Total Students"
-          value={statValue(studentsLoading, studentsData?.total)}
-          icon={Users}
-          trend="neutral"
-          trendLabel="enrolled"
-          iconColor="bg-blue-50"
-          iconText="text-blue-600"
-        />
-        <StatCard
-          label="Exams This Week"
-          value={statValue(examsLoadingAll, examsThisWeek)}
-          icon={GraduationCap}
-          trend="neutral"
-          trendLabel="scheduled"
-          iconColor="bg-brand-teal/10"
-          iconText="text-brand-teal"
-        />
-        <StatCard
-          label="Marks Pending"
-          value={statValue(examsLoadingAll, marksPending)}
-          icon={CheckSquare}
-          trend="neutral"
-          trendLabel="to enter"
-          iconColor="bg-brand-amber/10"
-          iconText="text-brand-amber"
-        />
-      </StatCardGrid>
-      <QuickActions actions={QUICK_ACTIONS} />
-      <div className="grid md:grid-cols-2 gap-4">
+    <div className="space-y-4 md:space-y-6">
+      <PrimaryOverviewKpis
+        title="Teaching"
+        summary="See how your classes are doing and follow up on missing marks or students who may need help."
+        academicYear={academicYear}
+        term={term}
+        overview={overview}
+        preferred={PREFERRED}
+        reportsHref="/reports?tab=teaching"
+      />
+      <div className="grid md:grid-cols-2 gap-3 md:gap-4">
         <ListCard
-          title="Today's Timetable"
+          title="Today's timetable"
           sub="Your classes today"
           isLoading={timetableLoading}
           isEmpty={(timetableToday ?? []).length === 0}
+          isError={timetableError}
+          onRetry={() => void refetchTimetable()}
           emptyMessage="No classes on your timetable today."
         >
           <TodaysTimetableList slots={timetableToday ?? []} />
         </ListCard>
         <ListCard
-          title="Students Needing Attention"
+          title="Students needing attention"
           sub="High-risk active students"
           isLoading={riskLoading}
           isEmpty={highRiskStudents.length === 0}
+          isError={riskError}
+          onRetry={() => void refetchRisk()}
           emptyMessage="No high-risk students right now."
         >
           <ul className="space-y-2">
@@ -182,13 +150,17 @@ export function AcademicDashboard() {
                     {s.firstName} {s.lastName}
                     {s.className ? <span className="text-muted"> · {s.className}</span> : null}
                   </span>
-                  <StudentRiskBadge riskLevel="HIGH" variant="dot" />
+                  <StudentRiskBadge riskLevel={s.riskLevel} variant="dot" hint={s.topFactor ?? undefined} />
                 </Link>
               </li>
             ))}
           </ul>
         </ListCard>
       </div>
+      <DashboardAttention query={attention} title="Your intervention queue" limit={5} />
+      <SecondaryKpis title="More figures and findings" overview={overview} preferred={PREFERRED} showInsights />
+      <QuickActions actions={QUICK_ACTIONS} compact />
+      <ReportLinks links={REPORT_LINKS} />
     </div>
   )
 }

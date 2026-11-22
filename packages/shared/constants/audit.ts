@@ -27,10 +27,10 @@ export type AuditEntityType = (typeof AUDIT_ENTITY_TYPES)[number]
 export type AuditSeverity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW'
 
 export const AUDIT_SEVERITY_CONFIG: Record<AuditSeverity, { label: string; badgeClass: string }> = {
-  CRITICAL: { label: 'Critical', badgeClass: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400' },
-  HIGH:     { label: 'High',     badgeClass: 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400' },
-  MEDIUM:   { label: 'Medium',   badgeClass: 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400' },
-  LOW:      { label: 'Low',      badgeClass: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400' },
+  CRITICAL: { label: 'Critical', badgeClass: 'text-status-danger' },
+  HIGH:     { label: 'High',     badgeClass: 'text-status-warning' },
+  MEDIUM:   { label: 'Medium',   badgeClass: 'text-status-info' },
+  LOW:      { label: 'Low',      badgeClass: 'text-status-neutral' },
 }
 
 // ─── PAGINATION BOUNDS ───────────────────────────────────

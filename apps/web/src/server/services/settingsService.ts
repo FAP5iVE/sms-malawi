@@ -479,6 +479,51 @@ export async function getTermDates(): Promise<{
   return termDates
 }
 
+// ─────────────────────────────────────────────────────────
+//  CURRENT ACADEMIC PERIOD
+//  The ONE server-side answer to "which academic year and term is it right
+//  now". Any route or service that needs a default period calls these — it
+//  must never fall back to a literal year or term, because a literal is
+//  right for exactly as long as it takes the calendar to move on, and (as
+//  the Finances summary cards showing MK 0.00 demonstrated) a wrong
+//  default doesn't fail loudly, it just quietly queries an empty slice.
+// ─────────────────────────────────────────────────────────
+
+export interface AcademicPeriod {
+  academicYear: string
+  term: number
+}
+
+/** The school's current academic year + term, straight from SystemSettings
+ *  (SETTING_KEYS.CURRENT_ACADEMIC_YEAR / CURRENT_TERM). */
+export async function getCurrentPeriod(): Promise<AcademicPeriod> {
+  const s = await getMany([SETTING_KEYS.CURRENT_ACADEMIC_YEAR, SETTING_KEYS.CURRENT_TERM])
+  return {
+    academicYear: s[SETTING_KEYS.CURRENT_ACADEMIC_YEAR],
+    term:         s[SETTING_KEYS.CURRENT_TERM],
+  }
+}
+
+/** Resolves the period a request is asking about: whatever the caller
+ *  explicitly supplied (if it is well-formed — a "YYYY/YYYY" year, a term
+ *  of 1–3), otherwise the school's current value for that half. Year and
+ *  term fall back independently, so `?term=2` alone means "term 2 of the
+ *  CURRENT year". Accepts raw query/body values (string | number |
+ *  undefined) so route handlers can pass `req.query` fields straight in. */
+export async function resolvePeriod(input: { academicYear?: unknown; term?: unknown } = {}): Promise<AcademicPeriod> {
+  const current = await getCurrentPeriod()
+
+  const year =
+    typeof input.academicYear === 'string' && /^\d{4}\/\d{4}$/.test(input.academicYear)
+      ? input.academicYear
+      : current.academicYear
+
+  const rawTerm = typeof input.term === 'string' || typeof input.term === 'number' ? Number(input.term) : NaN
+  const term = Number.isInteger(rawTerm) && rawTerm >= 1 && rawTerm <= 3 ? rawTerm : current.term
+
+  return { academicYear: year, term }
+}
+
 /**
  * Get school identity settings only.
  * Used by the public landing page (ISR — no auth required).

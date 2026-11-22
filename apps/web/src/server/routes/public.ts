@@ -36,6 +36,7 @@
  *   @shared/constants/malawi (COLLECTIONS.ANNOUNCEMENTS)
  */
 import { Router }          from 'express'
+import { rateLimit, emailIdentifier } from '@/lib/ratelimit'
 import { getFirestore }    from 'firebase-admin/firestore'
 import { getAdminApp }     from '@/lib/verifyAuth'
 import { prisma }          from '@/lib/prisma'
@@ -51,6 +52,7 @@ import { renderNewsletterConfirm } from '@/server/templates/emails/newsletter-co
 import { getPublicViewUrl } from '@/lib/storage'
 import * as placementService from '@/server/services/placementService'
 import { getManebCandidateList } from '@/server/services/analyticsService'
+import { requestPasswordReset } from '@/server/services/passwordResetService'
 
 export const publicRouter = Router()
 
@@ -62,12 +64,25 @@ export const publicRouter = Router()
 publicRouter.get('/school-info', async (_req, res) => {
   const settings = await settingsService.getPublicSettings()
 
+  // [NEW] Resolve each Discover card's optional photoKey to a real view URL
+  // — same getPublicViewUrl() resolution /public/leadership already does
+  // for SCHOOL_LEADERSHIP_TEAM photos. Cards with no photo yet keep
+  // photoUrl: null so the landing page can fall back to its existing
+  // gradient tint instead of rendering a broken <img>.
+  const discoverCardsRaw = settings[SETTING_KEYS.SCHOOL_DISCOVER_CARDS] ?? []
+  const discoverCards = await Promise.all(
+    discoverCardsRaw.map(async (c) => ({
+      cardKey:  c.cardKey,
+      photoUrl: c.photoKey ? await getPublicViewUrl('', c.photoKey) : null,
+    })),
+  )
+
   res.json({
     schoolName:  settings[SETTING_KEYS.SCHOOL_NAME]           ?? 'SMS Malawi',
     slogan:      settings[SETTING_KEYS.SCHOOL_SLOGAN]         ?? 'Where Minds Ignite & Futures Begin.',
     // [PRODUCTION FIX 2026-07-28] Previously hardcoded in page.tsx.
     systemTagline: settings[SETTING_KEYS.SCHOOL_SYSTEM_TAGLINE] ?? 'Secondary School Management System',
-    heroSubtitle:  settings[SETTING_KEYS.SCHOOL_HERO_SUBTITLE]  ?? 'Excellence in Education — from Form 1 through MSCE.',
+    heroSubtitle:  settings[SETTING_KEYS.SCHOOL_HERO_SUBTITLE]  ?? 'Secondary education from Form 1 through MSCE.',
     founded:     settings[SETTING_KEYS.SCHOOL_FOUNDED_YEAR]   ?? 1979,
     address:     settings[SETTING_KEYS.SCHOOL_ADDRESS]        ?? 'P.O. Box 123, Blantyre, Malawi',
     phone:       settings[SETTING_KEYS.SCHOOL_PHONE]          ?? '+265 999 123 456',
@@ -75,7 +90,10 @@ publicRouter.get('/school-info', async (_req, res) => {
     vision:      settings[SETTING_KEYS.SCHOOL_VISION]         ?? '',
     mission:     settings[SETTING_KEYS.SCHOOL_MISSION]        ?? '',
     coreValues:  settings[SETTING_KEYS.SCHOOL_CORE_VALUES]    ?? [],
-    currentYear: settings[SETTING_KEYS.CURRENT_ACADEMIC_YEAR] ?? '2025/2026',
+    // [NEW] See resolution above — one entry per card that has a photo set,
+    // absent entries mean "no photo yet, use the default tint".
+    discoverCards,
+    currentYear: settings[SETTING_KEYS.CURRENT_ACADEMIC_YEAR] ?? (await settingsService.getCurrentPeriod()).academicYear,
     // [PRODUCTION FIX 2026-07-28] Footer social icons — real URLs now,
     // editable under Settings -> School Identity. Empty string = hide icon.
     social: {
@@ -93,7 +111,7 @@ publicRouter.get('/school-info', async (_req, res) => {
 // Returns aggregated MANEB pass rates for the landing page stats section.
 
 publicRouter.get('/maneb-stats', async (req, res) => {
-  const year = String(req.query.year ?? '2025/2026')
+  const { academicYear: year } = await settingsService.resolvePeriod({ academicYear: req.query.year })
 
   const [records, enrolledStudents] = await Promise.all([
     prisma.manebRecord.findMany({
@@ -162,6 +180,7 @@ interface PublicPostData {
   body: string
   eventDate?: string | null
   imageKey?: string | null
+  authorName?: string | null
   postType?: string
   createdAt: FirebaseFirestore.Timestamp
 }
@@ -177,6 +196,9 @@ async function mapPublicPost(id: string, data: PublicPostData) {
     // back the raw Appwrite file ID and leaving the frontend with no way
     // to turn it into an <img src>.
     imageUrl: data.imageKey ? await getPublicViewUrl('', data.imageKey) : null,
+    // [FIX] Byline — "Written by: <name>" on the public detail page. null
+    // when the author left it blank.
+    authorName: data.authorName ?? null,
     createdAt: data.createdAt.toDate(),
   }
 }
@@ -301,7 +323,10 @@ const NewsletterSchema = z.object({
   name:  z.string().min(1).max(100).optional(),
 })
 
-publicRouter.post('/newsletter/subscribe', async (req, res) => {
+// [Issue 6] Sends an e-mail to a caller-supplied address: limited per address (so one
+// victim cannot be mail-bombed from many IPs), per IP, and against a deployment-wide
+// e-mail budget. Redis-backed — see lib/ratelimit-policies.ts.
+publicRouter.post('/newsletter/subscribe', rateLimit('public-newsletter', { identifier: emailIdentifier }), async (req, res) => {
   const parsed = NewsletterSchema.safeParse(req.body)
   if (!parsed.success) {
     return res.status(400).json({ error: 'Valid email address is required.' })
@@ -366,6 +391,23 @@ publicRouter.get('/newsletter/unsubscribe', async (req, res) => {
   res.json({ message: 'You have been unsubscribed from the SMS Malawi newsletter.' })
 })
 
+// ─── PASSWORD RESET (public "forgot password") ────────────────────────────────
+// POST /public/password-reset  { email }
+// Emails a link to the app's own /reset-password page (see passwordResetService.ts for why
+// Firebase's own reset email is not used). The answer never says whether the address has an
+// account. `delivered: false` means the e-mail service could not send, so the page may fall
+// back to Firebase's own reset email. Limited per address, per IP and against an e-mail budget.
+const PasswordResetSchema = z.object({ email: z.string().trim().email().max(254) })
+
+publicRouter.post('/password-reset', rateLimit('public-password-reset', { identifier: emailIdentifier }), async (req, res) => {
+  const parsed = PasswordResetSchema.safeParse(req.body)
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Please enter a valid email address.' })
+  }
+  const { delivered } = await requestPasswordReset(parsed.data.email)
+  res.json({ ok: true, delivered })
+})
+
 // ─── PUBLIC CONTACT FORM ──────────────────────────────────────────────────────
 // POST /public/contact
 // [PRODUCTION FIX 2026-07-28] The landing page's "Send us a message" form had
@@ -382,7 +424,8 @@ const ContactMessageSchema = z.object({
   message: z.string().min(1, 'Message is required').max(5000),
 })
 
-publicRouter.post('/contact', async (req, res) => {
+// [Issue 6] Sends e-mail to the school inbox — per sender address, per IP and a global budget.
+publicRouter.post('/contact', rateLimit('public-contact', { identifier: emailIdentifier }), async (req, res) => {
   const parsed = ContactMessageSchema.safeParse(req.body)
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.errors[0]?.message ?? 'Please check the form for errors.' })
@@ -407,7 +450,7 @@ publicRouter.post('/contact', async (req, res) => {
     return res.status(502).json({ error: 'Failed to send your message. Please try again or contact us by phone.' })
   }
 
-  res.status(201).json({ message: 'Thank you — the admissions office will respond within two working days.' })
+  res.status(201).json({ message: 'Thank you. The admissions office will respond within two working days.' })
 })
 
 // ─── PUBLIC PLACEMENT STATISTICS ──────────────────────────────────────────────
@@ -435,7 +478,7 @@ publicRouter.get('/placements', async (req, res) => {
 })
 
 publicRouter.get('/placement-stats', async (req, res) => {
-  const year = String(req.query.year ?? '2025/2026')
+  const { academicYear: year } = await settingsService.resolvePeriod({ academicYear: req.query.year })
 
   const [candidates, placements] = await Promise.all([
     getManebCandidateList(year, 'MSCE'),
@@ -526,9 +569,21 @@ publicRouter.get('/leadership', async (_req, res) => {
 // Deliberately narrow: only school-wide items (classId null, term null),
 // since a public page can't sensibly show every class/term-specific
 // variant — those belong in the real application/enrolment flow.
+// [BUGFIX 2026-09-16] The `year` fallback was hardcoded to the literal
+// string '2025/2026' — once the school's real CURRENT_ACADEMIC_YEAR
+// setting advanced past that (settingsService.ts, SETTING_KEYS.
+// CURRENT_ACADEMIC_YEAR) and FeeStructure rows were recreated under the
+// new year, this route kept querying the old, now-empty year forever
+// (admissions/page.tsx's usePublicFeeStructure() call passes no `year`,
+// so it always hit this default). Replaced with the same
+// settingsService.get(SETTING_KEYS.CURRENT_ACADEMIC_YEAR) lookup every
+// other current-year default in this codebase already uses (see this
+// file's own /school-info route, classes.ts's GET /:id/timetable).
 
 publicRouter.get('/fee-structure', async (req, res) => {
-  const year = String(req.query.year ?? '2025/2026')
+  const year = typeof req.query.year === 'string' && req.query.year
+    ? req.query.year
+    : await settingsService.get(SETTING_KEYS.CURRENT_ACADEMIC_YEAR)
   const items = await prisma.feeStructure.findMany({
     where: { academicYear: year, classId: null, term: null, isActive: true },
     select: { name: true, amount: true },

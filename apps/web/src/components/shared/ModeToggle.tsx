@@ -1,8 +1,9 @@
 'use client'
 
-import { useTheme }     from 'next-themes'
+import { useTheme }     from '@/components/providers/ThemeProvider'
 import { useEffect, useState }    from 'react'
-import { Sun, Moon, Monitor, Check } from 'lucide-react'
+import { Sun, Check } from 'lucide-react'
+import { THEME_OPTIONS, ThemeIcon, themeLabel } from '@/components/shared/themeOptions'
 import { Button }       from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -11,36 +12,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { cn }           from '@/lib/utils'
-import type { ThemeMode } from '@/store/themeStore'
-
-// ─────────────────────────────────────────────────────────
-//  THEME OPTIONS
-// ─────────────────────────────────────────────────────────
-
-const THEME_OPTIONS: Array<{
-  value: ThemeMode
-  label: string
-  icon:  React.ElementType
-}> = [
-  { value: 'light',  label: 'Light',  icon: Sun     },
-  { value: 'dark',   label: 'Dark',   icon: Moon    },
-  { value: 'system', label: 'System', icon: Monitor },
-]
-
-// ─────────────────────────────────────────────────────────
-//  ICON RESOLVER
-//  Returns the correct icon for the current active theme.
-//  Uses the resolved theme (actual light/dark) for the icon
-//  when system mode is active, so the icon always reflects
-//  what the user is actually seeing.
-// ─────────────────────────────────────────────────────────
-
-function ActiveIcon({ resolvedTheme }: { resolvedTheme: string | undefined }) {
-  if (resolvedTheme === 'dark') {
-    return <Moon className="h-4 w-4" />
-  }
-  return <Sun className="h-4 w-4" />
-}
 
 // ─────────────────────────────────────────────────────────
 //  COMPONENT
@@ -53,7 +24,7 @@ interface ModeToggleProps {
 }
 
 export function ModeToggle({ showLabel = false, className }: ModeToggleProps) {
-  const { theme, setTheme, resolvedTheme } = useTheme()
+  const { theme, setTheme } = useTheme()
 
   // next-themes requires mounted state to avoid hydration mismatch —
   // the server doesn't know the user's stored theme preference.
@@ -91,12 +62,12 @@ export function ModeToggle({ showLabel = false, className }: ModeToggleProps) {
             'text-muted-foreground hover:text-foreground hover:bg-accent transition-colors',
             className
           )}
-          aria-label={`Current theme: ${theme ?? 'system'}. Click to change theme.`}
+          aria-label={`Current theme: ${themeLabel(theme)}. Press to change theme.`}
         >
-          <ActiveIcon resolvedTheme={resolvedTheme} />
+          <ThemeIcon choice={theme} className="h-4 w-4" />
           {showLabel && (
             <span className="text-sm font-medium capitalize">
-              {theme === 'system' ? 'System' : (theme ?? 'System')}
+              {themeLabel(theme)}
             </span>
           )}
           <span className="sr-only">Toggle theme</span>

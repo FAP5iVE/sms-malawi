@@ -23,6 +23,8 @@ import 'server-only'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import * as auditService from '@/server/services/auditService'
+import { assertNotSelfReview } from '@/server/lib/selfReview'
+import * as algolia from '@/server/services/algoliaService'
 import type { UserRole } from '@shared/types/roles'
 import type { Decimal } from '@prisma/client/runtime/library'
 import type {
@@ -45,10 +47,28 @@ function serializeAsset<T extends { acquisitionCost: Decimal | number | null }>(
   return { ...asset, acquisitionCost: toNumber(asset.acquisitionCost) }
 }
 
+// [ALGOLIA ROLLOUT — Tier 1/2 item 11] Shared by every write below —
+// one mapping from an Asset Prisma row to the search record.
+function toAlgoliaAsset(asset: {
+  id: string; name: string; serialNumber: string | null; location: string | null
+  category: string; status: string; acquisitionDate: Date | null; acquisitionCost: Decimal | number | null
+}): algolia.AlgoliaAsset {
+  return {
+    objectID:        asset.id,
+    name:            asset.name,
+    serialNumber:    asset.serialNumber,
+    location:        asset.location,
+    category:        asset.category,
+    status:          asset.status,
+    acquisitionDate: asset.acquisitionDate ? asset.acquisitionDate.toISOString() : null,
+    acquisitionCost: asset.acquisitionCost === null ? null : Number(asset.acquisitionCost),
+  }
+}
+
 // ─── REGISTER (catalog) ─────────────────────────────────
 
 export async function listAssets(filters: {
-  category?: string; status?: string; search?: string
+  category?: string; status?: string; condition?: string; search?: string
   sortBy?: 'name' | 'category' | 'acquisitionDate' | 'acquisitionCost'
   sortDir?: 'asc' | 'desc'
 } = {}) {
@@ -56,6 +76,7 @@ export async function listAssets(filters: {
     where: {
       ...(filters.category ? { category: filters.category as never } : {}),
       ...(filters.status   ? { status: filters.status as never } : {}),
+      ...(filters.condition ? { condition: filters.condition as never } : {}),
       ...(filters.search   ? {
         OR: [
           { name:         { contains: filters.search, mode: 'insensitive' } },
@@ -65,6 +86,14 @@ export async function listAssets(filters: {
       } : {}),
     },
     orderBy: { [filters.sortBy ?? 'name']: filters.sortDir ?? 'asc' },
+    // [ALGOLIA ROLLOUT — Tier 1/2 item 11, unrelated to Algolia itself]
+    // This was an unbounded findMany with no cap at all — fine at today's
+    // inventory size, but a query with no ceiling only gets slower as the
+    // asset register grows. A generous cap, not real pagination — if this
+    // school's inventory ever approaches it, that's the actual signal to
+    // build real pagination here (or finish moving this screen onto the
+    // `assets` Algolia index, which owns its own pagination).
+    take: 2000,
   }).then(rows => rows.map(serializeAsset))
 }
 
@@ -101,6 +130,7 @@ export async function createAsset(data: CreateAssetInput, actorUid: string, acto
     actorUid, actorRole, metadata: { after: { name: asset.name, category: asset.category, quantity: asset.quantity } },
   })
   logger.info({ event: 'asset.create', assetId: asset.id, actorUid })
+  void algolia.indexAsset(toAlgoliaAsset(asset))
   return serializeAsset(asset)
 }
 
@@ -129,6 +159,7 @@ export async function updateAsset(id: string, data: UpdateAssetInput, actorUid: 
     action: 'asset.update', entityType: 'Asset', entityId: asset.id,
     actorUid, actorRole, metadata: { after: data as Record<string, unknown> },
   })
+  void algolia.updateAsset(toAlgoliaAsset(asset))
   return serializeAsset(asset)
 }
 
@@ -169,6 +200,7 @@ export async function disposeAsset(id: string, data: DisposeAssetInput, actorUid
     actorUid, actorRole, metadata: { after: { notes: data.notes } },
   })
   logger.info({ event: 'asset.dispose', assetId: asset.id, actorUid })
+  void algolia.updateAsset({ objectID: asset.id, status: asset.status })
   return serializeAsset(asset)
 }
 
@@ -189,7 +221,7 @@ export async function allocateAsset(assetId: string, data: AllocateAssetInput, a
     if (!staff) throw Object.assign(new Error('Staff member not found.'), { status: 400 })
   }
 
-  const [assignment] = await prisma.$transaction([
+  const [assignment, updatedAsset] = await prisma.$transaction([
     prisma.assetAssignment.create({
       data: {
         assetId,
@@ -210,6 +242,7 @@ export async function allocateAsset(assetId: string, data: AllocateAssetInput, a
     metadata: { after: { assetId, assignedToType: data.assignedToType, staffId: data.staffId, departmentOrRoom: data.departmentOrRoom } },
   })
   logger.info({ event: 'asset.allocate', assetId, assignmentId: assignment.id, actorUid })
+  void algolia.updateAsset({ objectID: updatedAsset.id, status: updatedAsset.status })
   return assignment
 }
 
@@ -225,7 +258,7 @@ export async function returnAsset(assignmentId: string, data: ReturnAssetInput, 
 
   const newAssetStatus = data.conditionOnReturn === 'DAMAGED' ? 'UNDER_REPAIR' : 'IN_STORE'
 
-  const [updated] = await prisma.$transaction([
+  const [updated, updatedAsset] = await prisma.$transaction([
     prisma.assetAssignment.update({
       where: { id: assignmentId },
       data: {
@@ -248,6 +281,7 @@ export async function returnAsset(assignmentId: string, data: ReturnAssetInput, 
     action: 'asset.return', entityType: 'AssetAssignment', entityId: updated.id,
     actorUid, actorRole, metadata: { after: { conditionOnReturn: data.conditionOnReturn } },
   })
+  void algolia.updateAsset({ objectID: updatedAsset.id, status: updatedAsset.status })
   return updated
 }
 
@@ -341,11 +375,13 @@ export async function getRequestsByDepartment() {
 }
 
 export async function approveAssetRequest(id: string, data: ReviewAssetRequestInput, actorUid: string, actorRole: UserRole) {
-  const existing = await prisma.assetRequest.findUnique({ where: { id }, select: { id: true, status: true } })
+  const existing = await prisma.assetRequest.findUnique({ where: { id }, select: { id: true, status: true, requestedByUid: true } })
   if (!existing) throw Object.assign(new Error('Request not found.'), { status: 404 })
   if (existing.status !== 'PENDING') {
     throw Object.assign(new Error('This request has already been reviewed.'), { status: 409 })
   }
+  // [Issue 7] Requester may not approve their own asset request (Approvals Hub parity).
+  assertNotSelfReview(existing.requestedByUid, actorUid, 'asset request')
 
   const request = await prisma.assetRequest.update({
     where: { id },
@@ -365,11 +401,12 @@ export async function approveAssetRequest(id: string, data: ReviewAssetRequestIn
 }
 
 export async function rejectAssetRequest(id: string, data: RejectAssetRequestInput, actorUid: string, actorRole: UserRole) {
-  const existing = await prisma.assetRequest.findUnique({ where: { id }, select: { id: true, status: true } })
+  const existing = await prisma.assetRequest.findUnique({ where: { id }, select: { id: true, status: true, requestedByUid: true } })
   if (!existing) throw Object.assign(new Error('Request not found.'), { status: 404 })
   if (existing.status !== 'PENDING') {
     throw Object.assign(new Error('This request has already been reviewed.'), { status: 409 })
   }
+  assertNotSelfReview(existing.requestedByUid, actorUid, 'asset request')
 
   const request = await prisma.assetRequest.update({
     where: { id },
@@ -467,6 +504,13 @@ export async function listAdvances(filters: { assetRequestId?: string; status?: 
 
 // ─── REPORTS ──────────────────────────────────────────────
 
+// [ALGOLIA ROLLOUT — Tier 1/2 item 11] Bulk seed — same pattern as the
+// other entities.
+export async function seedAllAssetsToAlgolia(): Promise<algolia.BulkIndexResult> {
+  const assets = await prisma.asset.findMany()
+  return algolia.bulkIndexAssets(assets.map(toAlgoliaAsset))
+}
+
 export async function getInventoryStats() {
   const [byCategory, byStatus, valuation, pendingRequests, outstandingAdvances] = await Promise.all([
     prisma.asset.groupBy({ by: ['category'], _count: { _all: true }, _sum: { quantity: true } }),
@@ -483,4 +527,4 @@ export async function getInventoryStats() {
     pendingRequests,
     outstandingAdvancesMWK: Number(outstandingAdvances._sum.amount ?? 0),
   }
-}
+}

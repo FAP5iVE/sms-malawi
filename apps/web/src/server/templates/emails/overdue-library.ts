@@ -1,7 +1,7 @@
 import 'server-only'
 
 import { format } from 'date-fns'
-import { buildEmailHtml, buildEmailText, TOKEN, type EmailMessage, type SchoolBranding } from './base'
+import { banner, buildEmailHtml, buildEmailText, details, fitSubject, para, TOKEN, TONES, tone, type EmailMessage, type SchoolBranding } from './base'
 
 export interface OverdueBook {
   title:       string
@@ -27,7 +27,7 @@ function formatCurrency(amount: number, locale: string, currency: string): strin
   try {
     return new Intl.NumberFormat(locale, {
       style: 'currency', currency,
-      minimumFractionDigits: 2, maximumFractionDigits: 2,
+      minimumFractionDigits: Number.isInteger(amount) ? 0 : 2, maximumFractionDigits: 2,
     }).format(amount)
   } catch {
     return `${currency} ${amount.toFixed(2)}`
@@ -42,104 +42,78 @@ export function renderOverdueLibrary(
   const fmtTotal       = formatCurrency(data.totalFineAmount, data.currencyLocale, data.currency)
   const bookCount      = data.books.length
   const bookWord       = bookCount === 1 ? 'book' : 'books'
-  const headerColor    = isReminder ? TOKEN.ACCENT_BLUE : TOKEN.ACCENT_AMBER
+  const dayWord        = `${data.daysUntilDue} day${data.daysUntilDue !== 1 ? 's' : ''}`
+  const earliestDue    = bookCount > 0 ? new Date(Math.min(...data.books.map((b) => b.dueDate.getTime()))) : null
 
-  const subject = isReminder
-    ? `📚 Library reminder — ${bookCount} ${bookWord} due in ${data.daysUntilDue} day${data.daysUntilDue !== 1 ? 's' : ''}`
-    : `⚠ Overdue library ${bookWord} — ${fmtTotal} in fines — ${data.borrowerName}`
+  const subject = fitSubject(
+    isReminder
+      ? (earliestDue
+          ? `Return ${bookCount} library ${bookWord} by ${format(earliestDue, 'd MMM yyyy')}`
+          : `${bookCount} library ${bookWord} due soon`)
+      : (data.totalFineAmount > 0
+          ? `${bookCount} overdue library ${bookWord}, ${fmtTotal} in fines`
+          : `${bookCount} overdue library ${bookWord}`),
+  )
 
-  const booksTableRows = data.books.map((book, i) => {
-    const isEven          = i % 2 === 0
-    const formattedDue    = format(book.dueDate, 'd MMM yyyy')
-    const formattedIssued = format(book.issuedOn, 'd MMM yyyy')
-    const bookFmt         = formatCurrency(book.fineAmount, data.currencyLocale, data.currency)
-
+  const bookBlocks = data.books.map((book, i) => {
+    const formattedDue = format(book.dueDate, 'd MMM yyyy')
+    const bookFmt      = formatCurrency(book.fineAmount, data.currencyLocale, data.currency)
+    const last         = i === data.books.length - 1
+    const bg           = i % 2 === 1 ? ` class="em-tint" bgcolor="${TOKEN.BG_ROW}" style="background-color:${TOKEN.BG_ROW};"` : ''
+    const late         = !isReminder
+      ? `<span class="${TONES.red.cls}" style="color:${TOKEN.ACCENT_RED};font-weight:bold;">${book.daysOverdue} day${book.daysOverdue !== 1 ? 's' : ''} late</span> &bull; Fine <span class="${TONES.red.cls}" style="color:${TOKEN.ACCENT_RED};font-weight:bold;">${bookFmt}</span> &bull; `
+      : ''
     return `
-    <tr${isEven ? '' : ' style="background-color:#f9fafb;"'}>
-      <td style="padding:12px 16px;border-bottom:1px solid ${TOKEN.BORDER};">
-        <p style="margin:0;font-family:${TOKEN.FONT_STACK};font-size:13px;font-weight:600;color:${TOKEN.TEXT_DARK};">${book.title}</p>
-        <p style="margin:2px 0 0;font-family:${TOKEN.FONT_STACK};font-size:12px;color:${TOKEN.TEXT_MUTED};">${book.author}</p>
-      </td>
-      <td style="padding:12px 16px;font-family:${TOKEN.FONT_STACK};font-size:13px;color:${TOKEN.TEXT_MUTED};border-bottom:1px solid ${TOKEN.BORDER};white-space:nowrap;">${formattedDue}</td>
-      ${!isReminder ? `<td style="padding:12px 16px;font-family:${TOKEN.FONT_STACK};font-size:13px;font-weight:600;color:${TOKEN.ACCENT_AMBER};border-bottom:1px solid ${TOKEN.BORDER};white-space:nowrap;">${book.daysOverdue}d late</td>
-      <td style="padding:12px 16px;font-family:${TOKEN.FONT_STACK};font-size:13px;font-weight:600;color:${TOKEN.ACCENT_RED};border-bottom:1px solid ${TOKEN.BORDER};white-space:nowrap;">${bookFmt}</td>` : ''}
-    </tr>`
+          <tr${bg}>
+            <td class="em-line" style="padding:12px 16px;${last ? '' : `border-bottom:1px solid ${TOKEN.BORDER};`}">
+              <p class="em-t" style="margin:0;font-family:${TOKEN.FONT_STACK};font-size:16px;font-weight:bold;color:${TOKEN.TEXT_DARK};line-height:1.4;">${book.title}</p>
+              <p class="em-m" style="margin:2px 0 0;font-family:${TOKEN.FONT_STACK};font-size:14px;color:${TOKEN.TEXT_MUTED};line-height:1.5;">${book.author}</p>
+              <p class="em-t" style="margin:6px 0 0;font-family:${TOKEN.FONT_STACK};font-size:14px;color:${TOKEN.TEXT_BODY};line-height:1.5;">${late}Due ${formattedDue}</p>
+            </td>
+          </tr>`
   }).join('')
 
+  const booksHtml = `
+    <tr>
+      <td class="em-pad" style="padding:20px 32px 0;">
+        <table role="presentation" cellpadding="0" cellspacing="0" class="em-line" style="width:100%;border:1px solid ${TOKEN.BORDER};border-radius:6px;">
+          <tr class="em-tint" bgcolor="${TOKEN.BG_ROW}" style="background-color:${TOKEN.BG_ROW};">
+            <td class="em-m em-line" style="padding:12px 16px;font-family:${TOKEN.FONT_STACK};font-size:14px;font-weight:bold;color:${TOKEN.TEXT_MUTED};border-bottom:1px solid ${TOKEN.BORDER};">${bookCount} ${bookWord}</td>
+          </tr>${bookBlocks}
+        </table>
+      </td>
+    </tr>`
+
   const bodyHtml = `
-    <!-- Intro -->
-    <tr>
-      <td style="padding:32px 32px 0;font-family:${TOKEN.FONT_STACK};font-size:15px;color:${TOKEN.TEXT_BODY};line-height:1.7;">
-        <p style="margin:0;">Dear <strong>${data.borrowerName}</strong>,</p>
-        <p style="margin:12px 0 0;">
-          ${isReminder
-            ? `This is a friendly reminder that you have <strong>${bookCount} ${bookWord}</strong> due to be returned to the library in <strong>${data.daysUntilDue} day${data.daysUntilDue !== 1 ? 's' : ''}</strong>. Please return ${bookCount === 1 ? 'it' : 'them'} by the due date to avoid fines.`
-            : `You have <strong>${bookCount} overdue library ${bookWord}</strong>. Please return ${bookCount === 1 ? 'it' : 'them'} immediately to avoid further fines. Your current outstanding fine is <strong style="color:${TOKEN.ACCENT_RED};">${fmtTotal}</strong>.`
-          }
-        </p>
-      </td>
-    </tr>
-
-    <!-- Books table -->
-    <tr>
-      <td style="padding:20px 32px 0;">
-        <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border:1px solid ${TOKEN.BORDER};border-radius:6px;overflow:hidden;">
-          <tr style="background-color:#f9fafb;">
-            <td style="padding:12px 16px;font-family:${TOKEN.FONT_STACK};font-size:11px;font-weight:bold;color:${TOKEN.TEXT_MUTED};text-transform:uppercase;letter-spacing:0.06em;border-bottom:1px solid ${TOKEN.BORDER};">Book</td>
-            <td style="padding:12px 16px;font-family:${TOKEN.FONT_STACK};font-size:11px;font-weight:bold;color:${TOKEN.TEXT_MUTED};text-transform:uppercase;letter-spacing:0.06em;border-bottom:1px solid ${TOKEN.BORDER};white-space:nowrap;">Due Date</td>
-            ${!isReminder ? `
-            <td style="padding:12px 16px;font-family:${TOKEN.FONT_STACK};font-size:11px;font-weight:bold;color:${TOKEN.TEXT_MUTED};text-transform:uppercase;letter-spacing:0.06em;border-bottom:1px solid ${TOKEN.BORDER};white-space:nowrap;">Overdue</td>
-            <td style="padding:12px 16px;font-family:${TOKEN.FONT_STACK};font-size:11px;font-weight:bold;color:${TOKEN.TEXT_MUTED};text-transform:uppercase;letter-spacing:0.06em;border-bottom:1px solid ${TOKEN.BORDER};white-space:nowrap;">Fine</td>` : ''}
-          </tr>
-          ${booksTableRows}
-        </table>
-      </td>
-    </tr>
-
-    ${!isReminder && data.totalFineAmount > 0 ? `
-    <!-- Total fine -->
-    <tr>
-      <td style="padding:16px 32px 0;">
-        <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;background-color:#fef2f2;border-radius:6px;">
-          <tr>
-            <td style="padding:14px 20px;">
-              <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;">
-                <tr>
-                  <td style="font-family:${TOKEN.FONT_STACK};font-size:14px;color:${TOKEN.TEXT_MUTED};">Total Outstanding Fine</td>
-                  <td style="font-family:${TOKEN.FONT_STACK};font-size:18px;font-weight:bold;color:${TOKEN.ACCENT_RED};text-align:right;">${fmtTotal}</td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>` : ''}
-
-    <tr>
-      <td style="padding:20px 32px 0;font-family:${TOKEN.FONT_STACK};font-size:14px;color:${TOKEN.TEXT_BODY};line-height:1.7;">
-        <p style="margin:0;">
-          ${isReminder
-            ? 'Please return your books to the library before or on the due date. If you need to renew your loan, visit the library in person.'
-            : 'Please return your books to the library immediately. Fines can be paid at the school finance office. Continued overdue status will result in suspension of your borrowing privileges.'
-          }
-        </p>
-      </td>
-    </tr>
-
-    <tr><td style="padding:24px 0 0;"></td></tr>
+    ${isReminder
+      ? banner({ tone: 'blue', title: 'Return reminder', detail: `${bookCount} ${bookWord} due in ${dayWord}` })
+      : banner({ tone: 'red', title: `Overdue library ${bookWord}`, detail: data.totalFineAmount > 0 ? `Outstanding fine: ${fmtTotal}` : undefined })}
+    ${para(
+      `Dear <strong>${data.borrowerName}</strong>,`,
+      isReminder
+        ? `This is a reminder that you have <strong>${bookCount} ${bookWord}</strong> to return to the library in <strong>${dayWord}</strong>. Please return ${bookCount === 1 ? 'it' : 'them'} by the due date to avoid fines.`
+        : `You have <strong>${bookCount} overdue library ${bookWord}</strong>. Please return ${bookCount === 1 ? 'it' : 'them'} now to avoid more fines. Your current outstanding fine is ${tone('red', fmtTotal)}.`,
+    )}
+    ${booksHtml}
+    ${!isReminder && data.totalFineAmount > 0
+      ? details({ rows: [{ label: 'Total outstanding fine', value: fmtTotal, tone: 'red', big: true }] })
+      : ''}
+    ${para(
+      isReminder
+        ? 'Please return your books to the library on or before the due date. To renew a loan, visit the library in person.'
+        : 'Please return your books to the library now. You can pay fines at the school finance office. If books stay overdue, your borrowing may be suspended.',
+    )}
   `
 
   const html = buildEmailHtml({
     previewText: isReminder
-      ? `Return reminder — ${bookCount} ${bookWord} due in ${data.daysUntilDue} day${data.daysUntilDue !== 1 ? 's' : ''}`
-      : `Overdue library notice — ${fmtTotal} in fines — ${data.borrowerName}`,
-    headerLabel: isReminder ? 'Library Return Reminder' : 'Overdue Library Notice',
-    headerColor,
+      ? `Return reminder: ${bookCount} ${bookWord} due in ${dayWord}`
+      : `Overdue library ${bookWord}${data.totalFineAmount > 0 ? `: ${fmtTotal} in fines` : ''}`,
+    headerLabel: isReminder ? 'Library return reminder' : 'Overdue library notice',
     body:        bodyHtml,
     cta: {
-      label: 'View Borrowing History',
+      label: 'View borrowing history',
       url:   `${school.loginUrl}/library`,
-      color: headerColor,
     },
     school,
   })
@@ -148,18 +122,18 @@ export function renderOverdueLibrary(
     `Dear ${data.borrowerName},`,
     '',
     isReminder
-      ? `LIBRARY RETURN REMINDER: You have ${bookCount} ${bookWord} due in ${data.daysUntilDue} day${data.daysUntilDue !== 1 ? 's' : ''}.`
-      : `OVERDUE LIBRARY NOTICE: You have ${bookCount} overdue ${bookWord}. Total fine: ${fmtTotal}`,
+      ? `Return reminder: you have ${bookCount} ${bookWord} due in ${dayWord}.`
+      : `Overdue library notice: you have ${bookCount} overdue ${bookWord}. Total fine: ${fmtTotal}`,
     '',
-    'Book(s):',
+    bookCount === 1 ? 'Book:' : 'Books:',
     ...data.books.map((b) =>
-      `  • "${b.title}" by ${b.author} — due ${format(b.dueDate, 'd MMM yyyy')}` +
-      (!isReminder ? ` — ${b.daysOverdue} day${b.daysOverdue !== 1 ? 's' : ''} overdue — Fine: ${formatCurrency(b.fineAmount, data.currencyLocale, data.currency)}` : '')
+      `  - "${b.title}" by ${b.author}, due ${format(b.dueDate, 'd MMM yyyy')}` +
+      (!isReminder ? `, ${b.daysOverdue} day${b.daysOverdue !== 1 ? 's' : ''} late, fine ${formatCurrency(b.fineAmount, data.currencyLocale, data.currency)}` : '')
     ),
     '',
     isReminder
       ? 'Please return your books on or before the due date to avoid fines.'
-      : `Please return your books immediately. Total fine of ${fmtTotal} is payable at the finance office.`,
+      : `Please return your books now. The total fine of ${fmtTotal} can be paid at the finance office.`,
     '',
     `Library portal: ${school.loginUrl}/library`,
   ]

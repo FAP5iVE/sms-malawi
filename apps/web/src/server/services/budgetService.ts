@@ -37,6 +37,19 @@ import type { ExpenseCategory } from '@prisma/client'
 import type { CreateBudgetInput } from '@shared/schemas/finance'
 
 export async function createBudget(data: CreateBudgetInput, actorUid: string) {
+  // A budget may be attached to the submission window it was raised under.
+  // The window must exist and belong to the same academic year, otherwise the
+  // link would silently mis-file the budget under another period's window.
+  if (data.budgetWindowId) {
+    const window = await prisma.budgetWindow.findUnique({ where: { id: data.budgetWindowId } })
+    if (!window) throw Object.assign(new Error('Budget window not found.'), { status: 400 })
+    if (window.academicYear !== data.academicYear) {
+      throw Object.assign(
+        new Error(`That budget window belongs to ${window.academicYear}, not ${data.academicYear}.`),
+        { status: 400 },
+      )
+    }
+  }
   return prisma.budget.create({
     data: {
       academicYear: data.academicYear,
@@ -45,6 +58,7 @@ export async function createBudget(data: CreateBudgetInput, actorUid: string) {
       category: data.category,
       allocated: data.allocated,
       description: data.description ?? null, // nullable field
+      budgetWindowId: data.budgetWindowId ?? null,
       createdByUid: actorUid,
     },
   })
@@ -58,16 +72,45 @@ export async function getBudgets(academicYear: string) {
 }
 
 export async function getBudgetVsActual(academicYear: string, term?: number) {
+  // Viewing a term shows that term's budgets PLUS the full-year (term = null)
+  // ones, which apply to every term. A bare `{ term }` filter used to drop
+  // the annual budgets entirely.
   const budgets = await prisma.budget.findMany({
-    where: { academicYear, ...(term ? { term } : {}) },
+    where: { academicYear, ...(term ? { OR: [{ term }, { term: null }] } : {}) },
+    orderBy: [{ department: 'asc' }, { category: 'asc' }],
   })
-  return budgets.map((b) => ({
-    department: b.department,
-    category: b.category,
-    allocated: Number(b.allocated),
-    spent: Number(b.spent),
-    remaining: Number(b.allocated) - Number(b.spent),
-  }))
+
+  // Money already promised to open requisitions / POs but not yet spent.
+  const committedRows = budgets.length
+    ? await prisma.budgetCommitment.groupBy({
+        by: ['budgetId'],
+        where: { budgetId: { in: budgets.map((b) => b.id) }, status: { in: ['RESERVED', 'COMMITTED'] } },
+        _sum: { amount: true },
+      })
+    : []
+  const committedById = new Map(committedRows.map((r) => [r.budgetId, Number(r._sum.amount ?? 0)]))
+
+  return budgets.map((b) => {
+    const allocated = Number(b.allocated)
+    const spent = Number(b.spent)
+    const committed = committedById.get(b.id) ?? 0
+    return {
+      // id is required: requisitions are attached to a budget by id, and the
+      // UI previously had no way to learn one.
+      id: b.id,
+      department: b.department,
+      category: b.category,
+      term: b.term,
+      budgetWindowId: b.budgetWindowId,
+      description: b.description,
+      allocated,
+      spent,
+      committed,
+      remaining: allocated - spent,
+      // Same formula budgetWindowService.getBudgetAvailability uses.
+      available: allocated - committed - spent,
+    }
+  })
 }
 
 export async function updateBudgetSpent(

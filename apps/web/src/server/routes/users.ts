@@ -16,6 +16,7 @@
  *   from change-password/page.tsx)
  */
 import { Router } from 'express'
+import { z } from 'zod'
 import { verifyAuth, requireRole } from '@/lib/verifyAuth'
 import { CreateUserSchema, UpdateUserRoleSchema, NotificationPrefSchema } from '@shared/schemas/admin'
 import * as userService from '@/server/services/userManagementService'
@@ -50,23 +51,31 @@ usersRouter.patch('/role', verifyAuth, requireRole(['admin']),
   async (req, res) => {
     const parsed = UpdateUserRoleSchema.safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
-    return res.json(await userService.updateUserRole(parsed.data.uid, parsed.data.role as UserRole, req.user!.uid))
+    return res.json(await userService.updateUserRole(parsed.data.uid, parsed.data.role as UserRole, req.user!.uid, req.user!.superUser === true))
   })
 
 // PATCH /users/:uid/disable
 usersRouter.patch('/:uid/disable', verifyAuth, requireRole(['admin']),
   async (req, res) => {
-    const { disabled } = req.body as { disabled: boolean }
-    await userService.toggleUserDisabled(String(req.params.uid), disabled, req.user!.uid)
+    // [Issue 7] Runtime-validate the flag — a TypeScript cast lets the string "false" through as truthy.
+    const parsedBody = z.object({ disabled: z.boolean() }).strict().safeParse(req.body)
+    if (!parsedBody.success) return res.status(400).json({ error: '"disabled" must be true or false.' })
+    await userService.toggleUserDisabled(String(req.params.uid), parsedBody.data.disabled, req.user!.uid, req.user!.superUser === true)
     return res.json({ success: true })
   })
 
 // POST /users/:uid/reset-password
 usersRouter.post('/:uid/reset-password', verifyAuth, requireRole(['admin']),
   async (req, res) => {
-    await userService.sendPasswordReset(String(req.params.uid))
+    await userService.sendPasswordReset(String(req.params.uid), req.user!.superUser === true)
     return res.json({ success: true })
   })
+
+// GET /users/me/sex — self-service only: the caller's own recorded sex, used
+// to pick their dashboard profile picture. Returns { sex: null } when none
+// is recorded. No requireRole gate, same reasoning as clear-password-change-flag.
+usersRouter.get('/me/sex', verifyAuth,
+  async (req, res) => res.json({ sex: await userService.getMySex(req.user!.uid) }))
 
 // GET /users/me/notification-prefs
 usersRouter.get('/me/notification-prefs', verifyAuth,

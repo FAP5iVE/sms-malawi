@@ -21,6 +21,19 @@
  */
 
 import { DEFAULT_PAYE_BRACKETS } from '../constants/malawi/finance'
+import { EMPLOYEE_NO_FORMAT_DEFAULT, STUDENT_REGISTRATION_NO_FORMAT_DEFAULT } from '../constants/malawi/registration'
+import { getAcademicYearForDate, getCurrentTerm, getTermDatesForYear, parseAcademicYear } from '../constants/malawi/academic'
+
+// First-install defaults for the academic period, DERIVED from the calendar
+// and the single term-date table (ACADEMIC_TERMS) — not literals. A literal
+// here ('2025/2026', '2025-09-01', ...) silently becomes wrong the moment
+// the calendar moves on, and it had already drifted from ACADEMIC_TERMS
+// (Term 1 end '12-05' here vs '12-15' there). These only apply when no
+// value has been stored yet; once seedDefaults() persists them (or an admin
+// sets the real ones) the stored SETTING_KEYS value is the sole authority.
+const DEFAULT_ACADEMIC_YEAR = getAcademicYearForDate()
+const DEFAULT_TERM_DATES    = getTermDatesForYear(DEFAULT_ACADEMIC_YEAR)
+const DEFAULT_TERM_NUMBER   = getCurrentTerm(new Date(), DEFAULT_ACADEMIC_YEAR)
 
 // ─────────────────────────────────────────────────────────
 //  COMPLEX VALUE INTERFACES
@@ -58,6 +71,37 @@ export type InstallmentOption = 2 | 3 | 4
  * of truth. Keys are department names; each value is the list of job
  * titles available within that department, in display order.
  */
+/**
+ * Leave types, in the order they are offered. Mirrors the LeaveType enum in
+ * schema.prisma; kept here so the settings registry, the HR schemas and the
+ * UI share one list.
+ */
+export const LEAVE_TYPES = ['ANNUAL', 'SICK', 'MATERNITY', 'PATERNITY', 'STUDY', 'UNPAID', 'EMERGENCY'] as const
+export type LeaveTypeKey = (typeof LEAVE_TYPES)[number]
+
+export const LEAVE_TYPE_LABELS: Record<LeaveTypeKey, string> = {
+  ANNUAL:    'Annual leave',
+  SICK:      'Sick leave',
+  MATERNITY: 'Maternity leave',
+  PATERNITY: 'Paternity leave',
+  STUDY:     'Study leave',
+  UNPAID:    'Unpaid leave',
+  EMERGENCY: 'Emergency leave',
+}
+
+/** Leave types that are only offered to one sex (when the profile records it). */
+export const LEAVE_TYPE_SEX: Partial<Record<LeaveTypeKey, 'MALE' | 'FEMALE'>> = {
+  MATERNITY: 'FEMALE',
+  PATERNITY: 'MALE',
+}
+
+/**
+ * Percent of normal pay a leave type attracts: 100 full pay, 50 half pay,
+ * 0 unpaid. For SICK this is the pay on the full-pay days; the days after
+ * those (HR_SICK_HALF_PAY_DAYS) are always paid at half.
+ */
+export type LeavePayPercent = Record<LeaveTypeKey, number>
+
 export interface DepartmentTitles {
   [departmentName: string]: string[]
 }
@@ -71,6 +115,23 @@ export interface LeadershipMember {
   bio?:     string
   photoKey?: string // Appwrite file ID — FILE_PREFIX.LEADERSHIP_PHOTO
   order?:   number
+}
+
+/** [NEW] The four fixed Discover-section cards on the public landing page
+ *  (page.tsx's hardcoded `href`/description copy for each is unchanged —
+ *  this union only identifies *which* card a preview photo belongs to).
+ *  A literal union, not a free-text string, so a typo in either the
+ *  Settings editor or the landing page's lookup can't silently produce a
+ *  card with no matching photo. */
+export type DiscoverCardKey = 'leadership' | 'academics' | 'student_life' | 'admissions'
+
+/** One entry in SETTING_KEYS.SCHOOL_DISCOVER_CARDS — the optional preview
+ *  photo shown behind each Discover card on the public landing page,
+ *  replacing that card's flat gradient tint once set. Same
+ *  upload-first/attach-photoKey pattern as LeadershipMember.photoKey. */
+export interface DiscoverCardImage {
+  cardKey:   DiscoverCardKey
+  photoKey?: string // Appwrite file ID — FILE_PREFIX.DISCOVER_PHOTO
 }
 
 // ─────────────────────────────────────────────────────────
@@ -114,6 +175,11 @@ export const SETTING_KEYS = {
   // records publicly, which would leak internal HR data never meant to be
   // public (employee numbers, department, contact details, etc).
   SCHOOL_LEADERSHIP_TEAM:         'school_leadership_team',
+  // [NEW] Optional preview photo for each of the four fixed Discover-section
+  // cards (Leadership/Academics/Student Life/Admissions) on the public
+  // landing page — replaces that card's flat gradient tint once set. Same
+  // admin/hr/high_rank-curated, upload-first pattern as SCHOOL_LEADERSHIP_TEAM.
+  SCHOOL_DISCOVER_CARDS:          'school_discover_cards',
   // [PRODUCTION FIX 2026-07-28] Footer social icons previously linked
   // nowhere (decorative buttons, no href) in both the old page and the
   // redesign. Real, admin/hr/high_rank-editable URLs, each optional — an
@@ -132,6 +198,11 @@ export const SETTING_KEYS = {
   EXAM_MANEB_CENTRE_NAME:         'exam_maneb_centre_name',
   EXAM_MANEB_REG_DEADLINE:        'exam_maneb_reg_deadline',
 
+  // ── Continuous assessment (CA) aggregation into the end-of-term result
+  EXAM_CA_AGGREGATE_ENABLED:      'exam_ca_aggregate_enabled',
+  EXAM_CA_COUNT:                  'exam_ca_count',
+  EXAM_CA_WEIGHTS:                'exam_ca_weights',
+
   // ── Student promotion
   PROMOTION_MIN_AVERAGE:          'promotion_min_average',
   PROMOTION_REQUIRED_PASSES:      'promotion_required_passes',
@@ -143,6 +214,10 @@ export const SETTING_KEYS = {
   RISK_ABSENCE_MEDIUM:            'risk_absence_medium',
   RISK_SUBJECT_FAILS_HIGH:        'risk_subject_fails_high',
   RISK_SUBJECT_FAILS_MEDIUM:      'risk_subject_fails_medium',
+  // Library factor of the unified risk engine (riskService)
+  RISK_LIBRARY_OVERDUE_DAYS_HIGH:   'risk_library_overdue_days_high',
+  RISK_LIBRARY_OVERDUE_DAYS_MEDIUM: 'risk_library_overdue_days_medium',
+  RISK_LIBRARY_FINES_MEDIUM:        'risk_library_fines_medium',
 
   // ── Finance — fee and penalty
   FINANCE_LATE_PENALTY_PER_DAY:   'finance_late_penalty_per_day',
@@ -182,9 +257,21 @@ export const SETTING_KEYS = {
   HR_PATERNITY_LEAVE_DAYS:        'hr_paternity_leave_days',
   HR_STUDY_LEAVE_DAYS:            'hr_study_leave_days',
   HR_EMERGENCY_LEAVE_DAYS:        'hr_emergency_leave_days',
+  HR_SICK_HALF_PAY_DAYS:          'hr_sick_half_pay_days',
+  HR_LEAVE_PAY_PERCENT:           'hr_leave_pay_percent',
 
   // ── HR — contract management
   HR_CONTRACT_EXPIRY_LOOKAHEAD_DAYS: 'hr_contract_expiry_lookahead_days',
+  // Compulsory retirement age in years. Retirement dates are COMPUTED from
+  // staff date of birth + this value, never stored per person, so changing the
+  // policy value moves every staff member's date at once.
+  HR_RETIREMENT_AGE:              'hr_retirement_age',
+
+  // ── ID numbers — how new employee and student registration numbers are laid out
+  // (e.g. 'EMP-{YYYY}-000'). The last run of zeros is the running number. See
+  // constants/malawi/registration.ts. Only new records follow a changed format.
+  HR_EMPLOYEE_NO_FORMAT:          'hr_employee_no_format',
+  STUDENT_REGISTRATION_NO_FORMAT: 'student_registration_no_format',
 
   // ── HR — department & job title taxonomy (production fix, 2026-07-27)
   HR_DEPARTMENT_TITLES:           'hr_department_titles',
@@ -247,6 +334,7 @@ export interface SettingValueMap {
   readonly [SETTING_KEYS.SCHOOL_SYSTEM_TAGLINE]: string
   readonly [SETTING_KEYS.SCHOOL_HERO_SUBTITLE]:  string
   readonly [SETTING_KEYS.SCHOOL_LEADERSHIP_TEAM]: LeadershipMember[]
+  readonly [SETTING_KEYS.SCHOOL_DISCOVER_CARDS]: DiscoverCardImage[]
   readonly [SETTING_KEYS.SOCIAL_FACEBOOK_URL]:  string
   readonly [SETTING_KEYS.SOCIAL_TWITTER_URL]:   string
   readonly [SETTING_KEYS.SOCIAL_INSTAGRAM_URL]: string
@@ -267,6 +355,13 @@ export interface SettingValueMap {
   readonly [SETTING_KEYS.EXAM_MANEB_CENTRE_NUMBER]: string
   readonly [SETTING_KEYS.EXAM_MANEB_CENTRE_NAME]:   string
   readonly [SETTING_KEYS.EXAM_MANEB_REG_DEADLINE]:  string  // "YYYY-MM-DD"
+  // Continuous assessment. When EXAM_CA_AGGREGATE_ENABLED is true, the end-of-term
+  // mark of every subject = sum of (CA_i score% x EXAM_CA_WEIGHTS[i]) + (end-of-term
+  // exam score% x (100 - sum(EXAM_CA_WEIGHTS))). EXAM_CA_WEIGHTS has exactly
+  // EXAM_CA_COUNT whole-number entries (percent of the FINAL term mark).
+  readonly [SETTING_KEYS.EXAM_CA_AGGREGATE_ENABLED]: boolean
+  readonly [SETTING_KEYS.EXAM_CA_COUNT]:             number    // 1-10, default 2
+  readonly [SETTING_KEYS.EXAM_CA_WEIGHTS]:           number[]  // length === EXAM_CA_COUNT, default [15, 15]
 
   // ── Promotion
   readonly [SETTING_KEYS.PROMOTION_MIN_AVERAGE]:      number  // percent, default 35
@@ -280,6 +375,9 @@ export interface SettingValueMap {
   readonly [SETTING_KEYS.RISK_ABSENCE_MEDIUM]:       number  // % absent, default 15
   readonly [SETTING_KEYS.RISK_SUBJECT_FAILS_HIGH]:   number  // subject count, default 4
   readonly [SETTING_KEYS.RISK_SUBJECT_FAILS_MEDIUM]: number  // subject count, default 2
+  readonly [SETTING_KEYS.RISK_LIBRARY_OVERDUE_DAYS_HIGH]:   number  // days a book is overdue, default 30
+  readonly [SETTING_KEYS.RISK_LIBRARY_OVERDUE_DAYS_MEDIUM]: number  // days a book is overdue, default 14
+  readonly [SETTING_KEYS.RISK_LIBRARY_FINES_MEDIUM]:        number  // MWK of unpaid library fines, default 5000
 
   // ── Finance — fees
   readonly [SETTING_KEYS.FINANCE_LATE_PENALTY_PER_DAY]:    number  // MWK
@@ -310,7 +408,12 @@ export interface SettingValueMap {
   readonly [SETTING_KEYS.HR_PATERNITY_LEAVE_DAYS]:     number
   readonly [SETTING_KEYS.HR_STUDY_LEAVE_DAYS]:         number
   readonly [SETTING_KEYS.HR_EMERGENCY_LEAVE_DAYS]:     number
+  readonly [SETTING_KEYS.HR_SICK_HALF_PAY_DAYS]:       number
+  readonly [SETTING_KEYS.HR_LEAVE_PAY_PERCENT]:        LeavePayPercent
   readonly [SETTING_KEYS.HR_CONTRACT_EXPIRY_LOOKAHEAD_DAYS]: number  // days
+  readonly [SETTING_KEYS.HR_RETIREMENT_AGE]: number                   // years
+  readonly [SETTING_KEYS.HR_EMPLOYEE_NO_FORMAT]: string
+  readonly [SETTING_KEYS.STUDENT_REGISTRATION_NO_FORMAT]: string
   readonly [SETTING_KEYS.HR_DEPARTMENT_TITLES]: DepartmentTitles
 
   // ── Security
@@ -349,56 +452,56 @@ export const SETTING_META: { readonly [K in SettingKey]: SettingMeta<K> } = {
     category: SETTING_CATEGORIES.ACADEMIC,
     isPublic: true,
     description: 'The currently active academic year in "YYYY/YYYY" format.',
-    defaultValue: '2025/2026',
+    defaultValue: DEFAULT_ACADEMIC_YEAR,
   },
   [SETTING_KEYS.CURRENT_TERM]: {
     key: SETTING_KEYS.CURRENT_TERM,
     category: SETTING_CATEGORIES.ACADEMIC,
     isPublic: true,
     description: 'The currently active term (1, 2, or 3).',
-    defaultValue: 1,
+    defaultValue: DEFAULT_TERM_NUMBER,
   },
   [SETTING_KEYS.TERM1_START]: {
     key: SETTING_KEYS.TERM1_START,
     category: SETTING_CATEGORIES.ACADEMIC,
     isPublic: true,
     description: 'Term 1 start date (ISO date YYYY-MM-DD). Malawi: typically September.',
-    defaultValue: '2025-09-01',
+    defaultValue: DEFAULT_TERM_DATES[0]!.start,
   },
   [SETTING_KEYS.TERM1_END]: {
     key: SETTING_KEYS.TERM1_END,
     category: SETTING_CATEGORIES.ACADEMIC,
     isPublic: true,
     description: 'Term 1 end date (ISO date YYYY-MM-DD). Malawi: typically early December.',
-    defaultValue: '2025-12-05',
+    defaultValue: DEFAULT_TERM_DATES[0]!.end,
   },
   [SETTING_KEYS.TERM2_START]: {
     key: SETTING_KEYS.TERM2_START,
     category: SETTING_CATEGORIES.ACADEMIC,
     isPublic: true,
     description: 'Term 2 start date. Malawi: typically January.',
-    defaultValue: '2026-01-12',
+    defaultValue: DEFAULT_TERM_DATES[1]!.start,
   },
   [SETTING_KEYS.TERM2_END]: {
     key: SETTING_KEYS.TERM2_END,
     category: SETTING_CATEGORIES.ACADEMIC,
     isPublic: true,
     description: 'Term 2 end date. Malawi: typically April.',
-    defaultValue: '2026-04-10',
+    defaultValue: DEFAULT_TERM_DATES[1]!.end,
   },
   [SETTING_KEYS.TERM3_START]: {
     key: SETTING_KEYS.TERM3_START,
     category: SETTING_CATEGORIES.ACADEMIC,
     isPublic: true,
     description: 'Term 3 start date. Malawi: typically May.',
-    defaultValue: '2026-05-04',
+    defaultValue: DEFAULT_TERM_DATES[2]!.start,
   },
   [SETTING_KEYS.TERM3_END]: {
     key: SETTING_KEYS.TERM3_END,
     category: SETTING_CATEGORIES.ACADEMIC,
     isPublic: true,
     description: 'Term 3 end date. Malawi: typically late July.',
-    defaultValue: '2026-07-24',
+    defaultValue: DEFAULT_TERM_DATES[2]!.end,
   },
 
   // ── School identity
@@ -435,6 +538,13 @@ export const SETTING_META: { readonly [K in SettingKey]: SettingMeta<K> } = {
     category: SETTING_CATEGORIES.SCHOOL_IDENTITY,
     isPublic: true,
     description: 'Public leadership/management team listing shown on the Discover -> Leadership page.',
+    defaultValue: [],
+  },
+  [SETTING_KEYS.SCHOOL_DISCOVER_CARDS]: {
+    key: SETTING_KEYS.SCHOOL_DISCOVER_CARDS,
+    category: SETTING_CATEGORIES.SCHOOL_IDENTITY,
+    isPublic: true,
+    description: 'Preview photos for the four Discover-section cards (Leadership/Academics/Student Life/Admissions) on the public landing page.',
     defaultValue: [],
   },
   [SETTING_KEYS.SOCIAL_FACEBOOK_URL]: {
@@ -563,7 +673,29 @@ export const SETTING_META: { readonly [K in SettingKey]: SettingMeta<K> } = {
     category: SETTING_CATEGORIES.EXAM,
     isPublic: false,
     description: 'MANEB candidate registration deadline for the current academic year (ISO date).',
-    defaultValue: '2026-03-31',
+    defaultValue: `${parseAcademicYear(DEFAULT_ACADEMIC_YEAR).endYear}-03-31`,
+  },
+
+  [SETTING_KEYS.EXAM_CA_AGGREGATE_ENABLED]: {
+    key: SETTING_KEYS.EXAM_CA_AGGREGATE_ENABLED,
+    category: SETTING_CATEGORIES.EXAM,
+    isPublic: false,
+    description: 'Whether continuous assessments are aggregated into the end-of-term result. When off, the term result is the end-of-term exam alone.',
+    defaultValue: false,
+  },
+  [SETTING_KEYS.EXAM_CA_COUNT]: {
+    key: SETTING_KEYS.EXAM_CA_COUNT,
+    category: SETTING_CATEGORIES.EXAM,
+    isPublic: false,
+    description: 'Number of continuous assessments per subject per term (used only when CA aggregation is on).',
+    defaultValue: 2,
+  },
+  [SETTING_KEYS.EXAM_CA_WEIGHTS]: {
+    key: SETTING_KEYS.EXAM_CA_WEIGHTS,
+    category: SETTING_CATEGORIES.EXAM,
+    isPublic: false,
+    description: 'Whole-number percent of the final term mark contributed by each continuous assessment, in order (CA 1, CA 2, ...). The end-of-term exam carries the remainder to 100.',
+    defaultValue: [15, 15],
   },
 
   // ── Promotion
@@ -624,6 +756,27 @@ export const SETTING_META: { readonly [K in SettingKey]: SettingMeta<K> } = {
     isPublic: false,
     description: 'Number of failed subjects at or above which a student is flagged MEDIUM risk.',
     defaultValue: 2,
+  },
+  [SETTING_KEYS.RISK_LIBRARY_OVERDUE_DAYS_HIGH]: {
+    key: SETTING_KEYS.RISK_LIBRARY_OVERDUE_DAYS_HIGH,
+    category: SETTING_CATEGORIES.ACADEMIC,
+    isPublic: false,
+    description: 'Days a library book may be overdue (or any lost book) before the library factor of a student\'s risk is HIGH severity.',
+    defaultValue: 30,
+  },
+  [SETTING_KEYS.RISK_LIBRARY_OVERDUE_DAYS_MEDIUM]: {
+    key: SETTING_KEYS.RISK_LIBRARY_OVERDUE_DAYS_MEDIUM,
+    category: SETTING_CATEGORIES.ACADEMIC,
+    isPublic: false,
+    description: 'Days a library book may be overdue before the library factor of a student\'s risk is MEDIUM severity.',
+    defaultValue: 14,
+  },
+  [SETTING_KEYS.RISK_LIBRARY_FINES_MEDIUM]: {
+    key: SETTING_KEYS.RISK_LIBRARY_FINES_MEDIUM,
+    category: SETTING_CATEGORIES.ACADEMIC,
+    isPublic: false,
+    description: 'Unpaid library fines (MWK) at or above which the library factor of a student\'s risk is MEDIUM severity.',
+    defaultValue: 5000,
   },
 
   // ── Finance — fees and penalties
@@ -749,42 +902,64 @@ export const SETTING_META: { readonly [K in SettingKey]: SettingMeta<K> } = {
     key: SETTING_KEYS.HR_ANNUAL_LEAVE_DAYS,
     category: SETTING_CATEGORIES.HR,
     isPublic: false,
-    description: 'Default annual leave entitlement in days per calendar year.',
-    defaultValue: 18,
+    description: 'Annual leave entitlement in working days per calendar year. The Employment Act minimum for a five-day week is 15. Unused days do not carry over to the next year.',
+    defaultValue: 15,
   },
   [SETTING_KEYS.HR_SICK_LEAVE_DAYS]: {
     key: SETTING_KEYS.HR_SICK_LEAVE_DAYS,
     category: SETTING_CATEGORIES.HR,
     isPublic: false,
-    description: 'Default sick leave entitlement in days per calendar year.',
-    defaultValue: 10,
+    description: 'Sick leave on full pay, in working days per calendar year. The Employment Act minimum is four weeks (20 days on a five-day week).',
+    defaultValue: 20,
+  },
+  [SETTING_KEYS.HR_SICK_HALF_PAY_DAYS]: {
+    key: SETTING_KEYS.HR_SICK_HALF_PAY_DAYS,
+    category: SETTING_CATEGORIES.HR,
+    isPublic: false,
+    description: 'Sick leave on half pay, in working days per calendar year, used after the full-pay days. The Employment Act minimum is eight weeks (40 days on a five-day week).',
+    defaultValue: 40,
+  },
+  [SETTING_KEYS.HR_LEAVE_PAY_PERCENT]: {
+    key: SETTING_KEYS.HR_LEAVE_PAY_PERCENT,
+    category: SETTING_CATEGORIES.HR,
+    isPublic: false,
+    description: 'Percent of normal pay each leave type attracts: 100 full pay, 50 half pay, 0 unpaid. Payroll applies it to the pay for the month the leave falls in.',
+    defaultValue: {
+      ANNUAL:    100,
+      SICK:      100,
+      MATERNITY: 100,
+      PATERNITY: 100,
+      STUDY:     0,
+      UNPAID:    0,
+      EMERGENCY: 100,
+    },
   },
   [SETTING_KEYS.HR_MATERNITY_LEAVE_DAYS]: {
     key: SETTING_KEYS.HR_MATERNITY_LEAVE_DAYS,
     category: SETTING_CATEGORIES.HR,
     isPublic: false,
-    description: 'Maternity leave entitlement in days.',
-    defaultValue: 90,
+    description: 'Maternity leave allowed per request, in working days. The Employment Act minimum is eight weeks (40 days on a five-day week), on full pay.',
+    defaultValue: 40,
   },
   [SETTING_KEYS.HR_PATERNITY_LEAVE_DAYS]: {
     key: SETTING_KEYS.HR_PATERNITY_LEAVE_DAYS,
     category: SETTING_CATEGORIES.HR,
     isPublic: false,
-    description: 'Paternity leave entitlement in days.',
-    defaultValue: 5,
+    description: 'Paternity leave allowed per request, in working days. The Employment Act minimum is two weeks (10 days on a five-day week).',
+    defaultValue: 10,
   },
   [SETTING_KEYS.HR_STUDY_LEAVE_DAYS]: {
     key: SETTING_KEYS.HR_STUDY_LEAVE_DAYS,
     category: SETTING_CATEGORIES.HR,
     isPublic: false,
-    description: 'Study leave entitlement in days per calendar year.',
+    description: 'Study leave allowed per request, in working days.',
     defaultValue: 10,
   },
   [SETTING_KEYS.HR_EMERGENCY_LEAVE_DAYS]: {
     key: SETTING_KEYS.HR_EMERGENCY_LEAVE_DAYS,
     category: SETTING_CATEGORIES.HR,
     isPublic: false,
-    description: 'Emergency leave entitlement in days per calendar year.',
+    description: 'Emergency leave in working days per calendar year.',
     defaultValue: 3,
   },
   [SETTING_KEYS.HR_CONTRACT_EXPIRY_LOOKAHEAD_DAYS]: {
@@ -793,6 +968,27 @@ export const SETTING_META: { readonly [K in SettingKey]: SettingMeta<K> } = {
     isPublic: false,
     description: 'How many days ahead of a contract end date a staff contract counts as "expiring soon" in HR reports and alerts.',
     defaultValue: 60,
+  },
+  [SETTING_KEYS.HR_RETIREMENT_AGE]: {
+    key: SETTING_KEYS.HR_RETIREMENT_AGE,
+    category: SETTING_CATEGORIES.HR,
+    isPublic: false,
+    description: 'Retirement age in years. Each staff member\'s retirement date is their date of birth plus this value.',
+    defaultValue: 60,
+  },
+  [SETTING_KEYS.HR_EMPLOYEE_NO_FORMAT]: {
+    key: SETTING_KEYS.HR_EMPLOYEE_NO_FORMAT,
+    category: SETTING_CATEGORIES.HR,
+    isPublic: false,
+    description: 'Layout of new employee numbers, e.g. EMP-{YYYY}-000. The last run of zeros is the running number. Set under Settings → ID numbers.',
+    defaultValue: EMPLOYEE_NO_FORMAT_DEFAULT,
+  },
+  [SETTING_KEYS.STUDENT_REGISTRATION_NO_FORMAT]: {
+    key: SETTING_KEYS.STUDENT_REGISTRATION_NO_FORMAT,
+    category: SETTING_CATEGORIES.ACADEMIC,
+    isPublic: false,
+    description: 'Layout of new student registration numbers, e.g. SMS-{YYYY}-0000. The last run of zeros is the running number. Set under Settings → ID numbers.',
+    defaultValue: STUDENT_REGISTRATION_NO_FORMAT_DEFAULT,
   },
 
   [SETTING_KEYS.HR_DEPARTMENT_TITLES]: {

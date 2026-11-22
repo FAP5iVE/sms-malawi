@@ -31,18 +31,24 @@
  *   • Class + term + academic year selector
  *   • "Generate All" button → calls GET /exams/report-cards/:classId/:term
  *   • Per-student status table: Queued → Generating → Done | Failed
- *   • Individual PDF download/view link (signed Appwrite URL)
+ *   • Individual PDF view action — opens the report card in the browser's
+ *     own PDF viewer (new tab); download/print from the viewer's controls
  *   • Retry failed students individually
  *   • Progress bar showing batch completion
  *
- * The student-facing download is in the student's results page, which
- * calls GET /exams/report-card/:studentId (singular — the only
- * authenticated, access-controlled path) directly.
+ * The student-facing view is in the student's results page
+ * (StudentResultsView.tsx), which uses the same shared openPdfPreview().
+ *
+ * [PDF PREVIEW] The per-row Download button (an <a download> click that
+ * forced a file download) was removed. Viewing a report card now goes
+ * through lib/pdfPreview.ts; the browser's PDF viewer already provides
+ * Download and Print, so users review first and save only if they choose to.
  */
 
 import { useState, useCallback }       from 'react'
 import { motion, AnimatePresence }     from 'framer-motion'
 import { getAuth }                      from 'firebase/auth'
+import { toast }                        from 'sonner'
 import {
   FileText,
   Download,
@@ -64,9 +70,10 @@ import {
   EASE,
 }                                       from '@/lib/motion'
 import { apiFetch }                     from '@/lib/api-client'
+import { openPdfPreview, downloadProtectedFile } from '@/lib/pdfPreview'
 import type { BatchGenerationResult }   from '@/server/services/reportCardService'
 import { useClasses }                   from '@/hooks/useClasses'
-import { usePublicSchoolInfo }          from '@/hooks/usePublic'
+import { useEffectiveViewingPeriod }     from '@/hooks/useViewingPeriod'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PROGRESS BAR
@@ -90,7 +97,7 @@ function ProgressBar({
       <div className="flex justify-between text-xs text-muted">
         <span>{done} / {total} generated</span>
         {failed > 0 && (
-          <span className="text-brand-coral">{failed} failed</span>
+          <span className="text-tone-coral">{failed} failed</span>
         )}
       </div>
       <div className="h-2 bg-page rounded-full overflow-hidden border border-base">
@@ -121,45 +128,53 @@ interface StudentRow extends BatchGenerationResult {
 function StudentResultRow({
   row,
   onRetry,
+  canTranscript,
 }: {
-  row:     StudentRow
-  onRetry: (studentId: string) => void
+  row:           StudentRow
+  onRetry:       (studentId: string) => void
+  canTranscript: boolean
 }) {
-  // [PRODUCTION FIX] These used to be plain <a href={row.url}> links.
-  // /api/files/[fileId] requires a live auth token, and a direct browser
-  // navigation can never attach one — every click returned {"error":
-  // "Unauthorised"}. Fetching a fresh ID token at click time and appending
-  // it as the ?token= param (now accepted by getIdTokenFromRequest, see
-  // verifyAuth.ts) makes these work without weakening the access check —
-  // it's still the same decoded uid/role being verified, just read from
-  // the query string instead of a header this navigation could never send.
-  const openWithToken = useCallback(async (mode: 'view' | 'download') => {
-    if (!row.url) return
-    const user = getAuth().currentUser
-    if (!user) return
-    const token = await user.getIdToken()
-    const separator = row.url.includes('?') ? '&' : '?'
-    const authedUrl = `${row.url}${separator}token=${encodeURIComponent(token)}`
-    if (mode === 'view') {
-      window.open(authedUrl, '_blank', 'noopener,noreferrer')
-    } else {
-      const a = document.createElement('a')
-      a.href = authedUrl
-      a.download = `report-card-${row.registrationNo}.pdf`
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
+  // Transcript: builds the all-terms transcript for this student on the server
+  // (POST /exams/transcript, admin and exam officer only) and saves the PDF.
+  const [transcriptBusy, setTranscriptBusy] = useState(false)
+  const downloadTranscript = useCallback(async () => {
+    setTranscriptBusy(true)
+    try {
+      const { url } = await apiFetch<{ url: string }>('/exams/transcript', {
+        method: 'POST',
+        body:   JSON.stringify({ studentId: row.studentId }),
+      })
+      await downloadProtectedFile(url, `Transcript - ${row.fullName}.pdf`)
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Could not build this transcript.')
+    } finally {
+      setTranscriptBusy(false)
     }
-  }, [row.url, row.registrationNo])
+  }, [row.studentId, row.fullName])
+
+  // [PDF PREVIEW] /api/files/[fileId] requires a live auth token, and a plain
+  // browser navigation can never attach an Authorization header (an earlier
+  // <a href> version returned {"error":"Unauthorised"} on every click).
+  // openPdfPreview() fetches a fresh ID token at click time, appends it as
+  // ?token= (accepted by getIdTokenFromRequest, see verifyAuth.ts) and opens
+  // the file in a new tab. The server still runs the same token + canReadFile
+  // checks and answers Content-Disposition: inline, so the browser's PDF
+  // viewer shows it. The tab is opened synchronously inside the click.
+  const openPreview = useCallback(() => {
+    if (!row.url) return
+    openPdfPreview(row.url).catch((err: unknown) => {
+      toast.error(err instanceof Error ? err.message : 'Could not open this report card.')
+    })
+  }, [row.url])
 
   return (
     <div className="flex items-center gap-3 px-4 py-3 bg-surface border-b border-base last:border-0">
       {/* Status icon */}
       <div className="shrink-0 w-6 flex items-center justify-center">
         {row.rowStatus === 'queued'     && <span className="w-2 h-2 rounded-full bg-base border border-muted" />}
-        {row.rowStatus === 'generating' && <Loader2 className="w-4 h-4 text-brand-teal animate-spin" />}
+        {row.rowStatus === 'generating' && <Loader2 className="w-4 h-4 text-tone-teal animate-spin" />}
         {row.rowStatus === 'done'       && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
-        {row.rowStatus === 'failed'     && <XCircle className="w-4 h-4 text-brand-coral" />}
+        {row.rowStatus === 'failed'     && <XCircle className="w-4 h-4 text-tone-coral" />}
       </div>
 
       {/* Student info */}
@@ -167,37 +182,40 @@ function StudentResultRow({
         <p className="text-sm font-heading font-medium text-body truncate">{row.fullName}</p>
         <p className="text-xs text-muted">{row.registrationNo}</p>
         {row.error && (
-          <p className="text-xs text-brand-coral mt-0.5 truncate">{row.error}</p>
+          <p className="text-xs text-tone-coral mt-0.5 truncate">{row.error}</p>
         )}
       </div>
 
       {/* Actions */}
       <div className="flex items-center gap-2 shrink-0">
+        {canTranscript && row.rowStatus !== 'generating' && (
+          <button
+            type="button"
+            onClick={downloadTranscript}
+            disabled={transcriptBusy}
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-base px-3 text-sm font-medium text-body transition-colors hover:bg-page disabled:opacity-60"
+            aria-label={`Download transcript for ${row.fullName}`}
+          >
+            {transcriptBusy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <FileText className="h-4 w-4" aria-hidden />}
+            {transcriptBusy ? 'Building…' : 'Transcript'}
+          </button>
+        )}
         {row.rowStatus === 'done' && row.url && (
-          <>
-            <button
-              type="button"
-              onClick={() => void openWithToken('view')}
-              className="p-1.5 rounded-lg text-brand-teal hover:bg-brand-teal/10 transition-colors"
-              aria-label={`View report card for ${row.fullName}`}
-            >
-              <ExternalLink className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => void openWithToken('download')}
-              className="p-1.5 rounded-lg text-brand-navy hover:bg-brand-navy/10 transition-colors"
-              aria-label={`Download report card for ${row.fullName}`}
-            >
-              <Download className="w-4 h-4" />
-            </button>
-          </>
+          <button
+            type="button"
+            onClick={openPreview}
+            className="p-1.5 rounded-lg text-tone-teal hover:bg-brand-teal/10 transition-colors"
+            aria-label={`View report card for ${row.fullName}`}
+            title="View report card (opens in a new tab)"
+          >
+            <ExternalLink className="w-4 h-4" />
+          </button>
         )}
         {row.rowStatus === 'failed' && (
           <button
             type="button"
             onClick={() => onRetry(row.studentId)}
-            className="p-1.5 rounded-lg text-brand-amber hover:bg-brand-amber/10 transition-colors"
+            className="p-1.5 rounded-lg text-tone-amber hover:bg-brand-amber/10 transition-colors"
             aria-label={`Retry generation for ${row.fullName}`}
           >
             <RefreshCw className="w-4 h-4" />
@@ -216,18 +234,25 @@ export function ReportCardGenerator() {
   const { role }      = useAuthStore()
   const motionEnabled = useMotionEnabled()
 
-  const { data: classes = [] } = useClasses()
-  const { data: schoolInfo }   = usePublicSchoolInfo()
+  // Year AND term come from the GLOBAL viewing period. This generator used to
+  // keep its own term select (defaulting to Term 1 no matter which term the
+  // page was showing) and a free-text year box — so "Generate All" could quietly
+  // build the wrong term's cards. The Exams page subtitle and the header
+  // switcher now decide which period is generated; the panel states it below.
+  const { academicYear: effectiveAcademicYear, term: viewingTerm } = useEffectiveViewingPeriod()
+  const term = viewingTerm as 1 | 2 | 3
+
+  // [MAINT 2026-10-23] Scoped to the viewed year, like the Exams page above it.
+  // With no year, every year's class rows came back — each class listed once
+  // per year, and a prior year's row could be picked for the wrong cards.
+  const { data: classes = [] } = useClasses(effectiveAcademicYear)
 
   const [classId,      setClassId]      = useState('')
-  const [term,         setTerm]         = useState<1 | 2 | 3>(1)
-  const [academicYear, setAcademicYear] = useState('')
   const [rows,         setRows]         = useState<StudentRow[]>([])
   const [generating,   setGenerating]   = useState(false)
   const [error,        setError]        = useState<string | null>(null)
   const [done,         setDone]         = useState(false)
 
-  const effectiveAcademicYear = academicYear || schoolInfo?.currentYear || ''
 
   const doneCount   = rows.filter((r) => r.rowStatus === 'done').length
   const failedCount = rows.filter((r) => r.rowStatus === 'failed').length
@@ -237,7 +262,7 @@ export function ReportCardGenerator() {
   // ── Generate all ──────────────────────────────────────────────────────────
   const handleGenerate = useCallback(async () => {
     if (!classId) { setError('Please select a class.'); return }
-    if (!effectiveAcademicYear) { setError('Academic year is still loading — please try again shortly.'); return }
+    if (!effectiveAcademicYear) { setError('Academic year is still loading. Please try again shortly.'); return }
     setGenerating(true)
     setError(null)
     setDone(false)
@@ -317,7 +342,7 @@ export function ReportCardGenerator() {
       <div>
         <h2 className="font-heading font-bold text-xl text-brand-navy flex items-center gap-2">
           <FileText className="w-5 h-5" aria-hidden />
-          Report Card Generator
+          Report card generator
         </h2>
         <p className="text-sm text-muted mt-0.5">
           Batch-generate PDF report cards and upload to Appwrite storage.
@@ -327,7 +352,7 @@ export function ReportCardGenerator() {
       {/* Controls */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
         <div>
-          <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">
+          <label className="block text-xs font-heading font-semibold text-muted mb-1.5">
             Class
           </label>
           <select
@@ -343,30 +368,12 @@ export function ReportCardGenerator() {
         </div>
 
         <div>
-          <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">
-            Term
-          </label>
-          <select
-            value={term}
-            onChange={(e) => setTerm(parseInt(e.target.value) as 1 | 2 | 3)}
-            className="w-full min-h-[44px] border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
-          >
-            <option value={1}>Term 1</option>
-            <option value={2}>Term 2</option>
-            <option value={3}>Term 3</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">
-            Academic Year
-          </label>
-          <input
-            value={effectiveAcademicYear}
-            onChange={(e) => setAcademicYear(e.target.value)}
-            placeholder="e.g. 2025/2026"
-            className="w-full min-h-[44px] border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
-          />
+          <p className="block text-xs font-heading font-semibold text-muted mb-1.5">
+            Period
+          </p>
+          <p className="min-h-[44px] flex items-center text-sm text-body">
+            Term {term} · {effectiveAcademicYear}
+          </p>
         </div>
 
         {canGenerate && (
@@ -374,7 +381,7 @@ export function ReportCardGenerator() {
             type="button"
             onClick={handleGenerate}
             disabled={generating || !classId}
-            className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+            className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold bg-brand-deep text-white hover:brightness-110 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
           >
             {generating
               ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating…</>
@@ -385,7 +392,7 @@ export function ReportCardGenerator() {
 
       {/* Error */}
       {error && (
-        <div className="flex items-center gap-2 bg-brand-coral/8 border border-brand-coral/25 rounded-xl px-4 py-3 text-sm text-brand-coral">
+        <div className="flex items-center gap-2 bg-brand-coral/8 border border-brand-coral/25 rounded-xl px-4 py-3 text-sm text-tone-coral">
           <AlertTriangle className="w-4 h-4 shrink-0" />
           {error}
         </div>
@@ -403,21 +410,22 @@ export function ReportCardGenerator() {
 
       {/* Success summary */}
       {done && (
-        <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 text-sm text-emerald-700 dark:bg-emerald-950/20 dark:border-emerald-800/40 dark:text-emerald-400">
+        <div className="flex items-center gap-2 rounded-xl px-4 py-3 text-sm text-tone-teal app-tint">
           <CheckCircle2 className="w-4 h-4 shrink-0" />
           {doneCount} report card{doneCount !== 1 ? 's' : ''} generated successfully.
-          {failedCount > 0 && ` ${failedCount} failed — use the retry button to regenerate.`}
+          {failedCount > 0 && ` ${failedCount} failed. Use the retry button to regenerate.`}
         </div>
       )}
 
-      {/* Student rows */}
+      {/* Student rows — [PRODUCTION FIX] was its own bordered card,
+         redundant nested inside ModuleSurface's panel. */}
       {rows.length > 0 && (
         <motion.div
           key={`rows-${rows.length}`}
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="border border-base rounded-xl overflow-hidden"
+          className="overflow-hidden"
         >
           {rows.map((row) => (
             <motion.div
@@ -425,7 +433,7 @@ export function ReportCardGenerator() {
               variants={itemVariants}
               transition={itemTransition}
             >
-              <StudentResultRow row={row} onRetry={handleRetry} />
+              <StudentResultRow row={row} onRetry={handleRetry} canTranscript={canGenerate} />
             </motion.div>
           ))}
         </motion.div>
@@ -433,7 +441,7 @@ export function ReportCardGenerator() {
 
       {rows.length === 0 && !generating && (
         <div className="text-center py-16 text-muted text-sm border border-dashed border-base rounded-xl">
-          Select a class and term, then click Generate All to create report cards.
+          Select a class, then click Generate All to create report cards for the period shown above.
         </div>
       )}
     </div>

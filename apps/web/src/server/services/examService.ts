@@ -72,19 +72,43 @@
  * [DEPENDS ON]: apps/web/src/server/services/gradeService.ts (calcGrade),
  *   @shared/constants/malawi (getManebExamType)
  *
+ * [MAINT 2026-10-22 — Continuous Assessment aggregation]: new
+ *   getCaConfig()/resolveCaSlot() and a rewritten computeTermResults().
+ *   Settings (Exam & Grading) decide whether continuous assessments feed the
+ *   end-of-term result, how many there are, and each one's weight (see
+ *   SETTING_KEYS.EXAM_CA_*). createExam()/updateExam() require a valid, unused
+ *   caSlot for a CA exam while aggregation is on. The arithmetic lives in
+ *   @shared/constants/exams (computeSubjectTermMark - exact, half-up, no
+ *   floating-point drift); this file only gathers the inputs and persists.
+ *
  * [R8 ADDENDUM — Academics IV: Report Cards, Transcripts, Promotion & Risk
  *   Assessment]: listExams() now also returns className/totalStudents/
  *   feeBlockedCount/marksEntered per exam — ResultsReleaseWorkflow.tsx
  *   needs these for its per-exam release-readiness summary and previously
  *   had no source for any of them.
+ *
+ * [MAINT 2026-09-16 — Class Subject Presets]: createExam()/updateExam() now
+ *   also call classService.assertSubjectOfferedByClass(classId, subject) —
+ *   the exam's subject must be one of the class's preset subjects (see
+ *   classService.ts's Class Subject Presets section), the same shared gate
+ *   createTimetableSlot/createSubjectAssignment use. This applies to every
+ *   actor, not just teachers scoped by assertOwnsSubject above — an
+ *   oversight role (exam_officer/high_rank) can no longer schedule an exam
+ *   for a subject the class doesn't offer either.
  */
 import 'server-only'
 
 import { prisma }           from '@/lib/prisma'
 import { logger }           from '@/lib/logger'
 import { checkBalanceGate } from '@/server/services/feeService'
-import { calcGrade, computeManebAggregate } from '@/server/services/gradeService'
+import { calcGrade, computeManebAggregate, computeInternalTermOutcome } from '@/server/services/gradeService'
 import { getManebExamType } from '@shared/constants/malawi'
+import {
+  isCaExamType, validateCaConfig, computeSubjectTermMark,
+  type CaConfig, type MarkComponent,
+} from '@shared/constants/exams'
+import * as settingsService from '@/server/services/settingsService'
+import { SETTING_KEYS } from '@shared/types/settings'
 import * as classService    from '@/server/services/classService'
 import * as auditService    from '@/server/services/auditService'
 import * as announcementService from '@/server/services/announcementService'
@@ -92,10 +116,23 @@ import type { UserRole }    from '@shared/types/roles'
 import type { CreateExamInput, UpdateExamInput, BulkMarkEntryInput, CreateManebRecordInput } from '@shared/schemas/exam'
 import type { Decimal } from '@prisma/client/runtime/library'
 import { Prisma, type ExamStatus } from '@prisma/client'
+import {
+  sortBest, buildStudentStanding, buildTopPerformersBody,
+  type CohortMember, type StudentStanding,
+} from '@/server/services/analytics/examLogic'
 
 function toNumber(v: Decimal | number | null | undefined): number {
   if (v === null || v === undefined) return 0
   return typeof v === 'number' ? v : Number(v)
+}
+
+// A rule violation the user can fix (bad input, wrong stage of the workflow).
+// The global error handler hides the message of any status >= 500 in
+// production, so a plain `new Error(...)` reached the UI as the useless
+// "An internal server error occurred." Giving these a 4xx status lets the
+// real reason ("Missing marks for 3 student(s)…") reach the toast.
+function httpError(status: 400 | 403 | 404 | 409, message: string): Error & { status: number } {
+  return Object.assign(new Error(message), { status })
 }
 
 // ─── EXAM ACTOR + SUBJECT-OWNERSHIP GUARD (AC-2..AC-6) ───
@@ -120,6 +157,68 @@ async function assertOwnsSubject(
   }
 }
 
+// ─── CONTINUOUS ASSESSMENT CONFIG + SLOT RULES ──────────
+/** Current CA configuration. Throws 409 if aggregation is ON but the stored
+ *  count/weights are inconsistent - a broken config must never silently
+ *  produce wrong marks. */
+export async function getCaConfig(): Promise<CaConfig> {
+  const v = await settingsService.getMany([
+    SETTING_KEYS.EXAM_CA_AGGREGATE_ENABLED,
+    SETTING_KEYS.EXAM_CA_COUNT,
+    SETTING_KEYS.EXAM_CA_WEIGHTS,
+  ])
+  const cfg: CaConfig = {
+    enabled: v[SETTING_KEYS.EXAM_CA_AGGREGATE_ENABLED],
+    count:   v[SETTING_KEYS.EXAM_CA_COUNT],
+    weights: v[SETTING_KEYS.EXAM_CA_WEIGHTS],
+  }
+  if (cfg.enabled) {
+    const problem = validateCaConfig(cfg)
+    if (problem) {
+      throw Object.assign(
+        new Error(`Continuous assessment settings are invalid: ${problem} Fix them in Settings > Exam & Grading.`),
+        { status: 409 },
+      )
+    }
+  }
+  return cfg
+}
+
+/** Validates/normalises the caSlot of an exam about to be written and returns
+ *  the value to store. `excludeExamId` exempts the exam being edited from its
+ *  own slot. */
+async function resolveCaSlot(
+  args: { type: string; caSlot: number | null | undefined; classId: string; subject: string; academicYear: string; term: number },
+  excludeExamId?: string,
+): Promise<number | null> {
+  const cfg = await getCaConfig()
+  const isCa = isCaExamType(args.type)
+
+  if (!isCa) {
+    if (args.caSlot != null)
+      throw Object.assign(new Error('Only continuous assessments (test, quiz, assignment, midterm) can have a CA slot.'), { status: 400 })
+    return null
+  }
+  if (!cfg.enabled) return null            // aggregation off: slots are not used
+
+  if (args.caSlot == null)
+    throw Object.assign(new Error(`Choose which continuous assessment this is (CA 1 to CA ${cfg.count}) - continuous assessments count toward the end-of-term result.`), { status: 400 })
+  if (args.caSlot < 1 || args.caSlot > cfg.count)
+    throw Object.assign(new Error(`CA slot must be between 1 and ${cfg.count}.`), { status: 400 })
+
+  const clash = await prisma.exam.findFirst({
+    where: {
+      classId: args.classId, subject: args.subject, academicYear: args.academicYear,
+      term: args.term, caSlot: args.caSlot,
+      ...(excludeExamId ? { id: { not: excludeExamId } } : {}),
+    },
+    select: { title: true },
+  })
+  if (clash)
+    throw Object.assign(new Error(`CA ${args.caSlot} for ${args.subject} this term is already used by "${clash.title}". Pick another slot.`), { status: 409 })
+  return args.caSlot
+}
+
 // ─── CREATE EXAM ─────────────────────────────────────────
 // Form 2 Term 3 (JCE) and Form 4 Term 3 (MSCE) are MANEB national
 // examinations — the school does not set, mark, or grade them, so no
@@ -132,7 +231,7 @@ async function assertOwnsSubject(
 // phase closes.
 export async function createExam(data: CreateExamInput, actor: ExamActor) {
   if (data.type === 'MANEB_JCE' || data.type === 'MANEB_MSCE') {
-    throw new Error(
+    throw httpError(400,
       `${data.type === 'MANEB_JCE' ? 'JCE' : 'MSCE'} results come from MANEB, not internal marks entry. Record them via the MANEB panel (createManebRecord) once MANEB releases results.`
     )
   }
@@ -140,7 +239,7 @@ export async function createExam(data: CreateExamInput, actor: ExamActor) {
   const targetClass = await prisma.class.findUniqueOrThrow({ where: { id: data.classId }, select: { form: true } })
   const manebType = getManebExamType(targetClass.form, data.term)
   if (manebType && data.type === 'END_TERM') {
-    throw new Error(
+    throw httpError(400,
       `Form ${targetClass.form} Term ${data.term} is the national ${manebType} examination, administered by MANEB — the school does not set an internal end-of-term exam for this slot. Record results via the MANEB panel once MANEB releases them.`
     )
   }
@@ -149,8 +248,21 @@ export async function createExam(data: CreateExamInput, actor: ExamActor) {
   // assigned to; oversight roles bypass. (MANEB guards above run first.)
   await assertOwnsSubject(actor, data.classId, data.subject, data.academicYear)
 
+  // [NEW 2026-09-16 — Class Subject Presets] The subject must be one of
+  // this class's preset subjects (or the class has no presets configured
+  // yet) — the same shared gate createTimetableSlot and
+  // createSubjectAssignment use, so an exam can never be scheduled for a
+  // subject the class doesn't offer, regardless of the actor's role.
+  await classService.assertSubjectOfferedByClass(data.classId, data.subject)
+
+  // Continuous-assessment slot (see getCaConfig/resolveCaSlot).
+  const caSlot = await resolveCaSlot({
+    type: data.type, caSlot: data.caSlot, classId: data.classId,
+    subject: data.subject, academicYear: data.academicYear, term: data.term,
+  })
+
   const exam = await prisma.exam.create({
-    data: { ...data, date: new Date(data.date), createdByUid: actor.uid },
+    data: { ...data, caSlot, date: new Date(data.date), createdByUid: actor.uid },
     include: { class: { select: { name: true, form: true } } },
   })
   await auditService.log({
@@ -178,9 +290,18 @@ export async function listExams(classId: string | undefined, academicYear: strin
   const where: Prisma.ExamWhereInput = { academicYear, term, ...(classId ? { classId } : {}) }
 
   // AC-3: a student sees only their OWN class's RESULTS_RELEASED exams.
+  // The Exams page enforces the same rule in the UI (no class picker for
+  // students; the tab is hidden for a non-active student with no class) but
+  // THIS is the guard that matters: it holds for any direct API call too.
+  //   • no class assigned            -> nothing
+  //   • asks for a DIFFERENT class   -> nothing (previously the param was
+  //                                     silently overwritten, which hid the
+  //                                     mistake and made the endpoint look
+  //                                     like it honoured the filter)
   if (actor.role === 'student') {
     const me = await prisma.student.findFirst({ where: { firebaseUid: actor.uid }, select: { classId: true } })
     if (!me?.classId) return []
+    if (classId && classId !== me.classId) return []
     where.classId = me.classId
     where.status = 'RESULTS_RELEASED'
   }
@@ -227,26 +348,41 @@ export async function listExams(classId: string | undefined, academicYear: strin
   )
 }
 
-// ─── UPDATE / DELETE EXAM ────────────────────────────────
-// Editing an exam once its results are finalized/approved/released is
-// blocked (marks/results already derive from it). Editing is subject-
-// ownership-scoped, and any change to classId/subject/term/type re-runs the
-// MANEB guard so an exam cannot be mutated into a national MANEB slot (or a
-// MANEB_* type) that createExam() would have rejected. Deleting is likewise
-// blocked once marks exist or results are locked.
+// ─── UPDATE / DELETE EXAM ────────────────────────────────────────────────
+// WHO may change an exam, and UNTIL WHEN:
+//   • WHO   — oversight roles (admin / high_rank / exam_officer) and the
+//             teacher assigned to the exam's (class, subject) — see
+//             assertOwnsSubject. A teacher's `exam.edit` / `exam.delete`
+//             permission alone never reaches another teacher's exam.
+//   • UNTIL — the teacher CONFIRMS (finalizes) the marks. Up to that point
+//             (SCHEDULED → IN_PROGRESS → MARKS_PENDING → MARKS_DRAFT) the
+//             exam can still be edited or deleted; from MARKS_FINAL onward it
+//             is locked for good (approval / release build on those marks).
+//             An exam an exam officer later "unlocks" is back to
+//             MARKS_PENDING, but it was confirmed once, so it stays
+//             undeletable (see FINALIZED guard in deleteExam).
+// Any change to classId/subject/term/type re-runs the MANEB guard so an exam
+// cannot be mutated into a national MANEB slot (or a MANEB_* type) that
+// createExam() would have rejected.
 const EXAM_EDIT_LOCKED_STATUSES: ExamStatus[] = ['MARKS_FINAL', 'RESULTS_APPROVED', 'RESULTS_RELEASED']
 
 export async function updateExam(id: string, data: UpdateExamInput, actor: ExamActor) {
   const existing = await prisma.exam.findUniqueOrThrow({
     where:  { id },
-    select: { classId: true, subject: true, academicYear: true, term: true, status: true, type: true },
+    select: {
+      classId: true, subject: true, academicYear: true, term: true, status: true, type: true, caSlot: true,
+      _count: { select: { marks: true } },
+    },
   })
 
-  if (EXAM_EDIT_LOCKED_STATUSES.includes(existing.status)) {
-    throw Object.assign(
-      new Error('This exam\u2019s results are finalized and it can no longer be edited.'),
-      { status: 409 },
-    )
+  // Re-labelling WHICH continuous assessment an exam is (its caSlot) never
+  // changes a mark, so it stays possible after finalization - otherwise a CA
+  // finalised before aggregation was switched on could never be slotted.
+  // Every other field is locked once marks are final.
+  const changedKeys = Object.entries(data).filter(([, v]) => v !== undefined).map(([k]) => k)
+  const onlyCaSlot  = changedKeys.length > 0 && changedKeys.every((k) => k === 'caSlot')
+  if (EXAM_EDIT_LOCKED_STATUSES.includes(existing.status) && !onlyCaSlot) {
+    throw httpError(409, 'The marks for this exam have been confirmed, so it can no longer be edited.')
   }
 
   // Ownership on the current (class, subject).
@@ -263,19 +399,56 @@ export async function updateExam(id: string, data: UpdateExamInput, actor: ExamA
     await assertOwnsSubject(actor, nextClassId, nextSubject, nextYear)
   }
 
+  // Marks that were already typed in belong to the students of the CURRENT
+  // class and to this exam's scale. Moving the exam to another class would
+  // orphan them, and shrinking the maximum below a recorded mark would leave
+  // an impossible mark behind - refuse both with a clear reason instead.
+  if (existing._count.marks > 0) {
+    if (data.classId !== undefined && data.classId !== existing.classId) {
+      throw httpError(409, 'Marks have already been entered for this exam, so it cannot be moved to another class. Delete it and schedule a new one instead.')
+    }
+    if (data.maxMark !== undefined) {
+      const highest = await prisma.examMark.aggregate({ where: { examId: id }, _max: { mark: true } })
+      const top = toNumber(highest._max.mark)
+      if (data.maxMark < top) {
+        throw httpError(409, `A mark of ${top} has already been entered, so the maximum mark cannot be lowered below ${top}.`)
+      }
+    }
+  }
+
+  // [NEW 2026-09-16 — Class Subject Presets] Same shared gate createExam
+  // uses — re-checked on every update (not just class/subject changes)
+  // since it's a cheap query and keeps the rule uniform.
+  await classService.assertSubjectOfferedByClass(nextClassId, nextSubject)
+
   // MANEB re-guard.
   if (nextType === 'MANEB_JCE' || nextType === 'MANEB_MSCE') {
-    throw new Error(`${nextType === 'MANEB_JCE' ? 'JCE' : 'MSCE'} results come from MANEB, not internal marks entry — record them via the MANEB panel.`)
+    throw httpError(400, `${nextType === 'MANEB_JCE' ? 'JCE' : 'MSCE'} results come from MANEB, not internal marks entry — record them via the MANEB panel.`)
   }
   const targetClass = await prisma.class.findUniqueOrThrow({ where: { id: nextClassId }, select: { form: true } })
   const manebType = getManebExamType(targetClass.form, nextTerm)
   if (manebType && nextType === 'END_TERM') {
-    throw new Error(`Form ${targetClass.form} Term ${nextTerm} is the national ${manebType} examination, administered by MANEB — the school does not set an internal end-of-term exam for this slot.`)
+    throw httpError(400, `Form ${targetClass.form} Term ${nextTerm} is the national ${manebType} examination, administered by MANEB — the school does not set an internal end-of-term exam for this slot.`)
   }
+
+  // Re-resolve the CA slot only when something that determines it changed;
+  // a plain title/venue edit must not suddenly demand a slot.
+  const slotInputsChanged =
+    data.caSlot !== undefined || nextType !== existing.type || nextClassId !== existing.classId ||
+    nextSubject !== existing.subject || nextYear !== existing.academicYear || nextTerm !== existing.term
+  const nextCaSlot = slotInputsChanged
+    ? await resolveCaSlot({
+        type: nextType,
+        // Switching to a non-CA type drops the slot rather than erroring.
+        caSlot: data.caSlot !== undefined ? data.caSlot : (isCaExamType(nextType) ? existing.caSlot : null),
+        classId: nextClassId, subject: nextSubject, academicYear: nextYear, term: nextTerm,
+      }, id)
+    : undefined
 
   const exam = await prisma.exam.update({
     where: { id },
     data: {
+      ...(nextCaSlot         !== undefined ? { caSlot: nextCaSlot }                : {}),
       ...(data.type          !== undefined ? { type: data.type }                   : {}),
       ...(data.subject       !== undefined ? { subject: data.subject }             : {}),
       ...(data.classId       !== undefined ? { classId: data.classId }             : {}),
@@ -302,25 +475,41 @@ export async function updateExam(id: string, data: UpdateExamInput, actor: ExamA
 export async function deleteExam(id: string, actor: ExamActor) {
   const existing = await prisma.exam.findUniqueOrThrow({
     where:  { id },
-    select: { classId: true, subject: true, academicYear: true, status: true, _count: { select: { marks: true } } },
+    select: {
+      classId: true, subject: true, academicYear: true, status: true,
+      _count: { select: { marks: true } },
+    },
   })
 
-  if (EXAM_EDIT_LOCKED_STATUSES.includes(existing.status) || existing._count.marks > 0) {
-    throw Object.assign(
-      new Error('This exam has marks or released results and cannot be deleted.'),
-      { status: 409 },
-    )
+  // Ownership first: someone who may not touch this exam should not learn
+  // anything about its state from the error they get back.
+  await assertOwnsSubject(actor, existing.classId, existing.subject, existing.academicYear)
+
+  if (EXAM_EDIT_LOCKED_STATUSES.includes(existing.status)) {
+    throw httpError(409, 'The marks for this exam have been confirmed, so it can no longer be deleted.')
+  }
+  // An exam officer's "unlock" rewinds a confirmed exam to MARKS_PENDING, but
+  // its marks still carry the finalizedAt stamp from the teacher's
+  // confirmation - treat "was ever confirmed" as permanent.
+  const everFinalized = await prisma.examMark.count({ where: { examId: id, finalizedAt: { not: null } } })
+  if (everFinalized > 0) {
+    throw httpError(409, 'The marks for this exam were confirmed earlier, so it can no longer be deleted.')
   }
 
-  await assertOwnsSubject(actor, existing.classId, existing.subject, existing.academicYear)
-  await prisma.exam.delete({ where: { id } })
+  // Only the teacher's own unconfirmed (draft) marks can be left at this
+  // point; they go with the exam, atomically.
+  const discardedDraftMarks = existing._count.marks
+  await prisma.$transaction([
+    prisma.examMark.deleteMany({ where: { examId: id } }),
+    prisma.exam.delete({ where: { id } }),
+  ])
   await auditService.log({
     action: 'exam.deleted', entityType: 'Exam', entityId: id,
     actorUid: actor.uid, actorRole: actor.role,
-    metadata: { before: { classId: existing.classId, subject: existing.subject } },
+    metadata: { before: { classId: existing.classId, subject: existing.subject, status: existing.status, discardedDraftMarks } },
   })
-  logger.info({ event: 'exam.deleted', examId: id, actorUid: actor.uid })
-  return { success: true }
+  logger.info({ event: 'exam.deleted', examId: id, actorUid: actor.uid, discardedDraftMarks })
+  return { success: true, discardedDraftMarks }
 }
 
 // ─── ENTER MARKS (bulk upsert) ────────────────────────────
@@ -336,8 +525,47 @@ const ADVANCEABLE_TO_MARKS_DRAFT: ExamStatus[] = ['SCHEDULED', 'IN_PROGRESS', 'M
 // silent re-entry through this path.
 const MARKS_LOCKED_STATUSES: ExamStatus[] = ['MARKS_FINAL', 'RESULTS_APPROVED', 'RESULTS_RELEASED']
 
+type MarkEntryInput = BulkMarkEntryInput['entries'][number]
+
+/** Rejects a batch that is empty, spans several exams, or breaks the exam's
+ *  maximum. Shared by enterMarks (draft) and finalizeMarks (with entries). */
+function assertValidMarkBatch(examId: string, title: string, maxMark: number, entries: MarkEntryInput[]): void {
+  if (entries.length === 0) throw httpError(400, 'There are no marks to save.')
+  if (entries.some((e) => e.examId !== examId)) {
+    throw httpError(400, 'All marks in one submission must belong to the same exam.')
+  }
+  for (const e of entries) {
+    if (e.mark !== undefined && e.mark > maxMark)
+      throw httpError(400, `Mark ${e.mark} exceeds the maximum of ${maxMark} for "${title}".`)
+  }
+}
+
+/** Every submitted student must be an active member of the exam's class -
+ *  a sheet built for the wrong class (or a stale/tampered request) must not
+ *  write marks against students who never sat this exam. */
+function assertEntriesBelongToClass(entries: MarkEntryInput[], activeStudentIds: ReadonlySet<string>): void {
+  const stray = entries.filter((e) => !activeStudentIds.has(e.studentId))
+  if (stray.length > 0) {
+    throw httpError(400, `${stray.length} of the submitted students are not active members of this exam's class.`)
+  }
+}
+
+function markUpserts(
+  db: Pick<typeof prisma, 'examMark'>,
+  entries: MarkEntryInput[], isDraft: boolean, actorUid: string,
+) {
+  return entries.map((e) =>
+    db.examMark.upsert({
+      where: { examId_studentId: { examId: e.examId, studentId: e.studentId } },
+      create: { ...e, mark: e.mark ?? null, comment: e.comment ?? null, enteredByUid: actorUid, isDraft },
+      update: { mark: e.mark ?? null, absent: e.absent ?? false, comment: e.comment ?? null, isDraft, enteredByUid: actorUid },
+    }),
+  )
+}
+
 export async function enterMarks(data: BulkMarkEntryInput, actor: ExamActor) {
   const { entries, isDraft } = data
+  if (entries.length === 0) throw httpError(400, 'There are no marks to save.')
   const exam = await prisma.exam.findUniqueOrThrow({ where: { id: entries[0]!.examId } })
 
   // AC-2: only the assigned subject teacher (or an oversight role) may enter.
@@ -345,32 +573,21 @@ export async function enterMarks(data: BulkMarkEntryInput, actor: ExamActor) {
 
   // AC-5: no edits after marks are finalized.
   if (MARKS_LOCKED_STATUSES.includes(exam.status)) {
-    throw Object.assign(
-      new Error('Marks for this exam are finalized and can no longer be edited.'),
-      { status: 409 },
-    )
+    throw httpError(409, 'Marks for this exam are finalized and can no longer be edited.')
   }
 
-  const max = toNumber(exam.maxMark)
-  for (const e of entries) {
-    if (e.mark !== undefined && e.mark > max)
-      throw new Error(`Mark ${e.mark} exceeds maximum ${max} for exam ${exam.title}`)
-  }
-  const upserted = await prisma.$transaction(
-    entries.map((e) =>
-      prisma.examMark.upsert({
-        where: { examId_studentId: { examId: e.examId, studentId: e.studentId } },
-        create: { ...e, mark: e.mark ?? null, comment: e.comment ?? null, enteredByUid: actor.uid, isDraft },
-        update: { mark: e.mark ?? null, absent: e.absent ?? false, comment: e.comment ?? null, isDraft, enteredByUid: actor.uid },
-      })
-    )
-  )
+  assertValidMarkBatch(exam.id, exam.title, toNumber(exam.maxMark), entries)
+  const classStudents = await prisma.student.findMany({
+    where: { classId: exam.classId, status: 'ACTIVE' }, select: { id: true },
+  })
+  assertEntriesBelongToClass(entries, new Set<string>(classStudents.map((s: { id: string }) => s.id)))
+  const upserted = await prisma.$transaction(markUpserts(prisma, entries, isDraft, actor.uid))
 
   if (isDraft && ADVANCEABLE_TO_MARKS_DRAFT.includes(exam.status)) {
     await prisma.exam.update({ where: { id: exam.id }, data: { status: 'MARKS_DRAFT' } })
   }
 
-  logger.info({ event: 'marks.enter', examId: entries[0]!.examId, count: entries.length, isDraft, actorUid: actor.uid })
+  logger.info({ event: 'marks.enter', examId: exam.id, count: entries.length, isDraft, actorUid: actor.uid })
   return upserted
 }
 
@@ -389,7 +606,12 @@ export async function getMarksForExam(examId: string, actor: ExamActor) {
 }
 
 // ─── FINALIZE MARKS ──────────────────────────────────────
-export async function finalizeMarks(examId: string, actor: ExamActor) {
+// `entries` (optional): the marks sheet as it is on the teacher's screen. When
+// given, they are saved and the exam is finalized in ONE transaction, so the
+// teacher's "Finalize" click can never end up half-done (marks saved as final
+// but the exam still open) and never depends on what happened to be saved as
+// a draft earlier. Without entries, whatever is already saved is finalized.
+export async function finalizeMarks(examId: string, actor: ExamActor, entries?: MarkEntryInput[]) {
   const exam = await prisma.exam.findUniqueOrThrow({
     where: { id: examId },
     include: { class: { include: { students: { where: { status: 'ACTIVE' } } } } },
@@ -398,24 +620,51 @@ export async function finalizeMarks(examId: string, actor: ExamActor) {
   // AC-5: only the assigned subject teacher (or an oversight role) may finalize.
   await assertOwnsSubject(actor, exam.classId, exam.subject, exam.academicYear)
 
-  const marks = await prisma.examMark.findMany({
+  if (MARKS_LOCKED_STATUSES.includes(exam.status)) {
+    throw httpError(409, 'The marks for this exam are already finalized.')
+  }
+  if (entries && entries.length > 0) {
+    assertValidMarkBatch(exam.id, exam.title, toNumber(exam.maxMark), entries)
+  }
+
+  const activeIds = new Set<string>(exam.class.students.map((s: { id: string }) => s.id))
+  const batch = entries ?? []
+  assertEntriesBelongToClass(batch, activeIds)
+
+  // What the sheet WILL contain once the batch is applied: saved rows, with
+  // the submitted entries layered on top. Validated BEFORE anything is
+  // written, so a refusal leaves the exam exactly as it was.
+  const saved = await prisma.examMark.findMany({
     where:  { examId },
     select: { studentId: true, mark: true, absent: true },
   })
-  const markedIds = marks.map((m) => m.studentId)
-  const missing = exam.class.students.filter((s) => !markedIds.includes(s.id))
+  const resulting = new Map<string, { mark: number | null; absent: boolean }>(
+    saved.map((m) => [m.studentId, { mark: m.mark === null ? null : toNumber(m.mark), absent: m.absent }]),
+  )
+  for (const e of batch) resulting.set(e.studentId, { mark: e.mark ?? null, absent: e.absent ?? false })
+
+  const missing = [...activeIds].filter((id) => !resulting.has(id))
   if (missing.length > 0)
-    throw new Error(`Missing marks for ${missing.length} student(s). Enter all marks first.`)
+    throw httpError(409, `Missing marks for ${missing.length} student(s). Enter all marks first.`)
 
   // Row *existence* alone is not enough — a row can exist with mark: null
   // and absent: false (an uninitialized client-side entry that was upserted
   // with defaults but never actually given a real value). Reject those too.
-  const invalid = marks.filter((m) => m.mark === null && !m.absent)
+  const invalid = [...activeIds].filter((id) => {
+    const r = resulting.get(id)
+    return !r || (r.mark === null && !r.absent)
+  })
   if (invalid.length > 0)
-    throw new Error(`${invalid.length} student(s) have no mark entered and are not marked absent. Enter a mark or mark them absent before finalizing.`)
+    throw httpError(409, `${invalid.length} student(s) have no mark entered and are not marked absent. Enter a mark or mark them absent before finalizing.`)
 
-  await prisma.examMark.updateMany({ where: { examId }, data: { isDraft: false, finalizedAt: new Date() } })
-  await prisma.exam.update({ where: { id: examId }, data: { status: 'MARKS_FINAL' } })
+  // One atomic batch: every upsert, the lock stamp, and the status change
+  // commit together or not at all.
+  await prisma.$transaction([
+    ...markUpserts(prisma, batch, false, actor.uid),
+    prisma.examMark.updateMany({ where: { examId }, data: { isDraft: false, finalizedAt: new Date() } }),
+    prisma.exam.update({ where: { id: examId }, data: { status: 'MARKS_FINAL' } }),
+  ])
+
   await auditService.log({
     action: 'exam.marks_finalized', entityType: 'Exam', entityId: examId,
     actorUid: actor.uid, actorRole: actor.role,
@@ -427,7 +676,7 @@ export async function finalizeMarks(examId: string, actor: ExamActor) {
 
 export async function approveResults(examId: string, actor: ExamActor) {
   const exam = await prisma.exam.findUniqueOrThrow({ where: { id: examId } })
-  if (exam.status !== 'MARKS_FINAL') throw new Error('Marks must be finalized before approval.')
+  if (exam.status !== 'MARKS_FINAL') throw httpError(409, 'Marks must be finalized before approval.')
   await prisma.exam.update({ where: { id: examId }, data: { status: 'RESULTS_APPROVED' } })
   await auditService.log({
     action: 'exam.results_approved', entityType: 'Exam', entityId: examId,
@@ -439,7 +688,7 @@ export async function approveResults(examId: string, actor: ExamActor) {
 
 export async function releaseResults(examId: string, actor: ExamActor) {
   const exam = await prisma.exam.findUniqueOrThrow({ where: { id: examId } })
-  if (exam.status !== 'RESULTS_APPROVED') throw new Error('Results must be approved before release.')
+  if (exam.status !== 'RESULTS_APPROVED') throw httpError(409, 'Results must be approved before release.')
   await prisma.exam.update({ where: { id: examId }, data: { status: 'RESULTS_RELEASED' } })
   await auditService.log({
     action: 'exam.results_released', entityType: 'Exam', entityId: examId,
@@ -484,76 +733,344 @@ export async function getStudentResults(studentId: string, academicYear: string,
   // "your average vs class average" and "position of N".
   const siblings = await prisma.termResult.findMany({
     where:  { classId: termResult.classId, academicYear, term },
-    select: { average: true },
+    select: { average: true, aggregatePoints: true },
   })
   const classSize = siblings.length
   const classAverage = classSize > 0
     ? Math.round((siblings.reduce((sum, r) => sum + toNumber(r.average), 0) / classSize) * 100) / 100
     : null
-  return { ...termResult, classAverage, classSize }
+
+  // MSCE track: the meaningful class benchmark is the average AGGREGATE, not
+  // the average percentage — a Form 3/4 student compares points to points.
+  const siblingPoints = siblings
+    .map((r) => r.aggregatePoints)
+    .filter((p): p is number => p !== null)
+  const classAveragePoints = siblingPoints.length > 0
+    ? Math.round((siblingPoints.reduce((sum, p) => sum + p, 0) / siblingPoints.length) * 10) / 10
+    : null
+
+  // classForm lets the client label the overall result correctly ("Points"
+  // for Forms 3-4, "Grade" for Forms 1-2) without guessing from the class
+  // name string.
+  const cls = await prisma.class.findUnique({
+    where:  { id: termResult.classId },
+    select: { form: true },
+  })
+
+  return {
+    ...termResult,
+    // Decimal columns serialise to strings over JSON, which is why the
+    // student's own Average rendered as an em dash while the computed
+    // classAverage (a real number) rendered fine. Coerced here so every
+    // consumer receives numbers.
+    totalMark:      toNumber(termResult.totalMark),
+    average:        toNumber(termResult.average),
+    classForm:      cls?.form ?? null,
+    classAverage,
+    classAveragePoints,
+    classSize,
+  }
+}
+
+// ─── STUDENT: STANDING WITHIN OWN CLASS ──────────────────
+// What a student sees in Exams > Analytics once results are out: the top ten
+// of THEIR OWN class (names, as on the announcement), and how their marks sit
+// against the class best, the class average and the class lowest — overall and
+// subject by subject.
+//
+// Deliberately NOT returned: any bottom-ten list, or any name/id attached to
+// the lowest figures. "Lowest" is a bare number so a student can see the range
+// they sit in without anyone being singled out. Same fee gate as
+// getStudentResults(); there is no results row until the term is released and
+// computed, so an unreleased term returns null.
+export interface StudentClassStanding {
+  classId:      string
+  className:    string
+  form:         number
+  gradingTrack: 'JCE' | 'MSCE'
+  /** True when the class is ranked on MSCE aggregate points (lower is better). */
+  rankedByPoints: boolean
+  standing:     StudentStanding
+  topTen:       { position: number; name: string; value: number; points: number | null; isYou: boolean }[]
+}
+
+export async function getStudentClassStanding(
+  studentId: string, academicYear: string, term: number,
+): Promise<StudentClassStanding | null> {
+  const gateOpen = await checkBalanceGate(studentId, term, academicYear)
+  if (!gateOpen) {
+    throw Object.assign(new Error('Outstanding fee balance. Pay fees to view results.'), { status: 403 })
+  }
+  const mine = await prisma.termResult.findFirst({
+    where: { studentId, academicYear, term }, select: { classId: true },
+  })
+  if (!mine) return null
+
+  const [cls, rows] = await Promise.all([
+    prisma.class.findUnique({ where: { id: mine.classId }, select: { name: true, form: true } }),
+    prisma.termResult.findMany({
+      where:  { classId: mine.classId, academicYear, term },
+      select: { studentId: true, average: true, aggregatePoints: true, subjectResults: true },
+    }),
+  ])
+  if (!cls) return null
+
+  const students = await prisma.student.findMany({
+    where:  { id: { in: rows.map((r) => r.studentId) } },
+    select: { id: true, firstName: true, lastName: true },
+  })
+  const nameById = new Map(students.map((s) => [s.id, `${s.firstName} ${s.lastName}`]))
+
+  const cohort: CohortMember[] = rows.map((r) => {
+    const sr = (r.subjectResults as Record<string, { average: number }> | null) ?? {}
+    return {
+      studentId: r.studentId,
+      name:      nameById.get(r.studentId) ?? '—',
+      average:   toNumber(r.average),
+      points:    r.aggregatePoints,
+      subjects:  Object.fromEntries(Object.entries(sr).map(([k, v]) => [k, Number(v.average)])),
+    }
+  })
+
+  const track: 'JCE' | 'MSCE' = cls.form >= 3 ? 'MSCE' : 'JCE'
+  const byPoints = track === 'MSCE'
+  const standing = buildStudentStanding(studentId, cohort, byPoints)
+  if (!standing) return null
+
+  const topTen = sortBest(cohort.map((c) => ({ ...c, value: c.average })), byPoints)
+    .slice(0, 10)
+    .map((c, i) => ({
+      position: i + 1, name: c.name, value: c.average, points: c.points,
+      isYou: c.studentId === studentId,
+    }))
+
+  return {
+    classId: mine.classId, className: cls.name, form: cls.form,
+    gradingTrack: track, rankedByPoints: byPoints, standing, topTen,
+  }
+}
+
+// Exam statuses at which an exam's marks are final (not draft) - the only
+// ones a continuous assessment may be counted from.
+const CA_FINAL_STATUSES: ExamStatus[] = ['MARKS_FINAL', 'RESULTS_APPROVED', 'RESULTS_RELEASED']
+
+type ExamWithMarks = Prisma.ExamGetPayload<{ include: { marks: true } }>
+
+/** One student's score on one exam as the pure calculator expects it. A
+ *  student with no ExamMark row, no mark, or marked absent scores 0. */
+function toMarkComponent(exam: ExamWithMarks, studentId: string): MarkComponent {
+  const row = exam.marks.find((m) => m.studentId === studentId)
+  return {
+    mark:   row && row.mark !== null ? toNumber(row.mark) : null,
+    max:    toNumber(exam.maxMark),
+    absent: row?.absent ?? false,
+  }
+}
+
+export interface ComputeTermResultsOptions {
+  /** Aggregation ON only. When a subject has a CA slot with no finalised exam,
+   *  the default is to refuse (the school must finish its assessments). With
+   *  this flag the missing slot's weight moves to the end-of-term exam for
+   *  that subject and the gap is reported back. */
+  allowIncompleteCa?: boolean
 }
 
 // ─── COMPUTE TERM RESULTS ────────────────────────────────
 // Refuses to run for a MANEB national term (Form 2 Term 3 / Form 4 Term 3)
-// — those results come from MANEB itself (ManebRecord), never from
+// - those results come from MANEB itself (ManebRecord), never from
 // aggregating internally-marked Exam/ExamMark rows, even if some were
 // mistakenly created before createExam()'s own guard was added.
-export async function computeTermResults(classId: string, academicYear: string, term: number, actorUid: string) {
+//
+// [MAINT 2026-10-22 - Continuous Assessment aggregation] Reads the CA
+// settings (Settings > Exam & Grading):
+//   OFF -> a subject's term mark is its released end-of-term exam alone.
+//   ON  -> a subject's term mark = CA subtotal + end-of-term exam points, using
+//          each CA slot's configured weight (see @shared/constants/exams for
+//          the exact rule and rounding). Only CA exams whose marks are FINAL
+//          count; drafts never leak into a result.
+// Subjects are those with a RELEASED end-of-term exam this term (unchanged).
+// All arithmetic is delegated to computeSubjectTermMark(); the overall
+// average/total are computed here in integer hundredths, never with
+// accumulated floats, and the overall grade is taken from the rounded
+// average so what is printed is what was graded.
+export async function computeTermResults(
+  classId: string, academicYear: string, term: number, actorUid: string,
+  opts: ComputeTermResultsOptions = {},
+) {
   const classRecord = await prisma.class.findUniqueOrThrow({ where: { id: classId }, select: { form: true } })
   const classForm: number = classRecord.form // e.g. 1, 2, 3, or 4
 
   const manebType = getManebExamType(classForm, term)
   if (manebType) {
-    throw new Error(
+    throw httpError(400,
       `Form ${classForm} Term ${term} is the national ${manebType} examination — results come from MANEB, not internal computation. Record them via the MANEB panel once MANEB releases them.`
     )
   }
 
+  const ca = await getCaConfig()   // throws 409 if aggregation is on but misconfigured
+
   const students = await prisma.student.findMany({ where: { classId, status: 'ACTIVE' } })
-  const exams = await prisma.exam.findMany({
-    where: { classId, academicYear, term, status: 'RESULTS_RELEASED' },
+  const allExams = await prisma.exam.findMany({
+    where:   { classId, academicYear, term },
     include: { marks: true },
   })
-  const results: { studentId: string; average: number }[] = []
 
-  for (const student of students) {
-    const subjectMap: Record<string, { marks: number[] }> = {}
-    for (const exam of exams) {
-      const mark = exam.marks.find((m) => m.studentId === student.id)
-      if (!subjectMap[exam.subject]) subjectMap[exam.subject] = { marks: [] }
-      if (mark && !mark.absent && mark.mark !== null)
-        subjectMap[exam.subject]!.marks.push((toNumber(mark.mark) / toNumber(exam.maxMark)) * 100)
-    }
-    const subjectResults: Record<string, { average: number; grade: string; pass: boolean }> = {}
-    let totalAvg = 0, subjectCount = 0
-    for (const [subject, data] of Object.entries(subjectMap)) {
-      const avg = data.marks.length > 0 ? data.marks.reduce((a, b) => a + b, 0) / data.marks.length : 0
-      // gradeService.calcGrade() is the single grade-boundary authority
-      // anywhere in the codebase now — persisted exactly as returned, no
-      // local override.
-      const { grade, pass } = await calcGrade(avg, 'INTERNAL', classForm)
-      subjectResults[subject] = { average: Math.round(avg * 100) / 100, grade, pass }
-      totalAvg += avg; subjectCount++
-    }
-    const overallAvg = subjectCount > 0 ? totalAvg / subjectCount : 0
-    const { grade, pass } = await calcGrade(overallAvg, 'INTERNAL', classForm)
-    await prisma.termResult.upsert({
-      where: { studentId_academicYear_term: { studentId: student.id, academicYear, term } },
-      create: { studentId: student.id, classId, academicYear, term, totalMark: subjectCount * overallAvg, average: Math.round(overallAvg * 100) / 100, grade, passStatus: pass, subjectResults },
-      update: { average: Math.round(overallAvg * 100) / 100, grade, passStatus: pass, subjectResults },
-    })
-    results.push({ studentId: student.id, average: overallAvg })
+  // Subjects + their end-of-term exam(s): RELEASED end-of-term exams only.
+  const endBySubject = new Map<string, ExamWithMarks[]>()
+  for (const e of allExams) {
+    if (e.type !== 'END_TERM' || e.status !== 'RESULTS_RELEASED') continue
+    const list = endBySubject.get(e.subject) ?? []
+    list.push(e)
+    endBySubject.set(e.subject, list)
+  }
+  if (endBySubject.size === 0) {
+    throw Object.assign(
+      new Error(`No released end-of-term exams exist for this class in Term ${term} - there is nothing to compute. Release the end-of-term results first.`),
+      { status: 409 },
+    )
   }
 
-  results.sort((a, b) => b.average - a.average)
+  // Continuous assessments (aggregation ON): usable = a CA type, slotted within
+  // the configured count, marks final.
+  const caBySubjectSlot = new Map<string, Map<number, ExamWithMarks>>()
+  const caNotes: string[] = []
+  if (ca.enabled) {
+    for (const e of allExams) {
+      if (!isCaExamType(e.type)) continue
+      const usable = e.caSlot !== null && e.caSlot >= 1 && e.caSlot <= ca.count && CA_FINAL_STATUSES.includes(e.status)
+      if (!usable) {
+        const why = e.caSlot === null ? 'has no CA slot'
+          : e.caSlot > ca.count ? `uses CA ${e.caSlot}, but only ${ca.count} CA(s) are configured`
+          : 'marks are not finalised'
+        caNotes.push(`${e.subject}: "${e.title}" ${why} and was not counted.`)
+        continue
+      }
+      const bySlot = caBySubjectSlot.get(e.subject) ?? new Map<number, ExamWithMarks>()
+      bySlot.set(e.caSlot!, e)
+      caBySubjectSlot.set(e.subject, bySlot)
+    }
+
+    // Readiness: every subject needs a usable exam in every slot.
+    const gaps: string[] = []
+    for (const subject of endBySubject.keys()) {
+      const slots = caBySubjectSlot.get(subject)
+      const lacking: number[] = []
+      for (let slot = 1; slot <= ca.count; slot++) if (!slots?.has(slot)) lacking.push(slot)
+      if (lacking.length > 0) gaps.push(`${subject}: CA ${lacking.join(', CA ')}`)
+    }
+    if (gaps.length > 0 && !opts.allowIncompleteCa) {
+      throw Object.assign(
+        new Error(
+          `Continuous assessment is switched on, but some subjects are missing a finalised CA: ${gaps.join('; ')}. ` +
+          `Create/finalise those assessments first, or compute anyway to move the missing CA weight onto the end-of-term exam.`,
+        ),
+        { status: 409, missingCa: gaps },
+      )
+    }
+    for (const g of gaps) caNotes.push(`Missing CA - ${g} (weight moved to the end-of-term exam).`)
+  }
+
+  const results: { studentId: string; average: number; points: number | null }[] = []
+
+  for (const student of students) {
+    type SubjectResult = {
+      average: number; grade: string; pass: boolean
+      ca?:   { slots: Array<number | null>; points: number; weight: number }
+      exam?: { points: number; weight: number }
+    }
+    const subjectResults: Record<string, SubjectResult> = {}
+    let totalCents = 0
+
+    for (const [subject, endExams] of endBySubject) {
+      const slotExams = caBySubjectSlot.get(subject)
+      const r = computeSubjectTermMark({
+        aggregate: ca.enabled,
+        weights:   ca.enabled ? ca.weights : [],
+        ca:        ca.enabled
+          ? ca.weights.map((_, i) => { const ex = slotExams?.get(i + 1); return ex ? toMarkComponent(ex, student.id) : null })
+          : [],
+        exam:      endExams.map((ex) => toMarkComponent(ex, student.id)),
+      })
+      // gradeService.calcGrade() is the single grade-boundary authority — fed the
+      // ROUNDED term mark, exactly what the report card prints.
+      const { grade, pass } = await calcGrade(r.finalPercent, 'INTERNAL', classForm)
+      subjectResults[subject] = {
+        average: r.finalPercent, grade, pass,
+        ...(r.aggregated
+          ? {
+              ca:   { slots: r.caSlotPercents, points: r.caPoints, weight: r.caWeight },
+              exam: { points: r.examPoints, weight: r.examWeight },
+            }
+          : {}),
+      }
+      totalCents += Math.round(r.finalPercent * 100)
+    }
+
+    const subjectCount = Object.keys(subjectResults).length
+    // Mean of the (already 2 d.p.) subject marks, rounded half-up in integers.
+    const overallCents = Math.floor((2 * totalCents + subjectCount) / (2 * subjectCount))
+    const overallAvg   = overallCents / 100
+    const totalMark    = totalCents / 100
+
+    // [MSCE CORRECTION] The overall result is NOT calcGrade(overallAvg).
+    // Forms 3-4 are assessed on the MSCE 1-9 scale, whose overall result is
+    // the sum of the point values of the six best subjects — averaging the
+    // percentages and re-grading that average produces a number that looks
+    // like an MSCE grade but is not one, and it was passing every student
+    // because the average always landed in a passing band. Forms 1-2 keep
+    // the JCE-style overall letter grade. gradeService owns both branches.
+    const gradeMap = Object.fromEntries(
+      Object.entries(subjectResults).map(([subject, s]) => [subject, s.grade]),
+    )
+    const outcome = await computeInternalTermOutcome(classForm, gradeMap, overallAvg)
+
+    const fields = {
+      totalMark,
+      average:           overallAvg,
+      grade:             outcome.overallGrade,
+      aggregatePoints:   outcome.aggregatePoints,
+      aggregateSubjects: outcome.aggregateSubjects,
+      gradingTrack:      outcome.track,
+      passStatus:        outcome.pass,
+      subjectResults,
+    }
+    // totalMark is refreshed on UPDATE too (it used to be written on create
+    // only, so a recompute left a stale total on the report card).
+    await prisma.termResult.upsert({
+      where:  { studentId_academicYear_term: { studentId: student.id, academicYear, term } },
+      create: { studentId: student.id, classId, academicYear, term, ...fields },
+      update: fields,
+    })
+    results.push({ studentId: student.id, average: overallAvg, points: outcome.aggregatePoints })
+  }
+
+  // [MSCE CORRECTION] Ranking direction differs by track. On the MSCE track
+  // a LOWER aggregate is better, so ranking by average descending put the
+  // worst candidates at the top. Students with no valid six-subject
+  // aggregate rank last rather than being treated as a perfect score.
+  const msceTrack = classForm >= 3
+  results.sort((a, b) => {
+    if (msceTrack) {
+      const ap = a.points ?? Number.POSITIVE_INFINITY
+      const bp = b.points ?? Number.POSITIVE_INFINITY
+      if (ap !== bp) return ap - bp
+      return b.average - a.average   // tie-break on average, higher is better
+    }
+    return b.average - a.average
+  })
+
+  // classPosition/classTotal were declared on TermResult but never written —
+  // which is why every generated report card read "Position: 0th / 0".
+  // Written here alongside `position` from the same ranked pass.
+  const classTotal = results.length
   await prisma.$transaction(
     results.map((r, i) => prisma.termResult.update({
       where: { studentId_academicYear_term: { studentId: r.studentId, academicYear, term } },
-      data: { position: i + 1 },
+      data: { position: i + 1, classPosition: i + 1, classTotal },
     }))
   )
-  logger.info({ event: 'term_results.computed', classId, academicYear, term, count: results.length, actorUid })
-  return { computed: results.length }
+  logger.info({ event: 'term_results.computed', classId, academicYear, term, count: results.length, caAggregated: ca.enabled, actorUid })
+  return { computed: results.length, caAggregated: ca.enabled, notes: caNotes }
 }
 
 // ─── MANEB ────────────────────────────────────────────────
@@ -741,7 +1258,7 @@ export async function correctMarksInReview(
   }
   const max = toNumber(exam.maxMark)
   for (const e of entries) {
-    if (e.mark !== undefined && e.mark > max) throw new Error(`Mark ${e.mark} exceeds maximum ${max} for exam ${exam.title}`)
+    if (e.mark !== undefined && e.mark > max) throw httpError(400, `Mark ${e.mark} exceeds the maximum of ${max} for "${exam.title}".`)
   }
 
   const updated = await prisma.$transaction(
@@ -762,22 +1279,23 @@ export async function correctMarksInReview(
 }
 
 // RW-5 helper: per-class top-N performers for a term, from computed TermResults.
-// Names included (staff-facing announcement); no marks are exposed by callers
-// that build the public top-10 announcement — they use names + position only.
+// Names only (the announcement never shows marks). Ranked per class on the
+// class's own track: MSCE classes by aggregate points (LOWER is better), JCE
+// classes by average. The old query ordered everything by average descending,
+// which put the WORST MSCE candidates at the top of a Form 3/4 list.
 export interface ClassTopPerformers {
   classId: string
   className: string
   form: number
-  students: { studentId: string; name: string; average: number; position: number }[]
+  students: { studentId: string; name: string; average: number; points: number | null; position: number }[]
 }
 
 export async function getTopPerformersByClass(
   academicYear: string, term: number, limit = 10,
 ): Promise<ClassTopPerformers[]> {
   const results = await prisma.termResult.findMany({
-    where:   { academicYear, term },
-    orderBy: { average: 'desc' },
-    select:  { studentId: true, classId: true, average: true, classPosition: true, position: true },
+    where:  { academicYear, term },
+    select: { studentId: true, classId: true, average: true, aggregatePoints: true },
   })
   if (results.length === 0) return []
 
@@ -787,30 +1305,42 @@ export async function getTopPerformersByClass(
     prisma.class.findMany({ where: { id: { in: classIds } }, select: { id: true, name: true, form: true } }),
     prisma.student.findMany({ where: { id: { in: studentIds } }, select: { id: true, firstName: true, lastName: true } }),
   ])
-  const classById = new Map(classes.map((c) => [c.id, c]))
   const nameById = new Map(students.map((s) => [s.id, `${s.firstName} ${s.lastName}`]))
 
-  const byClass = new Map<string, ClassTopPerformers>()
-  for (const r of results) {
-    const cls = classById.get(r.classId)
-    if (!cls) continue
-    let bucket = byClass.get(r.classId)
-    if (!bucket) { bucket = { classId: r.classId, className: cls.name, form: cls.form, students: [] }; byClass.set(r.classId, bucket) }
-    if (bucket.students.length < limit) {
-      bucket.students.push({
+  const out: ClassTopPerformers[] = []
+  for (const cls of classes) {
+    const rows = results
+      .filter((r) => r.classId === cls.id)
+      .map((r) => ({
         studentId: r.studentId,
         name:      nameById.get(r.studentId) ?? '—',
-        average:   toNumber(r.average),
-        position:  r.classPosition || r.position || bucket.students.length + 1,
-      })
-    }
+        value:     toNumber(r.average),
+        points:    r.aggregatePoints,
+      }))
+    if (rows.length === 0) continue
+    out.push({
+      classId: cls.id, className: cls.name, form: cls.form,
+      students: sortBest(rows, cls.form >= 3).slice(0, limit).map((r, i) => ({
+        studentId: r.studentId, name: r.name, average: r.value, points: r.points, position: i + 1,
+      })),
+    })
   }
-  return Array.from(byClass.values()).sort((a, b) => a.form - b.form || a.className.localeCompare(b.className))
+  return out.sort((a, b) => a.form - b.form || a.className.localeCompare(b.className))
 }
 
 // RW-4 + RW-5: release ALL end-of-term exams for a term "in unison" — only once
-// every end-of-term exam is approved (all classes reviewed) — then post ONE
-// combined top-10 announcement (names only, no marks) across all classes.
+// every end-of-term exam is approved (all classes reviewed) — then compute the
+// term results for every class that was released and post ONE announcement of
+// each class's top ten (names only, no marks).
+//
+// Computing here is what makes the announcement possible at all:
+// computeTermResults() only reads RELEASED end-of-term exams, so before this
+// step existed the term results (and therefore the top ten) did not exist yet
+// at the moment the announcement was composed. A class whose results cannot be
+// computed (e.g. continuous assessment switched on but incomplete) is reported
+// in `notComputed` and left out of the announcement; it can be computed by hand
+// from the Exams tab. The announcement is only posted when this call actually
+// released something, so re-pressing the button never posts a duplicate.
 export async function releaseTermEndResults(academicYear: string, term: number, actor: ExamActor) {
   const endTermExams = await prisma.exam.findMany({
     where:  { academicYear, term, type: 'END_TERM' },
@@ -842,32 +1372,49 @@ export async function releaseTermEndResults(academicYear: string, term: number, 
     metadata: { context: { academicYear, term, released: toRelease.length } },
   })
 
-  // RW-5: compose one combined top-10 announcement (names only, no marks).
-  let announced = false
-  let announcementId: string | null = null
-  const topByClass = await getTopPerformersByClass(academicYear, term, 10)
-  const withStudents = topByClass.filter((c) => c.students.length > 0)
-  if (withStudents.length > 0) {
-    const bodyLines: string[] = [`Congratulations to our Term ${term} top performers (${academicYear}):`, '']
-    for (const cls of withStudents) {
-      bodyLines.push(`${cls.className} (Form ${cls.form})`)
-      cls.students.forEach((st, i) => bodyLines.push(`${i + 1}. ${st.name}`))
-      bodyLines.push('')
+  // Compute results for every class that had an end-of-term exam released in
+  // this call, so the rankings reflect exactly what was just released.
+  const notComputed: { classId: string; className: string; reason: string }[] = []
+  if (toRelease.length > 0) {
+    const classIds = Array.from(new Set(toRelease.map((e) => e.classId)))
+    const names = new Map(
+      (await prisma.class.findMany({ where: { id: { in: classIds } }, select: { id: true, name: true } }))
+        .map((c) => [c.id, c.name]),
+    )
+    for (const classId of classIds) {
+      try {
+        await computeTermResults(classId, academicYear, term, actor.uid)
+      } catch (err) {
+        notComputed.push({
+          classId, className: names.get(classId) ?? classId,
+          reason: err instanceof Error ? err.message : 'Could not compute results.',
+        })
+      }
     }
-    const created = await announcementService.createAnnouncement({
-      title:         `Term ${term} Top Performers — ${academicYear}`,
-      body:          bodyLines.join('\n').trim(),
-      targetAll:     true,
-      createdByUid:  actor.uid,
-      createdByRole: actor.role,
-      publicWebsite: false,
-    }, true)
-    announced = true
-    announcementId = (created as { id?: string } | null)?.id ?? null
   }
 
-  logger.info({ event: 'exam.term_released', academicYear, term, released: toRelease.length, announced, actorUid: actor.uid })
-  return { released: toRelease.length, announced, announcementId }
+  // RW-5: one announcement, each class's top ten, structured for reading.
+  let announced = false
+  let announcementId: string | null = null
+  if (toRelease.length > 0) {
+    const topByClass = await getTopPerformersByClass(academicYear, term, 10)
+    const withStudents = topByClass.filter((c) => c.students.length > 0)
+    if (withStudents.length > 0) {
+      const created = await announcementService.createAnnouncement({
+        title:         `Term ${term} Top Performers — ${academicYear}`,
+        body:          buildTopPerformersBody(term, academicYear, withStudents, 10),
+        targetAll:     true,
+        createdByUid:  actor.uid,
+        createdByRole: actor.role,
+        publicWebsite: false,
+      }, true)
+      announced = true
+      announcementId = (created as { id?: string } | null)?.id ?? null
+    }
+  }
+
+  logger.info({ event: 'exam.term_released', academicYear, term, released: toRelease.length, announced, notComputed: notComputed.length, actorUid: actor.uid })
+  return { released: toRelease.length, announced, announcementId, notComputed }
 }
 
 // ─────────────────────────────────────────────────────────
@@ -880,20 +1427,70 @@ export interface RankedStudent {
   registrationNo: string
   classId:        string
   className:      string
+  /** The percentage figure (overall term average, or the selected subject's
+   *  average). Always present. */
   value:          number
+  /** MSCE-track rows only — the aggregate the ranking actually used. Null on
+   *  the JCE track and when no six-subject aggregate exists. */
+  points:         number | null
   position:       number
+}
+
+/** Per-class summary used when no single class is selected. Replaces the
+ *  old school-wide merged ranking: a Form 2 result and a Form 4 result are
+ *  produced by two different grading systems (JCE letters vs MSCE points)
+ *  over two different syllabuses, so ordering them in one Top 10 compares
+ *  quantities that are not comparable. Each class is summarised on its own
+ *  terms instead, and rankings are only ever produced within one class. */
+export interface ClassAnalyticsSummary {
+  classId:      string
+  className:    string
+  form:         number
+  gradingTrack: 'JCE' | 'MSCE'
+  total:        number
+  classAverage: number | null
+  /** MSCE-track classes only — mean aggregate points for the class. */
+  averagePoints: number | null
+  passRate:     number | null
+  atRiskCount:  number
+}
+
+/** One subject compared across the streams of a form (Form 1A vs Form 1B). */
+export interface SubjectStreamComparison {
+  subject: string
+  /** Mean across every stream combined. */
+  overall: number | null
+  byClass: { classId: string; className: string; average: number; passRate: number; count: number }[]
 }
 
 export interface ExamAnalyticsResult {
   metric:            'overall' | 'subject'
   subject:           string | null
+  /** What the rankings cover: one class, every stream of one form combined,
+   *  or the whole school (summary only — never ranked). */
+  scope:             'school' | 'class' | 'form'
+  /** Set only when a single class is selected. */
+  classId:           string | null
+  className:         string | null
+  form:              number | null
+  gradingTrack:      'JCE' | 'MSCE' | null
+  /** True when no class was selected: `perClass` is populated and top/bottom
+   *  are deliberately empty, because a cross-form ranking is not meaningful. */
+  schoolWide:        boolean
+  /** Why a selection returned nothing, when it did — so the UI can say
+   *  something better than "No results computed for this selection yet." */
+  emptyReason:       string | null
   total:             number
   classAverage:      number | null
+  averagePoints:     number | null
   passRate:          number | null
   atRiskCount:       number
   gradeDistribution: { grade: string; count: number }[]
   top:               RankedStudent[]
   bottom:            RankedStudent[]
+  perClass:          ClassAnalyticsSummary[]
+  /** Form scope only — subject-by-subject comparison between the streams. */
+  subjectComparison: SubjectStreamComparison[]
 }
 
 // AN-1 (top/bottom-10, filters, tie-safe) + AN-3 (pass rate, grade distribution,
@@ -903,7 +1500,7 @@ export interface ExamAnalyticsResult {
 export async function getExamAnalytics(
   academicYear: string,
   term: number,
-  opts: { classId?: string; subject?: string; limit?: number },
+  opts: { classId?: string; form?: number; subject?: string; limit?: number },
   actor: ExamActor,
 ): Promise<ExamAnalyticsResult> {
   const limit = Math.min(Math.max(opts.limit ?? 10, 1), 50)
@@ -911,7 +1508,12 @@ export async function getExamAnalytics(
   // Scope: non-oversight (teacher) may only view a class they teach.
   if (!OVERSIGHT_ROLES.includes(actor.role)) {
     if (!opts.classId) {
-      throw Object.assign(new Error('Select a class you teach to view its analytics.'), { status: 403 })
+      throw Object.assign(
+        new Error(opts.form
+          ? 'Combined-stream analytics are available to exam office and leadership. Select a single class you teach.'
+          : 'Select a class you teach to view its analytics.'),
+        { status: 403 },
+      )
     }
     const assignments = await classService.getTeacherSubjectAssignments(actor.uid, academicYear)
     const teachesClass = Array.from(assignments).some((key) => key.startsWith(`${opts.classId}|`))
@@ -920,12 +1522,49 @@ export async function getExamAnalytics(
     }
   }
 
+  // A single class wins over a form; a form means "every stream of that form
+  // in this academic year, combined" (Form 1A + Form 1B). Streams of one form
+  // share a syllabus and a grading track, so ranking them together IS
+  // meaningful — unlike ranking across forms.
+  const formClassIds = !opts.classId && opts.form
+    ? (await prisma.class.findMany({ where: { academicYear, form: opts.form }, select: { id: true } })).map((c) => c.id)
+    : null
+  const scope: 'school' | 'class' | 'form' = opts.classId ? 'class' : opts.form ? 'form' : 'school'
+  const schoolWide = scope === 'school'
+
   const results = await prisma.termResult.findMany({
-    where:  { academicYear, term, ...(opts.classId ? { classId: opts.classId } : {}) },
-    select: { studentId: true, classId: true, average: true, grade: true, passStatus: true, subjectResults: true },
+    where:  {
+      academicYear, term,
+      ...(opts.classId ? { classId: opts.classId } : formClassIds ? { classId: { in: formClassIds } } : {}),
+    },
+    select: {
+      studentId: true, classId: true, average: true, grade: true,
+      aggregatePoints: true, gradingTrack: true, passStatus: true, subjectResults: true,
+    },
   })
 
-  // Value per student: subject average when a subject filter is set, else overall.
+  // Class metadata for every class in play — needed to know each row's
+  // grading track (JCE letters vs MSCE points) and to name classes.
+  const classIdsInScope = opts.classId
+    ? [opts.classId]
+    : Array.from(new Set(results.map((r) => r.classId)))
+  const classRows = await prisma.class.findMany({
+    where:  { id: { in: classIdsInScope } },
+    select: { id: true, name: true, form: true },
+  })
+  const classById = new Map(classRows.map((c) => [c.id, c]))
+
+  const trackOf = (classId: string, stored: string | null): 'JCE' | 'MSCE' =>
+    (stored as 'JCE' | 'MSCE' | null) ?? ((classById.get(classId)?.form ?? 1) >= 3 ? 'MSCE' : 'JCE')
+
+  const selectedClass = opts.classId ? classById.get(opts.classId) ?? null : null
+  const selectedTrack: 'JCE' | 'MSCE' | null = selectedClass
+    ? (selectedClass.form >= 3 ? 'MSCE' : 'JCE')
+    : opts.form && scope === 'form' ? (opts.form >= 3 ? 'MSCE' : 'JCE') : null
+
+  // Value per student: subject average when a subject filter is set, else
+  // overall average. `points` is carried alongside so MSCE-track classes can
+  // be ranked on the aggregate rather than the percentage.
   const rows = results
     .map((r) => {
       let value: number | null
@@ -936,49 +1575,193 @@ export async function getExamAnalytics(
       } else {
         value = toNumber(r.average)
       }
-      return { studentId: r.studentId, classId: r.classId, grade: r.grade, passStatus: r.passStatus, value }
+      return {
+        studentId: r.studentId,
+        classId:   r.classId,
+        grade:     r.grade,
+        points:    r.aggregatePoints,
+        track:     trackOf(r.classId, r.gradingTrack),
+        passStatus: r.passStatus,
+        value,
+      }
     })
-    .filter((r): r is { studentId: string; classId: string; grade: string; passStatus: boolean; value: number } => r.value !== null)
+    .filter((r): r is {
+      studentId: string; classId: string; grade: string; points: number | null
+      track: 'JCE' | 'MSCE'; passStatus: boolean; value: number
+    } => r.value !== null)
 
   const total = rows.length
+
+  // ── Empty: say WHY, rather than the flat "No results computed for this
+  //    selection yet." that covered four different causes indistinguishably
+  //    (class not computed, subject not taught, wrong term, wrong year).
   if (total === 0) {
-    return { metric: opts.subject ? 'subject' : 'overall', subject: opts.subject ?? null, total: 0, classAverage: null, passRate: null, atRiskCount: 0, gradeDistribution: [], top: [], bottom: [] }
+    let emptyReason: string
+    if (opts.classId && !selectedClass) {
+      emptyReason = 'That class does not exist in the selected academic year.'
+    } else if (opts.classId && results.length === 0) {
+      emptyReason = `No results have been computed for ${selectedClass?.name ?? 'this class'} in Term ${term} of ${academicYear} yet. Open the Exams tab, select the class, and use "Compute Results" once its exams are released.`
+    } else if (scope === 'form' && results.length === 0) {
+      emptyReason = `No results have been computed for any Form ${opts.form} class in Term ${term} of ${academicYear} yet. Results are computed when the term's end-of-term exams are released.`
+    } else if (opts.subject) {
+      emptyReason = `No ${opts.subject} results were recorded for this selection in Term ${term}. Either the subject is not taught to this class, or its exam has not been released and computed yet.`
+    } else {
+      emptyReason = `No results have been computed for Term ${term} of ${academicYear} yet.`
+    }
+    return {
+      metric: opts.subject ? 'subject' : 'overall', subject: opts.subject ?? null,
+      scope,
+      classId: opts.classId ?? null, className: selectedClass?.name ?? null,
+      form: selectedClass?.form ?? (scope === 'form' ? opts.form ?? null : null), gradingTrack: selectedTrack,
+      schoolWide, emptyReason,
+      total: 0, classAverage: null, averagePoints: null, passRate: null,
+      atRiskCount: 0, gradeDistribution: [], top: [], bottom: [], perClass: [], subjectComparison: [],
+    }
   }
 
-  // AN-3 summary.
+  // ── Summary figures (apply to whatever scope was requested).
   const classAverage = Math.round((rows.reduce((sum, r) => sum + r.value, 0) / total) * 100) / 100
   const passRate     = Math.round((rows.filter((r) => r.passStatus).length / total) * 100)
   const atRiskCount  = rows.filter((r) => !r.passStatus).length
-  const gradeMap = new Map<string, number>()
-  for (const r of rows) gradeMap.set(r.grade, (gradeMap.get(r.grade) ?? 0) + 1)
-  const gradeDistribution = Array.from(gradeMap.entries())
+
+  const pointRows    = rows.map((r) => r.points).filter((p): p is number => p !== null)
+  const averagePoints = pointRows.length > 0
+    ? Math.round((pointRows.reduce((a, b) => a + b, 0) / pointRows.length) * 10) / 10
+    : null
+
+  // ── Per-class breakdown, always computed. This is what school-wide shows
+  //    INSTEAD of a merged ranking.
+  const perClass: ClassAnalyticsSummary[] = Array.from(
+    rows.reduce((acc, r) => {
+      const bucket = acc.get(r.classId) ?? []
+      bucket.push(r)
+      acc.set(r.classId, bucket)
+      return acc
+    }, new Map<string, typeof rows>()),
+  ).map(([classId, bucket]) => {
+    const meta = classById.get(classId)
+    const pts  = bucket.map((b) => b.points).filter((p): p is number => p !== null)
+    return {
+      classId,
+      className:    meta?.name ?? '—',
+      form:         meta?.form ?? 0,
+      gradingTrack: (meta?.form ?? 1) >= 3 ? 'MSCE' as const : 'JCE' as const,
+      total:        bucket.length,
+      classAverage: Math.round((bucket.reduce((s, b) => s + b.value, 0) / bucket.length) * 100) / 100,
+      averagePoints: pts.length > 0
+        ? Math.round((pts.reduce((a, b) => a + b, 0) / pts.length) * 10) / 10
+        : null,
+      passRate:     Math.round((bucket.filter((b) => b.passStatus).length / bucket.length) * 100),
+      atRiskCount:  bucket.filter((b) => !b.passStatus).length,
+    }
+  }).sort((a, b) => a.form - b.form || a.className.localeCompare(b.className))
+
+  // ── Grade distribution. On the MSCE track `grade` is deliberately empty
+  //    (Forms 3-4 have no overall grade), so distribution is banded by
+  //    aggregate points instead of producing one meaningless blank bucket.
+  const distMap = new Map<string, number>()
+  for (const r of rows) {
+    let key: string
+    if (r.track === 'MSCE') {
+      if (r.points == null) key = 'No aggregate'
+      else if (r.points <= 12) key = '6-12 (best)'
+      else if (r.points <= 24) key = '13-24'
+      else if (r.points <= 36) key = '25-36'
+      else key = '37-54'
+    } else {
+      key = r.grade || '—'
+    }
+    distMap.set(key, (distMap.get(key) ?? 0) + 1)
+  }
+  const gradeDistribution = Array.from(distMap.entries())
     .map(([grade, count]) => ({ grade, count }))
     .sort((a, b) => a.grade.localeCompare(b.grade))
 
-  // Resolve names + class names (staff-facing lists).
+  // ── Rankings. ONLY produced for a single selected class. A school-wide
+  //    Top 10 would rank a Form 2 JCE letter result against a Form 4 MSCE
+  //    aggregate — different scales, different syllabuses, not comparable.
+  if (schoolWide) {
+    return {
+      metric: opts.subject ? 'subject' : 'overall', subject: opts.subject ?? null,
+      scope,
+      classId: null, className: null, form: null, gradingTrack: null,
+      schoolWide: true, emptyReason: null,
+      total, classAverage, averagePoints, passRate, atRiskCount,
+      gradeDistribution, top: [], bottom: [], perClass, subjectComparison: [],
+    }
+  }
+
   const studentIds = rows.map((r) => r.studentId)
-  const classIds   = Array.from(new Set(rows.map((r) => r.classId)))
-  const [students, classes] = await Promise.all([
-    prisma.student.findMany({ where: { id: { in: studentIds } }, select: { id: true, firstName: true, lastName: true, registrationNo: true } }),
-    prisma.class.findMany({ where: { id: { in: classIds } }, select: { id: true, name: true } }),
-  ])
+  const students = await prisma.student.findMany({
+    where: { id: { in: studentIds } },
+    select: { id: true, firstName: true, lastName: true, registrationNo: true },
+  })
   const nameById = new Map(students.map((s) => [s.id, `${s.firstName} ${s.lastName}`]))
   const regById  = new Map(students.map((s) => [s.id, s.registrationNo]))
-  const clsById  = new Map(classes.map((c) => [c.id, c.name]))
 
   const enriched = rows.map((r) => ({
     studentId:      r.studentId,
     name:           nameById.get(r.studentId) ?? '—',
     registrationNo: regById.get(r.studentId) ?? '',
     classId:        r.classId,
-    className:      clsById.get(r.classId) ?? '—',
+    className:      classById.get(r.classId)?.name ?? '—',
     value:          Math.round(r.value * 100) / 100,
+    points:         r.points,
   }))
 
-  const byBest  = [...enriched].sort((a, b) => b.value - a.value || a.name.localeCompare(b.name))
-  const byWorst = [...enriched].sort((a, b) => a.value - b.value || a.name.localeCompare(b.name))
-  const top     = byBest.slice(0, limit).map((r, i) => ({ ...r, position: i + 1 }))
-  const bottom  = byWorst.slice(0, limit).map((r, i) => ({ ...r, position: i + 1 }))
+  // Ranking key. On the MSCE track, and only when looking at the overall
+  // result (not a single subject), the ranking quantity is the AGGREGATE and
+  // a LOWER total is better. Students with no valid six-subject aggregate
+  // sort last rather than sorting as if they scored a perfect 6.
+  const rankByPoints = selectedTrack === 'MSCE' && !opts.subject
+  const byBest = sortBest(enriched, rankByPoints)
+  const byWorst = [...byBest].reverse()
 
-  return { metric: opts.subject ? 'subject' : 'overall', subject: opts.subject ?? null, total, classAverage, passRate, atRiskCount, gradeDistribution, top, bottom }
-}
+  // Form scope: the same subject measured in each stream, side by side. Uses
+  // every subject (not just the filtered one) so the table is always complete.
+  let subjectComparison: SubjectStreamComparison[] = []
+  if (scope === 'form') {
+    const bySubject = new Map<string, Map<string, { sum: number; pass: number; n: number }>>()
+    for (const r of results) {
+      const sr = r.subjectResults as Record<string, { average: number; pass: boolean }> | null
+      if (!sr) continue
+      for (const [subj, cell] of Object.entries(sr)) {
+        const perClassMap = bySubject.get(subj) ?? new Map<string, { sum: number; pass: number; n: number }>()
+        const acc = perClassMap.get(r.classId) ?? { sum: 0, pass: 0, n: 0 }
+        acc.sum += Number(cell.average); acc.pass += cell.pass ? 1 : 0; acc.n += 1
+        perClassMap.set(r.classId, acc)
+        bySubject.set(subj, perClassMap)
+      }
+    }
+    subjectComparison = Array.from(bySubject.entries()).map(([subject, perClassMap]) => {
+      const all = Array.from(perClassMap.values())
+      const n = all.reduce((t, a) => t + a.n, 0)
+      return {
+        subject,
+        overall: n > 0 ? Math.round((all.reduce((t, a) => t + a.sum, 0) / n) * 100) / 100 : null,
+        byClass: Array.from(perClassMap.entries())
+          .map(([classId, a]) => ({
+            classId,
+            className: classById.get(classId)?.name ?? '—',
+            average:   Math.round((a.sum / a.n) * 100) / 100,
+            passRate:  Math.round((a.pass / a.n) * 100),
+            count:     a.n,
+          }))
+          .sort((x, y) => x.className.localeCompare(y.className)),
+      }
+    }).sort((a, b) => a.subject.localeCompare(b.subject))
+  }
+
+  const top    = byBest.slice(0, limit).map((r, i) => ({ ...r, position: i + 1 }))
+  const bottom = byWorst.slice(0, limit).map((r, i) => ({ ...r, position: i + 1 }))
+
+  return {
+    metric: opts.subject ? 'subject' : 'overall', subject: opts.subject ?? null,
+    scope,
+    classId: opts.classId ?? null, className: selectedClass?.name ?? null,
+    form: selectedClass?.form ?? (scope === 'form' ? opts.form ?? null : null), gradingTrack: selectedTrack,
+    schoolWide: false, emptyReason: null,
+    total, classAverage, averagePoints, passRate, atRiskCount,
+    gradeDistribution, top, bottom, perClass, subjectComparison,
+  }
+}

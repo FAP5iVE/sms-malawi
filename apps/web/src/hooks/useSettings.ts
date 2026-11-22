@@ -21,6 +21,7 @@ import { apiFetch } from '@/lib/api-client'
 import { queryKeys } from '@/lib/api-client'
 import { useAuthStore } from '@/store/authStore'
 import { SETTING_KEYS } from '@shared/types/settings'
+import { getAcademicYearForDate, getCurrentTerm } from '@shared/constants/malawi'
 import type {
   SettingKey,
   SettingValueMap,
@@ -47,11 +48,15 @@ export interface GradingScaleRow {
 }
 
 /** All grading scale rows, optionally filtered to one exam type client-side. */
-export function useGradingScales(examType?: GradingScaleRow['examType']) {
+/** `enabled: false` skips the request. The report card passes it when the server already embedded
+ *  the scale in the payload, which also keeps a parent (who may not read settings) from making a
+ *  request that can only be refused. */
+export function useGradingScales(examType?: GradingScaleRow['examType'], enabled = true) {
   return useQuery({
     queryKey: ['settings', 'grading-scales'],
     queryFn:  () => apiFetch<GradingScaleRow[]>('/settings/grading-scales'),
     select:   (rows) => (examType ? rows.filter((r) => r.examType === examType) : rows),
+    enabled,
   })
 }
 
@@ -111,6 +116,38 @@ export function useCurrentAcademicPeriod(): {
     academicYear: yearQ.data?.value,
     term:         termQ.data?.value,
     isLoading:    yearQ.isLoading || termQ.isLoading,
+  }
+}
+
+/**
+ * `useCurrentAcademicPeriod`, but always returns a usable year + term, for
+ * the many components that need a plain string/number to hand to another
+ * hook (`useClasses(year)`, a term <select>'s initial value, ...) rather
+ * than gate on `undefined`.
+ *
+ * The STORED settings are always the answer. Only for the brief moment
+ * before they have loaded (or if the request fails) does this fall back to
+ * a value DERIVED from today's date via the academic calendar
+ * (getAcademicYearForDate / getCurrentTerm) — never a literal like
+ * '2025/2026' or `term = 1`, which are right only until the calendar moves
+ * on and then silently point every dependent query at the wrong (often
+ * empty) slice of data. `isResolved` says which case you are in, for the
+ * few callers that would rather wait than show provisional data.
+ */
+export function useEffectiveAcademicPeriod(): {
+  academicYear: string
+  term:         number
+  isResolved:   boolean
+  isLoading:    boolean
+} {
+  const { academicYear, term, isLoading } = useCurrentAcademicPeriod()
+  const now  = new Date()
+  const year = academicYear ?? getAcademicYearForDate(now)
+  return {
+    academicYear: year,
+    term:         term ?? getCurrentTerm(now, year),
+    isResolved:   academicYear !== undefined && term !== undefined,
+    isLoading,
   }
 }
 
@@ -246,6 +283,7 @@ export function useBatchUpdateSettings() {
   const queryClient = useQueryClient()
 
   return useMutation({
+    meta: { successMessage: 'Settings saved', failureTitle: 'Could not save the settings' },
     mutationFn: (variables: BatchUpdateVariables) =>
       apiFetch<BatchUpdateResponse>('/settings/batch', {
         method: 'POST',

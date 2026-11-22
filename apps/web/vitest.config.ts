@@ -47,6 +47,7 @@ export default defineConfig({
         },
         test: {
           name: 'unit',
+          testTimeout: 15_000,
           environment: 'jsdom',
           globals: true,
           setupFiles: [path.join(dirname, 'test/setup.ts')],

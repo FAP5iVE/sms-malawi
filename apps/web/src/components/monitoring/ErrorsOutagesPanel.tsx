@@ -15,10 +15,11 @@ import { ChartCard } from '@/components/shared/ChartCard'
 import { Chart } from '@/components/shared/chart'
 import { useMonitoringIssues } from '@/hooks/useMonitoring'
 import type { ApiMonitoringIssue } from '@shared/types/monitoring'
+import { CHIP, chipClass } from '@/lib/hills/chip'
 
 const LEVEL_TONE: Record<string, string> = {
-  fatal: 'text-brand-coral', error: 'text-brand-coral',
-  warning: 'text-brand-amber', info: 'text-muted', debug: 'text-muted',
+  fatal: 'text-tone-coral', error: 'text-tone-coral',
+  warning: 'text-tone-amber', info: 'text-muted', debug: 'text-muted',
 }
 
 export function ErrorsOutagesPanel() {
@@ -32,10 +33,10 @@ export function ErrorsOutagesPanel() {
     { key: 'title', label: 'Issue', priority: 'critical', render: (row) => <span className="truncate">{row.title}{row.isUptimeIssue && ' \u00b7 Outage'}</span> },
     { key: 'eventCount', label: 'Events', priority: 'important', sortable: true },
     { key: 'userCount', label: 'Users', priority: 'important', sortable: true },
-    { key: 'lastSeenAt', label: 'Last Seen', priority: 'optional', render: (row) => row.lastSeenAt ? new Date(row.lastSeenAt).toLocaleString() : '\u2014' },
+    { key: 'lastSeenAt', label: 'Last seen', priority: 'optional', render: (row) => row.lastSeenAt ? new Date(row.lastSeenAt).toLocaleString() : '-' },
     {
       key: 'permalink', label: '', priority: 'critical', render: (row) => row.permalink ? (
-        <a href={row.permalink} target="_blank" rel="noopener noreferrer" className="text-brand-teal">
+        <a href={row.permalink} target="_blank" rel="noopener noreferrer" className="text-tone-teal">
           <ExternalLink className="w-4 h-4" />
         </a>
       ) : null,
@@ -46,11 +47,11 @@ export function ErrorsOutagesPanel() {
     <div className="space-y-4">
       <div className="flex items-center gap-2">
         <button type="button" onClick={() => setShowOutagesOnly(false)}
-          className={`px-3 py-1.5 rounded-full text-xs font-semibold ${!showOutagesOnly ? 'bg-brand-navy text-white' : 'bg-page text-muted'}`}>
+          className={chipClass(!showOutagesOnly)}>
           All ({issues?.length ?? 0})
         </button>
         <button type="button" onClick={() => setShowOutagesOnly(true)}
-          className={`px-3 py-1.5 rounded-full text-xs font-semibold ${showOutagesOnly ? 'bg-brand-coral text-white' : 'bg-page text-muted'}`}>
+          className={showOutagesOnly ? `${CHIP} bg-btn-danger text-btn-danger-fg border-transparent` : chipClass(false)}>
           Outages only
         </button>
       </div>
@@ -66,6 +67,7 @@ export function ErrorsOutagesPanel() {
         rowKey="id"
         columns={columns}
         emptyMessage="No unresolved issues \u2014 the system is quiet."
+        bordered={false}
       />
     </div>
   )

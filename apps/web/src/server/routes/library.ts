@@ -41,13 +41,16 @@
  *   read directly from source this phase)
  */
 import { Router } from 'express'
+import { rateLimit } from '@/lib/ratelimit'
 import { verifyAuth, requireRole } from '@/lib/verifyAuth'
 import { requirePermission, requireAnyPermission } from '@/server/middleware/verifyPermission'
+import { hasPermission } from '@shared/types/permissions'
 import {
   CreateBookSchema,
   UpdateBookSchema,
   IssueBorrowingSchema,
   ReturnBorrowingSchema,
+  MarkBookConditionSchema,
   CreateDigitalResourceSchema,
   CreateRecommendationSchema,
   ReviewRecommendationSchema,
@@ -86,6 +89,11 @@ libraryRouter.get('/reports/catalog', verifyAuth, requireRole([...LIB_STAFF, 'hi
 libraryRouter.get('/reports/overdue-by-class', verifyAuth, requireRole([...LIB_STAFF, 'high_rank']),
   async (_req, res) => {return res.json(await libService.getOverdueByClass())})
 
+// [R21] "no where to see how many and what books are lost, damaged" —
+// Borrowing.condition was set on return but never had a listing route.
+libraryRouter.get('/reports/conditions', verifyAuth, requireRole([...LIB_STAFF, 'high_rank']),
+  async (_req, res) => {return res.json(await libService.getConditionReport())})
+
 libraryRouter.get('/barcode/:barcode', verifyAuth, requireRole([...LIB_STAFF]),
   async (req, res) => {
     const book = await libService.findBookByBarcode(String(req.params.barcode))
@@ -111,8 +119,13 @@ libraryRouter.patch('/fines/:id/clear', verifyAuth, requirePermission('library.c
 // ── BORROWING ──
 libraryRouter.get('/borrowings/list', verifyAuth, requireRole([...LIB_STAFF, 'high_rank']),
   async (req, res) => {
-    const { studentId, staffId, status, overdue } = req.query as Record<string, string>
-    return res.json(await libService.listBorrowings({ studentId, staffId, status, overdue: overdue === 'true' }))
+    const { studentId, staffId, status, overdue, unreturned, dueSoon, search } = req.query as Record<string, string>
+    return res.json(await libService.listBorrowings({
+      studentId, staffId, status, search,
+      overdue:    overdue === 'true',
+      unreturned: unreturned === 'true',
+      dueSoon:    dueSoon === 'true',
+    }))
   })
 
 libraryRouter.post('/borrowings/issue', verifyAuth, requirePermission('library.issueBook'),
@@ -133,6 +146,40 @@ libraryRouter.patch('/borrowings/:id/return', verifyAuth, requirePermission('lib
     return res.json(await libService.returnBook(String(req.params.id), parsed.data, req.user!.uid))
   })
 
+// [R21.2] "no where to change [a book's] status" outside of the return
+// flow — marks a *shelf* copy damaged/lost directly from the Catalog.
+// Gated on holding EITHER markDamaged or markLost so a role with just
+// one still reaches the handler; the handler then checks the specific
+// permission for the condition actually being set, since a role could
+// plausibly hold one but not the other.
+libraryRouter.patch('/:id/condition', verifyAuth, requireAnyPermission(['library.markDamaged', 'library.markLost']),
+  async (req, res) => {
+    const parsed = MarkBookConditionSchema.safeParse(req.body)
+    if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
+    const requiredPermission = parsed.data.condition === 'LOST' ? 'library.markLost' : 'library.markDamaged'
+    if (!hasPermission(req.user!.role, requiredPermission, req.user!.superUser === true)) {
+      return res.status(403).json({ error: 'You do not have permission to perform this action.', required: requiredPermission })
+    }
+    try {
+      return res.json(await libService.markBookCondition(String(req.params.id), parsed.data, req.user!.uid))
+    } catch (err: unknown) {
+      return sendError(res, err, { defaultStatus: 400, tags: { module: 'library' } })
+    }
+  })
+
+// [R21] "Renew (+14d)" — the Active Borrowings table's renew action had no
+// backend at all. Gated on library.issueBook — renewing is, functionally,
+// re-extending an issue, and every role that may issue a book may extend
+// one already out.
+libraryRouter.patch('/borrowings/:id/renew', verifyAuth, requirePermission('library.issueBook'),
+  async (req, res) => {
+    try {
+      return res.json(await libService.renewBorrowing(String(req.params.id), req.user!.uid))
+    } catch (err: unknown) {
+      return sendError(res, err, { defaultStatus: 400, tags: { module: 'library' } })
+    }
+  })
+
 // ── DIGITAL LIBRARY (static/collection routes before /digital/:id/view) ──
 libraryRouter.get('/digital', verifyAuth, requirePermission('library.viewDigitalResources'),
   async (req, res) => {
@@ -149,6 +196,7 @@ libraryRouter.get('/digital', verifyAuth, requirePermission('library.viewDigital
 // file gets no public read permission; viewing still goes through
 // GET /digital/:id/view's role-checked signed URL, same as before.
 libraryRouter.post('/digital/upload-ticket', verifyAuth, requirePermission('library.uploadDigitalResource'),
+  rateLimit('upload-ticket'),
   async (_req, res) => {
     try {
       const ticket = await createDirectUploadTicket(FILE_PREFIX.DIGITAL_RESOURCE)
@@ -195,7 +243,7 @@ libraryRouter.post('/digital/upload', verifyAuth, requirePermission('library.upl
 libraryRouter.get('/digital/:id/view', verifyAuth, requirePermission('library.viewDigitalResources'),
   async (req, res) => {
     try {
-      const url = await libService.getDigitalResourceViewUrl(String(req.params.id), req.user!.role)
+      const url = await libService.getDigitalResourceViewUrl(String(req.params.id), req.user!.role, req.user!.uid)
       return res.json({ url })
     } catch (err: unknown) {
       return sendError(res, err, { tags: { module: 'library' } })
@@ -204,6 +252,18 @@ libraryRouter.get('/digital/:id/view', verifyAuth, requirePermission('library.vi
 
 libraryRouter.patch('/digital/:id/approve', verifyAuth, requirePermission('library.approveDigitalResource'),
   async (req, res) => { return res.json(await libService.approveDigitalResource(String(req.params.id), req.user!.uid))})
+
+// PATCH /digital/:id/reject — turns down an upload, keeping it with who/when/why.
+// Same permission as approving: whoever may approve resources may also reject them.
+libraryRouter.patch('/digital/:id/reject', verifyAuth, requirePermission('library.approveDigitalResource'),
+  async (req, res) => {
+    try {
+      const { reason } = (req.body ?? {}) as { reason?: string }
+      return res.json(await libService.rejectDigitalResource(String(req.params.id), req.user!.uid, String(reason ?? '')))
+    } catch (err: unknown) {
+      return sendError(res, err, { defaultStatus: 400, tags: { module: 'library' } })
+    }
+  })
 
 // ── RESOURCE RECOMMENDATIONS (registered before GET /:id — see header) ──
 libraryRouter.get('/recommendations', verifyAuth, requirePermission('library.recommendResource'),
@@ -241,6 +301,18 @@ libraryRouter.patch('/recommendations/:id/reject', verifyAuth, requirePermission
     return res.json({ ok: true })
   })
 
+// ── MY OWN LOANS AND FINES (registered before GET /:id — see header) ──
+// Scoped to the signed-in person by auth uid; nothing is read from the request.
+libraryRouter.get('/my/borrowings', verifyAuth, requirePermission('library.viewOwnBorrowings'),
+  async (req, res) => {
+    return res.json(await libService.listMyBorrowings(req.user!.uid))
+  })
+
+libraryRouter.get('/my/fines', verifyAuth, requirePermission('library.viewOwnFines'),
+  async (req, res) => {
+    return res.json(await libService.listMyFines(req.user!.uid))
+  })
+
 // ── FINE WAIVER REQUESTS (registered before GET /:id — see header) ──
 libraryRouter.get('/fine-waivers', verifyAuth, requireAnyPermission(['library.waiveFine', 'finance.waiveFine']),
   async (req, res) => {
@@ -250,14 +322,20 @@ libraryRouter.get('/fine-waivers', verifyAuth, requireAnyPermission(['library.wa
     ))
   })
 
-// Self-service create — any authenticated user may request a waiver on a
-// fine (narrowing, not granting, per sms-erp-security's established
-// self-service pattern); createFineWaiverRequest() itself confirms the
-// fine exists and still has an outstanding balance.
+// Self-service create — a person may request a waiver on a fine charged to THEM.
+// Previously any signed-in user could name any fine id; ownership is now checked
+// (library / finance staff who hold waiveFine may still file on someone's behalf).
+// createFineWaiverRequest() itself confirms the fine exists and still has an
+// outstanding balance.
 libraryRouter.post('/fine-waivers', verifyAuth,
   async (req, res) => {
     const parsed = CreateFineWaiverSchema.safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
+    const su = req.user!.superUser === true
+    const mayActForOthers = hasPermission(req.user!.role, 'library.waiveFine', su) || hasPermission(req.user!.role, 'finance.waiveFine', su)
+    if (!mayActForOthers && !(await libService.fineBelongsTo(req.user!.uid, parsed.data.fineId))) {
+      return res.status(403).json({ error: 'You can only request a waiver on a fine charged to you.' })
+    }
     try {
       const id = await workflowService.createFineWaiverRequest({
         ...parsed.data,

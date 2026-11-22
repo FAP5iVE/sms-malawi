@@ -35,10 +35,12 @@ import { usePathname, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Sidebar } from '@/components/shared/Sidebar'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { PeriodBanner } from '@/components/shared/PeriodSwitcher'
 import { MobileBottomNav } from '@/components/shared/MobileBottomNav'
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary'
 import { PublicAmbientBackground } from '@/components/shared/PublicAmbientBackground'
 import { useInactivityTimer } from '@/hooks/useInactivityTimer'
+import { useSessionHeartbeat } from '@/hooks/useSessionHeartbeat'
 import { useMotionEnabled } from '@/store/motionStore'
 import { PAGE_VARIANTS, SIDEBAR_COLLAPSED_WIDTH_PX } from '@/lib/motion'
 import { useEffect, useCallback } from 'react'
@@ -54,6 +56,10 @@ import { InactivityWarningDialog } from '@/components/shared/InactivityWarningDi
 function InactivityManager() {
   const router = useRouter()
   const { showWarning, keepAlive } = useInactivityTimer()
+  // [Sessions tab, Reports > Admin] Side-effect only, no DOM output — kept
+  // in this same always-mounted component rather than a second top-level
+  // one, since both are "run for the lifetime of an authenticated session".
+  useSessionHeartbeat()
 
   const handleLogout = useCallback(async () => {
     // R2: delegate to AuthProvider's shared logout() — it sequences the FCM
@@ -121,6 +127,7 @@ function PageTransitionWrapper({ children }: { children: React.ReactNode }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname()
   // [R15 fix] The sidebar wrapper's reserved width below is a hardcoded
   // Tailwind arbitrary-value class (`md:w-[60px]`) — Tailwind classes must
   // be static strings, so it can't be generated directly from
@@ -160,12 +167,15 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           1. Sidebar wrapper — `hidden md:flex` collapses it on mobile
           2. Main column  — always fills remaining width
       */}
-      <div className="flex h-dvh overflow-hidden bg-page">
+      {/* Left/right safe-area insets matter in landscape on notched phones now
+          that the viewport uses `viewport-fit=cover` (see app/layout.tsx); they
+          are 0 everywhere else, including all of desktop. */}
+      <div className="flex h-dvh overflow-hidden bg-page pl-[env(safe-area-inset-left,0px)] pr-[env(safe-area-inset-right,0px)]">
         {/* Same shared backdrop every public page uses — set once here so
             every authenticated page inherits it with no per-page changes.
             `fixed inset-0` + `pointer-events-none` means it costs nothing
             in this flex layout and never intercepts clicks/touches. */}
-        <PublicAmbientBackground />
+        <PublicAmbientBackground variant="calm" />
 
         {/* ── Sidebar wrapper ─────────────────────────────────────────────
           `hidden`    → display:none below md (Sidebar not rendered visually)
@@ -204,6 +214,9 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             For C1 the existing PageHeader renders across all breakpoints.
           */}
           <PageHeader />
+
+          {/* Shown on every page whenever the viewing period is not the live one */}
+          <PeriodBanner />
 
           {/*
             Scrollable page content area.
@@ -246,8 +259,13 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
                 a flex-1 child at all, independent of the bug above.
             ───────────────────────────────────────────────────────────────
           */}
-          <main className="flex-1 min-h-0 overflow-y-auto pt-4 px-4 main-scroll-pad md:p-6 relative">
-            <ErrorBoundary>
+          {/* Mobile: 16px side gutter (guideline minimum; also clears curved screen
+              edges), 12px top. `overflow-x-hidden` is a safety net — a single
+              over-wide child (a table, a long unbroken string) must never make
+              the whole page pan sideways; wide data scrolls inside its own
+              `.table-scroll` region instead. */}
+          <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pt-3 px-4 main-scroll-pad md:px-6 md:pt-6 lg:px-8 relative">
+            <ErrorBoundary resetKey={pathname}>
               <PageTransitionWrapper>{children}</PageTransitionWrapper>
             </ErrorBoundary>
           </main>

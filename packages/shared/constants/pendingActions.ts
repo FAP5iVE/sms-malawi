@@ -42,11 +42,11 @@ export const PENDING_ACTION_STATUS_CONFIG: Record<
   PendingActionStatus,
   { label: string; icon: PendingActionIconName; badgeClass: string }
 > = {
-  PENDING:   { label: 'Pending',   icon: 'clock', badgeClass: 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400' },
-  APPROVED:  { label: 'Approved',  icon: 'check', badgeClass: 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400' },
-  REJECTED:  { label: 'Rejected',  icon: 'x',     badgeClass: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400' },
-  CANCELLED: { label: 'Cancelled', icon: 'x',     badgeClass: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400' },
-  EXPIRED:   { label: 'Expired',   icon: 'alert', badgeClass: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400' },
+  PENDING:   { label: 'Pending',   icon: 'clock', badgeClass: 'text-status-warning' },
+  APPROVED:  { label: 'Approved',  icon: 'check', badgeClass: 'text-status-success' },
+  REJECTED:  { label: 'Rejected',  icon: 'x',     badgeClass: 'text-status-danger' },
+  CANCELLED: { label: 'Cancelled', icon: 'x',     badgeClass: 'text-status-neutral' },
+  EXPIRED:   { label: 'Expired',   icon: 'alert', badgeClass: 'text-status-neutral' },
 }
 
 // ─── REVIEWER ROLES ──────────────────────────────────────

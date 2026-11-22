@@ -47,15 +47,17 @@
 import 'server-only'
 
 import { Router } from 'express'
+import { rateLimit } from '@/lib/ratelimit'
 import { getFirestore, FieldValue } from 'firebase-admin/firestore'
 import { verifyAuth, getAdminApp } from '@/lib/verifyAuth'
 import { requirePermission, requireAnyPermission } from '@/server/middleware/verifyPermission'
 import { hasPermission } from '@shared/types/permissions'
 import { COLLECTIONS } from '@shared/constants/storage'
-import { AnnouncementSchema, AnnouncementDraftSchema } from '@shared/schemas/announcement'
+import { AnnouncementSchema, AnnouncementObjectSchema, AnnouncementDraftSchema } from '@shared/schemas/announcement'
 import * as announcementService from '@/server/services/announcementService'
 import { createDirectUploadTicket, FILE_PREFIX } from '@/lib/storage'
 import { sendError } from '@/server/lib/sendError'
+import { sanitizeRichText } from '@/server/lib/sanitizeRichText'
 
 export const announcementsRouter = Router()
 
@@ -71,7 +73,13 @@ announcementsRouter.get(
     const { user } = req
     if (!user) return res.status(401).json({ error: 'Not authenticated.' })
     try {
-      const announcements = await announcementService.listForViewer({ uid: user.uid, role: user.role })
+      // [NEW] ?includePublicPosts=true — used by the Announcements page so
+      // its News / Academic Advertisements tabs can list published items.
+      const includePublicPosts = req.query.includePublicPosts === 'true'
+      const announcements = await announcementService.listForViewer(
+        { uid: user.uid, role: user.role, superUser: user.superUser === true },
+        { includePublicPosts },
+      )
       return res.json({ announcements })
     } catch (err: unknown) {
       return sendError(res, err, { tags: { module: 'announcements' } })
@@ -181,8 +189,8 @@ announcementsRouter.patch(
     const { user } = req
     if (!user) return res.status(401).json({ error: 'Not authenticated.' })
 
-    const directPublish = hasPermission(user.role, 'announcement.publishDirect')
-    const scheduledFor = hasPermission(user.role, 'announcement.schedule')
+    const directPublish = hasPermission(user.role, 'announcement.publishDirect', user.superUser === true)
+    const scheduledFor = hasPermission(user.role, 'announcement.schedule', user.superUser === true)
       ? parsed.data.scheduledFor
       : undefined
 
@@ -200,6 +208,7 @@ announcementsRouter.patch(
           eventDate: parsed.data.eventDate,
           publicWebsite: parsed.data.publicWebsite,
           imageKey: parsed.data.imageKey,
+          authorName: parsed.data.authorName,
           postType: parsed.data.postType,
           createdByUid: user.uid,
           createdByRole: user.role,
@@ -231,6 +240,7 @@ announcementsRouter.post(
   '/image/upload-ticket',
   verifyAuth,
   requireAnyPermission(['announcement.create', 'announcement.createWithApproval']),
+  rateLimit('upload-ticket'),
   async (_req, res) => {
     try {
       const ticket = await createDirectUploadTicket(FILE_PREFIX.ANNOUNCEMENT_IMAGE)
@@ -255,12 +265,12 @@ announcementsRouter.post(
     const { user } = req
     if (!user) return res.status(401).json({ error: 'Not authenticated.' })
 
-    const directPublish = hasPermission(user.role, 'announcement.publishDirect')
+    const directPublish = hasPermission(user.role, 'announcement.publishDirect', user.superUser === true)
 
     // announcement.schedule is high_rank-only — silently drop scheduledFor
     // for any other role rather than erroring, since the schema itself
     // doesn't know the actor's role.
-    const scheduledFor = hasPermission(user.role, 'announcement.schedule')
+    const scheduledFor = hasPermission(user.role, 'announcement.schedule', user.superUser === true)
       ? parsed.data.scheduledFor
       : undefined
 
@@ -276,6 +286,7 @@ announcementsRouter.post(
           eventDate: parsed.data.eventDate,
           publicWebsite: parsed.data.publicWebsite,
           imageKey: parsed.data.imageKey,
+          authorName: parsed.data.authorName,
           postType: parsed.data.postType,
           createdByUid: user.uid,
           createdByRole: user.role,
@@ -306,11 +317,18 @@ announcementsRouter.patch(
       return res.status(403).json({ error: 'You can only edit your own announcements.' })
     }
 
-    const parsed = AnnouncementSchema.partial().safeParse(req.body)
+    const parsed = AnnouncementObjectSchema.partial().safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
 
+    // [FIX] This route writes parsed.data straight to Firestore rather
+    // than going through announcementService, so it needs its own
+    // sanitizeRichText() call — otherwise a client could PATCH a raw HTML
+    // body in, bypassing every other sanitize site in announcementService.ts.
+    const update = { ...parsed.data }
+    if (update.body !== undefined) update.body = sanitizeRichText(update.body)
+
     await ref.update({
-      ...parsed.data,
+      ...update,
       updatedAt: FieldValue.serverTimestamp(),
     })
     return res.json({ success: true })
@@ -372,7 +390,7 @@ announcementsRouter.delete(
     if (!snap.exists) return res.status(404).json({ error: 'Announcement not found.' })
 
     // deleteAny may delete anything; otherwise the caller must be the author.
-    const canDeleteAny = hasPermission(user.role, 'announcement.deleteAny')
+    const canDeleteAny = hasPermission(user.role, 'announcement.deleteAny', user.superUser === true)
     if (!canDeleteAny && snap.data()?.createdByUid !== user.uid) {
       return res.status(403).json({ error: 'You can only delete your own announcements.' })
     }

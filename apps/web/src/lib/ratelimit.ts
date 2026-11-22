@@ -3,157 +3,154 @@ import 'server-only'
 /**
  * apps/web/src/lib/ratelimit.ts
  *
- * Express rate limiting for the SMS Malawi API.
+ * Rate limiting for the SMS Malawi API.
  *
- * Stack context — why in-memory is correct here:
- *   This application runs on Firebase Auth + Neon PostgreSQL. Introducing
- *   a third data store (Redis / Upstash) purely for rate limiting would add
- *   infrastructure complexity, a fourth billing relationship, and extra latency
- *   on every API request — none of which is warranted for a school system.
+ * [CHANGE TYPE]: REWRITE (Issue 6 — in-memory rate limiting is not a global
+ * abuse boundary)
  *
- * Why the "per-Lambda-instance" concern is acceptable for this project:
- *   1. Every authenticated route is gated by Firebase token verification.
- *      A bad actor without a valid token cannot reach any data endpoint at all.
- *      The Vercel platform + Cloudflare (proxy.ts's Strict-Transport-Security)
- *      handle volumetric DDoS before requests reach Lambda.
+ * What changed, and why
+ *   The previous module used express-rate-limit's in-memory store for
+ *   everything and argued that per-Lambda-instance counters were acceptable.
+ *   That holds for a coarse backstop, but not for operations whose abuse costs
+ *   something real: with N warm instances every counter is N times as
+ *   generous, and the AI explanation's shared Gemini quota, public e-mail
+ *   senders, search, report/export work and bulk jobs all sat behind it.
  *
- *   2. The user base is bounded and known — students + staff at a single school
- *      (hundreds of users, not millions). Distributed counter skew across a
- *      handful of warm Lambda instances is inconsequential at this scale.
+ *   Now:
+ *   • ratelimit-policies.ts is the endpoint inventory — one policy per kind of
+ *     operation, keyed by user / IP / identifier / deployment-wide budget.
+ *   • Sensitive policies count in Upstash Redis (already provisioned for the
+ *     settings cache and audit queue — no new vendor) so a quota is shared by
+ *     every instance. Only the coarse global-ip backstop stays in memory.
+ *   • Each policy states what happens when Redis is down or unconfigured
+ *     (fail-closed 503, or a reduced local limit) and raises an alert. See
+ *     ratelimit-core.ts.
+ *   • 429s carry Retry-After and nothing else about the limiter.
+ *   • Authenticated routes key on the verified uid, not the IP, so a school
+ *     behind one NAT is not throttled as a single caller.
  *
- *   3. The rate limits (300 req / 15 min) are generous enough that legitimate
- *      users never approach them under normal operation. The limiter's value
- *      here is catching runaway client loops and accidental hammering, not
- *      repelling coordinated distributed attacks.
- *
- *   4. Should traffic scale beyond a single school (multi-tenancy), or if
- *      a public-facing endpoint is added without Firebase auth, the
- *      createRateLimiter() signature is already compatible with a drop-in
- *      Upstash / Redis replacement — only this file needs to change.
- *
- * Three tiers matching blueprint §5.4:
- *   standard — General authenticated API routes:    300 req / 15 min
- *   auth     — Future unauthenticated endpoints:     10 req /  1 min
- *   cron     — Cron supplementary guard (per-route):  3 req / 10 min
+ * Usage
+ *   // authenticated route — place AFTER verifyAuth so req.user exists
+ *   router.post('/x', verifyAuth, requirePermission('…'), rateLimit('ai-explain'), handler)
+ *   // public route with a per-address dimension
+ *   router.post('/y', rateLimit('public-newsletter', { identifier: emailFromBody }), handler)
  */
 
-import rateLimit, { ipKeyGenerator, type Options } from 'express-rate-limit'
+import * as Sentry from '@sentry/nextjs'
 import type { Request, RequestHandler } from 'express'
 
+import { getRedis } from '@/lib/redis'
+import { logger } from '@/lib/logger'
+import {
+  MemoryStore,
+  createLimiterMiddleware,
+  createMonitor,
+  createRedisStore,
+  type EvalCapable,
+  type LimiterDeps,
+  type LimiterRequest,
+  type RateLimitStore,
+} from '@/lib/ratelimit-core'
+import { RATE_POLICIES, type RatePolicyId } from '@/lib/ratelimit-policies'
+
+export { RATE_POLICIES, type RatePolicyId }
+
 // ─────────────────────────────────────────────────────────────────────────────
-// CLIENT IP EXTRACTION
+// WIRING (real store + monitor)
 // ─────────────────────────────────────────────────────────────────────────────
 
+let sharedStoreSingleton: RateLimitStore | null | undefined
+
+/** Redis-backed store, or null when Upstash is not configured. Memoised per instance. */
+function getSharedStore(): RateLimitStore | null {
+  if (sharedStoreSingleton !== undefined) return sharedStoreSingleton
+  const redis = getRedis()
+  sharedStoreSingleton = redis ? createRedisStore(redis as unknown as EvalCapable) : null
+  return sharedStoreSingleton
+}
+
+const monitor = createMonitor({
+  warn: (msg, fields) => logger.warn(fields, msg),
+  error: (msg, fields) => logger.error(fields, msg),
+  alert: (level, msg, fields, error) => {
+    try {
+      if (error instanceof Error) {
+        Sentry.captureException(error, { level, tags: { module: 'ratelimit', policy: String(fields.policyId) }, extra: fields })
+      } else {
+        Sentry.captureMessage(msg, { level, tags: { module: 'ratelimit', policy: String(fields.policyId) }, extra: fields })
+      }
+    } catch {
+      // Alerting must never break request handling.
+    }
+  },
+})
+
+const memoryStore = new MemoryStore()
+
+const deps: LimiterDeps = {
+  sharedStore: getSharedStore,
+  memoryStore,
+  monitor,
+  isProduction: () => process.env.NODE_ENV === 'production',
+}
+
+/** Skip in the test environment, as before, so unrelated route tests are not rate limited. */
+const skipInTests = () => process.env.NODE_ENV === 'test'
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PUBLIC API
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface RateLimitOptions {
+  /** Request-derived key for the policy's `identifier` dimension (e.g. a normalised e-mail). */
+  identifier?: (req: Request) => string | undefined
+}
+
+/** Express middleware enforcing the named policy. */
+export function rateLimit(policyId: RatePolicyId, options: RateLimitOptions = {}): RequestHandler {
+  const mw = createLimiterMiddleware(RATE_POLICIES[policyId], deps, {
+    skip: skipInTests,
+    ...(options.identifier
+      ? { identifier: (req: LimiterRequest) => options.identifier!(req as unknown as Request) }
+      : {}),
+  })
+  return ((req, res, next) => {
+    void mw(req as unknown as LimiterRequest, res as never, next)
+  }) as RequestHandler
+}
+
 /**
- * Vercel puts the real client IP first in the `x-forwarded-for` chain on
- * every request that reaches this Lambda. express-rate-limit's own default
- * IP detection doesn't trust that automatically — and as of v8, when it
- * also sees the standardized `Forwarded` header (RFC 9110) present and
- * unused, it throws ERR_ERL_FORWARDED_HEADER instead of silently guessing
- * (rightly so: guessing wrong here could mean either rate-limiting every
- * visitor behind Vercel's edge as one shared bucket, or keying on
- * `undefined` and not limiting anyone at all).
- *
- * This extracts the client IP ourselves instead of relying on the
- * library's automatic detection, which sidesteps that check entirely (it
- * only runs inside the library's own default keyGenerator). ipKeyGenerator
- * is express-rate-limit's own helper for normalizing the result — plain
- * IPv6 addresses are unsafe to use as rate-limit keys unnormalized, since
- * a single client can trivially cycle through addresses within its /64.
- *
- * See https://express-rate-limit.github.io/ERR_ERL_FORWARDED_HEADER/
+ * Normalised e-mail from `req.body.email`, for the `identifier` dimension of
+ * public e-mail-sending endpoints. Returns undefined for anything that does
+ * not look like a string address (the schema validation after it rejects it).
  */
-function clientIpKeyGenerator(req: Request): string {
-  const forwardedFor = req.headers['x-forwarded-for']
-  const first = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor?.split(',')[0]
-  const ip = first?.trim() || req.ip || req.socket.remoteAddress || 'unknown'
-  return ipKeyGenerator(ip)
+export function emailIdentifier(req: Request): string | undefined {
+  const raw = (req.body as { email?: unknown } | undefined)?.email
+  if (typeof raw !== 'string') return undefined
+  const v = raw.trim().toLowerCase()
+  return v.length > 0 && v.length <= 254 ? v : undefined
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TIER CONFIG
+// LEGACY TIER API (kept so existing imports keep compiling)
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** @deprecated Use rateLimit(policyId) with a named policy from ratelimit-policies.ts. */
 export type RateLimitTier = 'standard' | 'auth' | 'cron' | 'ai'
 
-interface TierConfig {
-  windowMs:     number
-  max:          number
-  errorMessage: string
+const LEGACY_TIER: Record<RateLimitTier, RatePolicyId> = {
+  standard: 'global-ip',
+  auth: 'login-telemetry',
+  cron: 'cron',
+  ai: 'ai-explain',
 }
 
-const TIER_CONFIG: Record<RateLimitTier, TierConfig> = {
-  standard: {
-    windowMs:     15 * 60 * 1000,   // 15 minutes
-    max:          300,
-    errorMessage: 'Too many requests — please slow down.',
-  },
-  auth: {
-    windowMs:     60 * 1000,         // 1 minute
-    max:          10,
-    errorMessage: 'Too many attempts — please wait a moment.',
-  },
-  cron: {
-    windowMs:     10 * 60 * 1000,   // 10 minutes
-    max:          3,
-    errorMessage: 'Cron rate limit exceeded.',
-  },
-  ai: {
-    // R18 — MSCE Advisory "explain this" feature (Gemini API). Deliberately
-    // tight: the free-tier Gemini quota (roughly 10-15 requests/minute,
-    // shared across every user of the whole app, not per-visitor) is far
-    // smaller than the standard tier's 300/15min. This tier exists to stop
-    // one person's repeated clicks — accidental or not — from exhausting
-    // the shared quota for everyone else using the feature at the same
-    // time. Deliberately per-IP, not global, so it can't be used to lock
-    // other users out; it only throttles a single caller.
-    windowMs:     5 * 60 * 1000,    // 5 minutes
-    max:          6,
-    errorMessage: 'AI explanations are limited to a few per few minutes — please wait a moment, or read the standard explanation above.',
-  },
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// FACTORY
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Returns a configured express-rate-limit middleware for the named tier.
- *
- * The in-memory MemoryStore is per-Lambda-instance on Vercel serverless.
- * This is intentional and acceptable for this project — see module header.
- *
- * The skipSuccessfulRequests option is intentionally false (default):
- *   We count all requests, not just failures. This prevents a pattern where
- *   a client hammers with valid requests to saturate server resources without
- *   triggering the rate limit.
- *
- * @example
- *   // In api-app.ts — applied globally before routes
- *   app.use(createRateLimiter('standard'))
- *
- *   // On a specific unauthenticated route
- *   router.post('/lookup', createRateLimiter('auth'), handler)
- */
+/** @deprecated Use rateLimit(policyId). */
 export function createRateLimiter(tier: RateLimitTier = 'standard'): RequestHandler {
-  const { windowMs, max, errorMessage } = TIER_CONFIG[tier]
+  return rateLimit(LEGACY_TIER[tier])
+}
 
-  const options: Partial<Options> = {
-    windowMs,
-    max,
-    // RFC 9110 standard rate-limit headers — consumed by API clients and monitoring
-    standardHeaders: 'draft-7',
-    // Disable legacy X-RateLimit-* headers to reduce response header noise
-    legacyHeaders: false,
-    // Suppress the express-rate-limit creation-stack warning in production
-    validate: { creationStack: false },
-    // See clientIpKeyGenerator's own comment above — fixes ERR_ERL_FORWARDED_HEADER
-    keyGenerator: clientIpKeyGenerator,
-    // Return JSON-formatted error consistent with all other API error responses
-    message: { error: errorMessage },
-    // Skip rate limiting in test environment to avoid flaky tests
-    skip: () => process.env.NODE_ENV === 'test',
-  }
-
-  return rateLimit(options)
+/** Test seam: clears this instance's in-memory counters. */
+export function _resetRateLimitMemoryForTests(): void {
+  memoryStore.clear()
 }

@@ -9,7 +9,7 @@
  *        candidates, each showing sex, MANEB aggregate points, exam ID, their
  *        current placement status (if any), and their actual subject-grade
  *        pills — an "Unplaced only" toggle hides already-CONFIRMED candidates.
- *     2. Assign University, Faculty & Admitted Course — a clickable grid of
+ *     2. Assign university, faculty and admitted course — a clickable grid of
  *        the catalogue's public universities, a Faculty/School dropdown
  *        (grouped from that university's active programmes), an Admitted
  *        Degree dropdown, and a detail card showing the programme's real
@@ -27,19 +27,16 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { usePublicSchoolInfo } from '@/hooks/usePublic'
+import { useEffectiveViewingPeriod } from '@/hooks/useViewingPeriod'
 import {
   useEligibleCohort,
   useRecordStaffPlacement,
   usePlacementCatalogue,
 } from '@/hooks/usePlacements'
-import { AcademicYearSelect } from '@/components/shared/AcademicYearSelect'
 import { PlacementStatusBadge } from '@/components/placements/PlacementStatusBadge'
 import { groupProgramsByFaculty, formatPrerequisites } from '@/lib/placementCatalogueHelpers'
 import type { ApiPlacementEligibleStudent } from '@shared/types/api'
 import { Search, Building2, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react'
-
-const FALLBACK_YEAR = '2025/2026'
 
 function abbreviate(subject: string): string {
   if (!subject) return ''
@@ -53,10 +50,13 @@ function nextIntakeYear(academicYear: string): string {
 }
 
 export function StaffPlacementEntryPanel() {
-  const { data: schoolInfo } = usePublicSchoolInfo()
+  // The school's stored current year (SystemSettings), never a literal.
+  // [UNIVERSAL PERIOD FILTER] The year comes ONLY from the app-wide header
+  // filter. The year select this panel used to carry wrote through to it (picking
+  // a year here already moved the whole app), so it was a second control for one
+  // value; it is now a read-only label.
+  const { academicYear: effectiveYear } = useEffectiveViewingPeriod()
   const { data: catalogue = [] } = usePlacementCatalogue()
-  const [academicYear, setAcademicYear] = useState<string>('')
-  const effectiveYear = academicYear || schoolInfo?.currentYear || FALLBACK_YEAR
 
   const { data: cohort = [], isLoading, isError, error } = useEligibleCohort(effectiveYear)
   const recordEntry = useRecordStaffPlacement(effectiveYear)
@@ -145,8 +145,8 @@ export function StaffPlacementEntryPanel() {
 
   return (
     <div className="space-y-4">
-      <div className="bg-surface border border-base rounded-xl p-4 flex items-start gap-3">
-        <div className="w-10 h-10 rounded-lg bg-brand-teal/10 text-brand-teal flex items-center justify-center shrink-0">
+      <div className="pb-4 flex items-start gap-3">
+        <div className="w-10 h-10 rounded-lg bg-brand-teal/10 text-tone-teal flex items-center justify-center shrink-0">
           <Building2 className="w-5 h-5" />
         </div>
         <div className="min-w-0 flex-1">
@@ -154,11 +154,9 @@ export function StaffPlacementEntryPanel() {
             <h3 className="font-heading font-semibold text-base">
               Staff Official Placement Entry (NCHE Harmonized Gazette)
             </h3>
-            <AcademicYearSelect
-              value={effectiveYear}
-              onChange={(e) => setAcademicYear(e.target.value)}
-              className="border border-base rounded-xl px-3 py-1.5 text-sm bg-page"
-            />
+            <span className="text-xs text-muted" aria-label="Academic year shown">
+              Intake {effectiveYear}
+            </span>
           </div>
           <p className="text-xs text-muted mt-0.5">
             Cross-reference the published NCHE Selection List with our school cohort and register
@@ -169,10 +167,10 @@ export function StaffPlacementEntryPanel() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* ── PANEL 1: SELECT COHORT GRADUATE ─────────────────────────── */}
-        <div className="bg-surface border border-base rounded-xl p-4 space-y-3">
+        <div className="pb-5 space-y-3">
           <div className="flex items-center justify-between">
             <h4 className="font-heading font-semibold text-sm flex items-center gap-1.5">
-              <span className="w-5 h-5 rounded-full bg-brand-navy text-white text-xs font-bold flex items-center justify-center">
+              <span className="w-5 h-5 rounded-full bg-brand-deep text-white text-xs font-bold flex items-center justify-center">
                 1
               </span>
               Select Cohort Graduate
@@ -202,11 +200,11 @@ export function StaffPlacementEntryPanel() {
           {isLoading ? (
             <p className="text-sm text-muted py-6 text-center">Loading cohort…</p>
           ) : isError ? (
-            <div className="text-sm text-brand-coral py-6 text-center px-4">
+            <div className="text-sm text-tone-coral py-6 text-center px-4">
               <p className="font-medium">Could not load the cohort.</p>
               <p className="text-xs text-muted mt-1">
                 {(error as Error)?.message ??
-                  'Unknown error — check your connection and try again.'}
+                  'Unknown error. Check your connection and try again.'}
               </p>
             </div>
           ) : cohort.length === 0 ? (
@@ -229,17 +227,15 @@ export function StaffPlacementEntryPanel() {
                     key={c.studentId}
                     type="button"
                     onClick={() => selectCandidate(c)}
-                    className={`w-full text-left rounded-xl border p-3 transition-colors ${
-                      selected
-                        ? 'border-brand-navy bg-brand-navy/5'
-                        : 'border-base bg-page hover:border-brand-navy/40'
+                    className={`w-full text-left rounded-xl p-3 transition-colors app-tint ${
+                      selected ? 'ring-2 ring-brand-teal' : 'hover:bg-brand-teal/10'
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-medium text-sm flex items-center gap-1.5">
                         {c.firstName} {c.lastName}
                         <span
-                          className={`text-[11px] font-bold ${c.sex === 'FEMALE' ? 'text-brand-coral' : 'text-brand-navy'}`}
+                          className={`text-xs font-bold ${c.sex === 'FEMALE' ? 'text-tone-coral' : 'text-brand-navy'}`}
                         >
                           {c.sex === 'FEMALE' ? 'F' : 'M'}
                         </span>
@@ -253,7 +249,7 @@ export function StaffPlacementEntryPanel() {
                         {c.candidateNo} {'\u00b7'} ID: {c.registrationNo}
                       </p>
                       {c.existingStatus && (
-                        <span className="text-[11px] font-medium text-muted">
+                        <span className="text-xs font-medium text-muted">
                           {c.existingStatus === 'PENDING_APPROVAL'
                             ? 'Pending Approval'
                             : c.existingStatus === 'CONFIRMED'
@@ -262,7 +258,7 @@ export function StaffPlacementEntryPanel() {
                         </span>
                       )}
                       {!c.existingStatus && (
-                        <span className="text-[11px] font-medium text-muted">Unplaced</span>
+                        <span className="text-xs font-medium text-muted">Unplaced</span>
                       )}
                     </div>
                     <div className="flex flex-wrap gap-1 mt-1.5">
@@ -271,7 +267,7 @@ export function StaffPlacementEntryPanel() {
                         .map(([subject, grade]) => (
                           <span
                             key={subject}
-                            className="inline-flex items-center rounded bg-surface border border-base px-1.5 py-0.5 text-[11px] text-muted"
+                            className="inline-flex items-center rounded bg-surface px-1.5 py-0.5 text-xs text-muted"
                           >
                             {abbreviate(subject)}: {grade}
                           </span>
@@ -285,16 +281,16 @@ export function StaffPlacementEntryPanel() {
         </div>
 
         {/* ── PANEL 2: ASSIGN UNIVERSITY, FACULTY & COURSE ────────────── */}
-        <div className="bg-surface border border-base rounded-xl p-4 space-y-4">
+        <div className="space-y-4">
           <h4 className="font-heading font-semibold text-sm flex items-center gap-1.5">
             <span className="w-5 h-5 rounded-full bg-brand-navy text-white text-xs font-bold flex items-center justify-center">
               2
             </span>
-            Assign University, Faculty & Admitted Course
+            Assign university, faculty and admitted course
           </h4>
 
           {!candidate ? (
-            <div className="flex items-center gap-2 bg-brand-amber/10 border border-brand-amber/25 text-brand-amber text-sm rounded-xl px-3 py-2.5">
+            <div className="flex items-center gap-2 bg-brand-amber/10 text-tone-amber text-sm rounded-xl px-3 py-2.5">
               <AlertCircle className="w-4 h-4 shrink-0" />
               Please pick a student from the cohort list on the left to proceed.
             </div>
@@ -343,15 +339,15 @@ export function StaffPlacementEntryPanel() {
                             setFaculty('')
                             setProgrammeId('')
                           }}
-                          className={`text-left rounded-xl border p-2.5 transition-colors ${
+                          className={`text-left rounded-xl p-2.5 transition-colors ${
                             universityId === u.id
-                              ? 'border-brand-navy bg-brand-navy text-white'
-                              : 'border-base bg-page hover:border-brand-navy/40'
+                              ? 'bg-btn-brand text-btn-brand-fg'
+                              : 'app-tint hover:bg-brand-teal/10'
                           }`}
                         >
                           <p className="text-xs font-bold">{u.shortName ?? u.id.toUpperCase()}</p>
                           <p
-                            className={`text-[11px] leading-snug ${universityId === u.id ? 'text-white/80' : 'text-muted'}`}
+                            className={`text-xs leading-snug ${universityId === u.id ? 'text-white/80' : 'text-muted'}`}
                           >
                             {u.name}
                           </p>
@@ -407,11 +403,11 @@ export function StaffPlacementEntryPanel() {
                   )}
 
                   {selectedProgramme && (
-                    <div className="bg-page border border-base rounded-xl p-3">
+                    <div className="app-tint rounded-xl p-3">
                       <div className="flex items-center justify-between gap-2 flex-wrap">
                         <p className="font-medium text-sm">{selectedProgramme.name}</p>
                         {selectedProgramme.faculty && (
-                          <span className="inline-flex items-center rounded bg-brand-navy/10 text-brand-navy text-[11px] font-semibold px-1.5 py-0.5">
+                          <span className="inline-flex items-center rounded bg-brand-navy/10 text-brand-navy text-xs font-semibold px-1.5 py-0.5">
                             {selectedProgramme.faculty}
                           </span>
                         )}
@@ -469,12 +465,12 @@ export function StaffPlacementEntryPanel() {
               </label>
 
               {formError && (
-                <p role="alert" className="text-sm text-brand-coral">
+                <p role="alert" className="text-sm text-tone-coral">
                   {formError}
                 </p>
               )}
               {recordEntry.isError && (
-                <p role="alert" className="text-sm text-brand-coral">
+                <p role="alert" className="text-sm text-tone-coral">
                   {(recordEntry.error as Error).message}
                 </p>
               )}

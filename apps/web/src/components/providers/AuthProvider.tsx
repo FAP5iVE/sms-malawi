@@ -65,8 +65,9 @@ import { auth, getFcmToken, removeFcmToken } from '@/lib/firebase'
 import * as Sentry from '@sentry/nextjs'
 import { apiFetch }          from '@/lib/api-client'
 import { useAuthStore }      from '@/store/authStore'
-import { SESSION_COOKIE, ROLE_COOKIE } from '@/proxy'
+import { SESSION_COOKIE, ROLE_COOKIE, SUPER_COOKIE } from '@/proxy'
 import type { UserRole } from '@shared/types/roles'
+import { isSuperUserClaim } from '@shared/constants/superUser'
 
 // ─── COOKIE UTILITIES ─────────────────────────────────────
 // These must stay in sync with proxy.ts SESSION_COOKIE / ROLE_COOKIE.
@@ -95,6 +96,7 @@ function clearCookie(name: string): void {
 function clearAuthCookies(): void {
   clearCookie(SESSION_COOKIE)
   clearCookie(ROLE_COOKIE)
+  clearCookie(SUPER_COOKIE)
 }
 
 // ─── MODULE-LEVEL FCM TOKEN STATE ─────────────────────────
@@ -227,30 +229,51 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | undefined>
   ])
 }
 
+// [Sessions tab, Reports > Admin] Best-effort call to close the caller's
+// UserSession row cleanly (endReason: 'logout') before signOut(auth) runs.
+// Same reasoning as the FCM unregister call just below it: by the time
+// onIdTokenChanged's signed-out branch would fire, auth.currentUser is
+// already null and there's no valid token left to authenticate the call
+// with. Bounded by the same LOGOUT_CLEANUP_TIMEOUT_MS as the FCM step —
+// a hung request here must never delay sign-out. If this is missed for
+// any reason, the session simply ages out of "active now" once its
+// heartbeat (~4 min) goes stale, rather than being marked as cleanly logged
+// out — the Sessions tab still reflects reality within a few minutes.
+async function logSessionEnd(authToken?: string): Promise<void> {
+  try {
+    await apiFetch<void>('/auth/log-logout', { method: 'POST' }, authToken)
+  } catch {
+    // Non-critical — see comment above.
+  }
+}
+
 export async function logout(): Promise<void> {
   if (!auth) return // auth is null during SSR; never reached in browser
 
   try {
     const user = getAuth().currentUser
-    if (user && currentFcmToken) {
-      // Capture a still-valid token and unregister the FCM token BEFORE
-      // sign-out — but bounded by a timeout so a slow token fetch or a hung
-      // unregister request can never delay the sign-out below.
-      const tokenToUnregister = currentFcmToken
-      await withTimeout(
-        (async () => {
-          let authToken: string | undefined
-          try {
-            authToken = await user.getIdToken()
-          } catch {
-            authToken = undefined
-          }
-          await unregisterFcmTokenFromServer(tokenToUnregister, authToken)
-        })(),
-        LOGOUT_CLEANUP_TIMEOUT_MS,
-      )
-      currentFcmToken = null
-      currentFcmTokenRegisteredAt = null
+    if (user) {
+      let authToken: string | undefined
+      try {
+        authToken = await user.getIdToken()
+      } catch {
+        authToken = undefined
+      }
+
+      await withTimeout(logSessionEnd(authToken), LOGOUT_CLEANUP_TIMEOUT_MS)
+
+      if (currentFcmToken) {
+        // Capture a still-valid token and unregister the FCM token BEFORE
+        // sign-out — but bounded by a timeout so a slow token fetch or a hung
+        // unregister request can never delay the sign-out below.
+        const tokenToUnregister = currentFcmToken
+        await withTimeout(
+          unregisterFcmTokenFromServer(tokenToUnregister, authToken),
+          LOGOUT_CLEANUP_TIMEOUT_MS,
+        )
+        currentFcmToken = null
+        currentFcmTokenRegisteredAt = null
+      }
     }
   } catch {
     // Any failure in best-effort cleanup is swallowed — sign-out must
@@ -345,6 +368,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const role     = (claims.role     ?? null) as UserRole | null
       const subtitle = (claims.subtitle ?? null) as string   | null
+      // alpha_admin: strict boolean-true check on the verified token claim.
+      const superUser = isSuperUserClaim(claims.superUser)
 
       // ── No role claim yet ────────────────────────────────
       // Can happen briefly after account creation before the Firebase Admin SDK
@@ -385,9 +410,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // ── Set routing cookies (Edge Runtime reads these in proxy.ts) ──
       setCookie(SESSION_COOKIE, user.uid)
       setCookie(ROLE_COOKIE, role)
+      if (superUser) setCookie(SUPER_COOKIE, '1')
+      else clearCookie(SUPER_COOKIE)
 
       // ── Update Zustand store (client-side role context) ──
-      setUser(user, role, subtitle)
+      setUser(user, role, subtitle, superUser)
 
       // ── Sentry user context (required for Crash-Free Users %) ──
       // ID ONLY — never name/email. See sentry-scrub.ts for the matching

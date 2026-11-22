@@ -173,6 +173,15 @@ export function globalErrorHandler(
   res:   Response,
   _next: NextFunction
 ): void {
+  // ── Oversized / malformed request cost (lib/requestLimits.ts) ──────────────
+  // [Issue 6] A client asking for a too-large page, date range or search term
+  // is a plain 400 with an actionable message — not an unhandled server error,
+  // so it is neither logged at error level nor sent to Sentry.
+  if (err.name === 'RequestCostError' && !res.headersSent) {
+    res.status(400).json({ error: err.message })
+    return
+  }
+
   // ── Always log the full error server-side ──────────────────────────────────
   // Sentry's automatic Express instrumentation (configured in instrumentation.ts)
   // will also capture this via the error-handling hook.

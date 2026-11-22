@@ -15,6 +15,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type {
   ApiMyPlacementResponse,
+  ApiOwnPlacementRecord,
   ApiUniversityPlacement,
   ApiPlacementEligibleStudent,
   ApiPlacementAnalytics,
@@ -39,8 +40,9 @@ export function useMyPlacement(enabled: boolean = true) {
 export function useSubmitPlacementClaim() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Placement claim submitted', failureTitle: 'Could not submit placement claim' },
     mutationFn: (data: StudentClaimInput) =>
-      apiFetch<ApiUniversityPlacement>('/placements/me/claim', { method: 'POST', body: JSON.stringify(data) }),
+      apiFetch<ApiOwnPlacementRecord>('/placements/me/claim', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.placements.me() })
       qc.invalidateQueries({ queryKey: ['placements', 'registry'] })
@@ -120,6 +122,7 @@ export function useEligibleCohort(academicYear: string | undefined) {
 export function useRecordStaffPlacement(academicYear?: string) {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Staff placement recorded', failureTitle: 'Could not record staff placement' },
     mutationFn: (data: StaffPlacementEntryInput) =>
       apiFetch<ApiUniversityPlacement>('/placements/staff-entry', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => {
@@ -155,6 +158,7 @@ function invalidateAfterVerification(qc: ReturnType<typeof useQueryClient>) {
 export function useApprovePlacementClaim() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Placement claim approved', failureTitle: 'Could not approve placement claim' },
     mutationFn: (id: string) => apiFetch<ApiUniversityPlacement>(`/placements/${id}/approve`, { method: 'PATCH' }),
     onSuccess:  () => invalidateAfterVerification(qc),
   })
@@ -163,6 +167,7 @@ export function useApprovePlacementClaim() {
 export function useRejectPlacementClaim() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Placement claim rejected', failureTitle: 'Could not reject placement claim' },
     mutationFn: ({ id, ...data }: RejectClaimInput & { id: string }) =>
       apiFetch<ApiUniversityPlacement>(`/placements/${id}/reject`, { method: 'PATCH', body: JSON.stringify(data) }),
     onSuccess: () => invalidateAfterVerification(qc),

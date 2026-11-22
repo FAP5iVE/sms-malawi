@@ -20,6 +20,7 @@
  */
 
 import { useState, useEffect } from 'react'
+import { StatusText } from '@/components/shared/StatusText'
 import { Loader2, Save }       from 'lucide-react'
 import { apiFetch }            from '@/lib/api-client'
 
@@ -81,13 +82,13 @@ export function LibrarySettings() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="font-heading font-bold text-lg text-brand-navy">Library Rules</h2>
+        <h2 className="font-heading font-bold text-lg text-brand-navy">Library rules</h2>
         <p className="text-sm text-muted mt-0.5">Borrowing limits, fine rates, and digital resource policies.</p>
       </div>
       <form onSubmit={handleSave} className="space-y-6">
         {/* Borrowing Limits */}
         <div className="pb-5 border-b border-base">
-          <h3 className="font-heading font-semibold text-sm text-body mb-4">Borrowing Limits</h3>
+          <h3 className="font-heading font-semibold text-sm text-body mb-4">Borrowing limits</h3>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {([
               ['max_borrow_days_student', 'Student Loan Days'],
@@ -96,7 +97,7 @@ export function LibrarySettings() {
               ['max_books_staff',         'Max Books (Staff)'],
             ] as [keyof LibraryConfig, string][]).map(([k, label]) => (
               <div key={k}>
-                <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">{label}</label>
+                <label className="block text-xs font-heading font-semibold text-muted mb-1.5">{label}</label>
                 <input type="number" min={1} value={config[k]} onChange={(e) => set(k, e.target.value)} className={inputCls} />
               </div>
             ))}
@@ -104,7 +105,7 @@ export function LibrarySettings() {
         </div>
         {/* Fines */}
         <div className="pb-5 border-b border-base">
-          <h3 className="font-heading font-semibold text-sm text-body mb-4">Late Return Fines (MWK)</h3>
+          <h3 className="font-heading font-semibold text-sm text-body mb-4">Late return fines (MWK)</h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-lg">
             {([
               ['fine_per_day_mwk',       'Fine Per Day'],
@@ -112,7 +113,7 @@ export function LibrarySettings() {
               ['max_fine_per_book_mwk',  'Maximum Fine Per Book'],
             ] as [keyof LibraryConfig, string][]).map(([k, label]) => (
               <div key={k}>
-                <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">{label}</label>
+                <label className="block text-xs font-heading font-semibold text-muted mb-1.5">{label}</label>
                 <input type="number" min={0} value={config[k]} onChange={(e) => set(k, e.target.value)} className={inputCls} />
               </div>
             ))}
@@ -120,7 +121,7 @@ export function LibrarySettings() {
         </div>
         {/* Digital Resources */}
         <div>
-          <h3 className="font-heading font-semibold text-sm text-body mb-4">Digital Resource Policy</h3>
+          <h3 className="font-heading font-semibold text-sm text-body mb-4">Digital resource policy</h3>
           <div className="space-y-4">
             <label className="flex items-start gap-3 cursor-pointer">
               <input type="checkbox" checked={config.allow_student_upload === 'true'} onChange={(e) => set('allow_student_upload', e.target.checked ? 'true' : 'false')} className="mt-0.5 w-4 h-4 accent-brand-teal" />
@@ -138,13 +139,13 @@ export function LibrarySettings() {
             </label>
           </div>
         </div>
-        {error && <p className="text-sm text-brand-coral">{error}</p>}
+        {error && <p className="text-sm text-tone-coral">{error}</p>}
         <div className="flex items-center gap-3">
           <button type="submit" disabled={saving}
-            className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors disabled:opacity-60 flex items-center gap-2">
+            className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold bg-brand-deep text-white hover:brightness-110 transition-colors disabled:opacity-60 flex items-center gap-2">
             {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</> : <><Save className="w-4 h-4" /> Save Settings</>}
           </button>
-          {saved && <span className="text-sm text-emerald-600 font-medium">Saved ✓</span>}
+          {saved && <StatusText tone="success" size="md">Saved</StatusText>}
         </div>
       </form>
     </div>

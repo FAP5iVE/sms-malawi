@@ -33,6 +33,16 @@
 // Lightweight API response types shared between frontend hooks and backend routes
 // These do NOT need to match Prisma types exactly — just the fields the frontend uses
 
+/** Which module owns a risk factor — drives the deep link on the risk card. */
+export type ApiRiskDomain = 'FEES' | 'ACADEMICS' | 'ATTENDANCE' | 'LIBRARY'
+
+export interface ApiRiskFactor {
+  id: string
+  domain: ApiRiskDomain
+  severity: 'HIGH' | 'MEDIUM' | 'LOW'
+  detail: string
+}
+
 export interface ApiStudent {
   id: string
   registrationNo: string
@@ -50,11 +60,29 @@ export interface ApiStudent {
   guardianName: string
   guardianPhone: string
   guardianRelation: string
+  // Demographics (present on the detail endpoint; null/undefined when not recorded)
+  nrbNumber?: string | null
+  traditionalAuthority?: string | null
+  religion?: string | null
+  homeLanguage?: string | null
+  residenceType?: 'DAY_HOME' | 'BOARDER' | 'LODGING' | 'WITH_RELATIVE' | null
+  travelMinutes?: number | null
+  admissionType?: 'NEW_INTAKE' | 'TRANSFER_IN' | 'RETURNEE'
+  previousSchool?: string | null
+  reasonForTransfer?: string | null
+  exitReason?: 'TRANSFERRED_OUT' | 'DROPPED_OUT' | 'DISMISSED' | 'DECEASED' | 'WITHDRAWN' | 'OTHER' | null
+  exitDate?: string | null
+  yearOutcomes?: Array<{ academicYear: string; form: number; outcome: 'PROMOTED' | 'REPEATED' | 'GRADUATED' | 'AWAITING_MANEB' }>
   status: string
   classId?: string
   class?: { id: string; name: string; form: number }
   feeBalance?: number
   riskLevel?: 'NONE' | 'LOW' | 'MEDIUM' | 'HIGH'
+  /** 0-100 composite from the unified risk engine (riskService). */
+  riskScore?: number
+  riskFactors?: ApiRiskFactor[]
+  /** Cross-module observations, e.g. "fee arrears together with absence…". */
+  riskInsights?: string[]
 }
 
 /** Response shape of POST /applications/:id/convert and POST /students/from-application/:id */
@@ -79,7 +107,9 @@ export interface ApiHighRiskStudent {
   lastName: string
   className: string | null
   riskLevel: 'NONE' | 'LOW' | 'MEDIUM' | 'HIGH'
+  riskScore?: number
   topFactor: string | null
+  domains?: ApiRiskDomain[]
 }
 
 export interface ApiHighRiskStudentsResponse {
@@ -89,22 +119,113 @@ export interface ApiHighRiskStudentsResponse {
 export interface ApiAssignmentSubmission {
   studentId: string
   status: 'SUBMITTED' | 'LATE' | 'MISSING'
+  /** Student's own hand-in: the instant. Teacher-recorded: noon of the day the teacher entered. */
   submittedAt: string
+  /** The private storage key is never sent - open the file through the authorised endpoint. */
+  hasFile: boolean
+  fileName?: string | null
+  note?: string | null
+  /** True when a teacher recorded this hand-in (rather than the student sending it). */
+  recordedByTeacher: boolean
+  /** Session marks - only when the teacher chose marks AND entered one. Never feeds exams or C.A. */
+  marks?: number | null
+  /** Shown to the student only together with a mark. */
+  feedback?: string | null
+  markedAt?: string | null
+  /** Version for stale-edit detection. */
+  updatedAt: string
+}
+
+export interface ApiAssignmentAttachment {
+  id: string
+  /** Storage id of a PRIVATE (FILE) or public-image (IMAGE) object; access is authorised by the file proxy. */
+  fileKey: string
+  fileName: string
+  mimeType: string
+  sizeBytes: number
+  kind: 'FILE' | 'IMAGE'
+  /** Ready-to-use URL: direct view URL for IMAGE, same-origin /api/files proxy path for FILE. */
+  url: string
+}
+
+/** Per-student state shown in the roster. */
+export type ApiAssignmentStudentStatus = 'NOT_SUBMITTED' | 'SUBMITTED' | 'LATE'
+
+/** What a student sees (shared/utils/assignment.ts studentAssignmentState). The tab badge counts PENDING. */
+export type ApiAssignmentStudentState = 'PENDING' | 'OVERDUE' | 'SUBMITTED' | 'LATE'
+
+export interface ApiAssignmentStats {
+  totalStudents: number
+  viewed: number
+  submitted: number   // on time
+  late: number
+  notSubmitted: number
+  marked: number
 }
 
 export interface ApiAssignment {
   id: string
   title: string
+  /** Task content - sanitised rich-text HTML (legacy plain text is converted on read). */
   description?: string | null
+  /** What the student must hand in - sanitised rich-text HTML. */
+  requirements?: string | null
   subject: string
   classId: string
   dueDate: string
   createdByUid: string
+  createdByName?: string | null
   createdAt: string
-  // Only populated by GET /classes/:classId/assignments (assignmentsRouter's
-  // Prisma `include: { submissions: ... }`) — not present when an
-  // Assignment is read via classService.getClass()'s own nested include.
+  /** Also the edit version: send it back as expectedUpdatedAt when saving. */
+  updatedAt: string
+  marksEnabled?: boolean
+  maxMarks?: number | null
+  attachmentCount?: number
+  /** True when the signed-in viewer may edit/mark/delete this assignment. */
+  canManage?: boolean
+  /** Staff viewers: class-wide progress counts. */
+  stats?: ApiAssignmentStats
+  /** Student viewer: their own state. `mine` is null until they hand in. */
+  mine?: ApiAssignmentSubmission | null
+  myStatus?: ApiAssignmentStudentStatus
+  myState?: ApiAssignmentStudentState
+  /** Student viewer: when they first opened it (null = never opened = show "New"). */
+  viewedAt?: string | null
+  /** Student viewers only: their own row (kept for older callers). */
   submissions?: ApiAssignmentSubmission[]
+}
+
+/** GET /classes/:classId/assignments/:id */
+export interface ApiAssignmentDetail extends ApiAssignment {
+  attachments: ApiAssignmentAttachment[]
+}
+
+/** One class-list row of GET /classes/:classId/assignments/:id/roster */
+export interface ApiAssignmentRosterRow {
+  studentId: string
+  firstName: string
+  lastName: string
+  registrationNo: string
+  viewedAt: string | null
+  lastViewedAt: string | null
+  viewCount: number
+  status: ApiAssignmentStudentStatus
+  submittedAt: string | null
+  hasFile: boolean
+  fileName: string | null
+  note: string | null
+  recordedByTeacher: boolean
+  marks: number | null
+  feedback: string | null
+  markedAt: string | null
+  /** null = no record yet. Send back as expectedUpdatedAt when saving. */
+  updatedAt: string | null
+}
+
+export interface ApiAssignmentRoster {
+  assignment: Pick<ApiAssignment, 'id' | 'title' | 'subject' | 'dueDate' | 'marksEnabled' | 'maxMarks' | 'canManage'> & { postedAt: string }
+  stats: ApiAssignmentStats
+  rows: ApiAssignmentRosterRow[]
 }
 
 export interface ApiClass {
@@ -114,8 +235,19 @@ export interface ApiClass {
   stream?: string
   room?: string
   teacherId?: string
+  // [MAINT 2026-09-16 — Class Subject Presets / class teacher display]
+  // Application-level join onto StaffProfile by teacherId (a plain Firebase
+  // UID string — no DB-level FK is possible, matching the established
+  // pattern in hrService.ts) — populated by classService's
+  // attachTeacherNames() helper on every read path (listClasses/getClass),
+  // never a second client-side fetch. Null when teacherId is unset, or set
+  // but the staff record can't be resolved.
+  teacherName?: string | null
   status: 'ACTIVE' | 'ARCHIVED'
   academicYear: string
+  // Null = subject presets never set for this class yet (see
+  // ClassSubjectsMeta.locked for the derived 5-day lock state).
+  subjectsSetAt?: string | null
   students?: ApiStudent[]
   _count?: { students: number }
   // Only populated by GET /classes/:id (classService.getClass()'s include) — list endpoints omit this
@@ -130,6 +262,27 @@ export interface ApiSubjectAssignment {
   subject: string
   teacherUid: string
   academicYear: string
+}
+
+/**
+ * Response shape of GET /classes/:id/subjects (classService.
+ * getClassSubjectsMeta) and the return value of PUT /classes/:id/subjects
+ * (classService.setClassSubjectPresets) — the class's preset subject list
+ * plus the derived 5-day edit-window lock state. `subjects: []` with
+ * `subjectsSetAt: null` means presets were never configured for this class
+ * (the transition-bridge state classService.assertSubjectOfferedByClass()
+ * also reads — every subject is accepted until a first preset is set).
+ */
+export interface ApiClassSubjectsMeta {
+  classId: string
+  academicYear: string
+  subjects: string[]
+  subjectsSetAt: string | null
+  /** subjectsSetAt + 5 days — null until subjectsSetAt is set. */
+  lockedAt: string | null
+  /** true once now() has passed lockedAt — the list can no longer change
+   *  for the rest of this Class row's academicYear. */
+  locked: boolean
 }
 
 /** Response shape of GET /attendance/class/:classId and GET /attendance/student/:studentId */
@@ -163,14 +316,39 @@ export interface ApiApplication {
   id: string
   firstName: string
   lastName: string
+  otherNames?: string | null
   dateOfBirth: string
   sex: 'MALE' | 'FEMALE'
   nationality: string
   district: string
+  village?: string | null
+  traditionalAuthority?: string | null
+  religion?: string | null
+  homeLanguage?: string | null
+  nrbNumber?: string | null
+  address?: string | null
+  phone?: string | null
+  email?: string | null
   guardianName: string
   guardianPhone: string
   guardianRelation: string
+  guardianEmail?: string | null
+  guardianAddress?: string | null
   applyingForForm: number
+  academicYear?: string | null
+  // Home & Admission
+  residenceType?: 'DAY_HOME' | 'BOARDER' | 'LODGING' | 'WITH_RELATIVE' | null
+  travelMinutes?: number | null
+  admissionType?: 'NEW_INTAKE' | 'TRANSFER_IN' | 'RETURNEE' | null
+  previousSchool?: string | null
+  reasonForTransfer?: string | null
+  /** Welfare, health and special needs. SENSITIVE: the API omits these unless the
+   *  viewer holds student.viewWelfare, so they are absent (undefined) for other roles. */
+  orphanStatus?: ApiStudentWelfare['orphanStatus']
+  isVulnerable?: boolean
+  vulnerabilityNote?: string | null
+  medicalAlert?: string | null
+  supportNeeds?: Array<{ type: ApiSupportNeed['type']; accommodation?: string; assistiveDevice?: string }> | null
   status: string
   createdAt: string
   notes?: string
@@ -330,6 +508,11 @@ export interface ApiPayment {
   receiptKey?: string
   receiptUrl?: string // signed URL from R2 — generated on request
   paidAt: string
+  notes?: string | null
+  /** Staff-only: who recorded the payment (GET /finances/balance/:id as staff). */
+  recordedByName?: string | null
+  /** Which fee line(s) this payment was applied to. */
+  allocations?: { id: string; amount: number; lineItem?: { feeName: string } }[]
 }
 
 export interface ApiExpense {
@@ -374,6 +557,65 @@ export interface ApiPayrollRun {
   payslips?: ApiPayslip[]
   /** Present on GET /payroll (payrollService.getPayrollHistory), absent on workflow-action responses. */
   _count?: { payslips: number }
+  /** Sum of every payslip's paye/pension on this run — computed in
+   *  getPayrollHistory()/getPayrollRunDetail(), not stored columns (avoids a
+   *  denormalized total that could drift from the real payslip rows). Present
+   *  on GET /payroll and GET /payroll/:id; absent on workflow-action responses. */
+  totalPaye?: number
+  totalPension?: number
+  /** Staff display names resolved server-side from the raw *ByUid audit
+   *  fields above (StaffProfile has no Prisma relation to these — same
+   *  Firebase-UID-as-plain-string pattern as staffName on ApiPayslip).
+   *  Present on GET /payroll and GET /payroll/:id only. */
+  runByName?: string
+  submittedByName?: string
+  approvedByName?: string
+}
+
+/**
+ * GET /payroll/run-window — whether payroll for a given month/year can be
+ * triggered right now, and the school's configured run window either side of
+ * Settings > Finance > Payroll Processing Day. Backs the "Run Payroll" button
+ * enable/disable state and the "opens on/opened on" copy in Payroll Runs &
+ * Approvals — the run window is a real, enforced business rule
+ * (payrollService.processMonthlyPayroll rejects a run attempted outside it),
+ * not just UI decoration.
+ */
+export interface ApiPayrollRunWindow {
+  month: number
+  year: number
+  /** ISO date-time the window opens for this month/year. */
+  opensAt: string
+  /** ISO date-time the window closes for this month/year. */
+  closesAt: string
+  /** Whether `now` falls within [opensAt, closesAt]. */
+  isOpen: boolean
+  /** Whether a PayrollRun already exists for this month/year (the
+   *  @@unique([month,year]) constraint means at most one ever will). */
+  alreadyRun: boolean
+  existingRun?: { id: string; status: string }
+  /** Count of staff with a SalaryStructure row — "N Staff Members Enrolled". */
+  enrolledStaffCount: number
+  /** The two settings this window is computed from, echoed back for display. */
+  windowStartDay: number
+  windowLengthDays: number
+}
+
+/**
+ * GET /analytics/finance/payroll-breakdown — one point per completed-or-later
+ * payroll run in the trailing window, with the full gross/paye/pension/net
+ * split (not just totalNet like the older single-series payroll-trend point)
+ * for Payroll's Financial Insights & Trends tab.
+ */
+export interface ApiPayrollBreakdownPoint {
+  month: number
+  year: number
+  label: string
+  totalGross: number
+  totalPaye: number
+  totalPension: number
+  totalNet: number
+  staffCount: number
 }
 
 export interface ApiPayslip {
@@ -384,6 +626,8 @@ export interface ApiPayslip {
   paye: number
   pension: number
   loanDeduction: number
+  /** Pay withheld for half-paid or unpaid leave that month. grossSalary is already net of it. */
+  leaveDeduction?: number
   netSalary: number
   payslipUrl?: string // signed URL from R2
   /** Present on GET /payroll/my-payslips (payrollService.getStaffPayslips's
@@ -392,15 +636,49 @@ export interface ApiPayslip {
   payrollRun?: { month: number; year: number }
 }
 
-/** GET /payroll/my-salary — self-service current salary structure. */
+/**
+ * One itemized allowance line as returned by the payroll self-service
+ * endpoints (GET /payroll/my-salary) — distinct from useHR.ts's own
+ * ApiAllowance (the HR salary-*management* CRUD contract against
+ * GET/POST/DELETE /hr/:id/allowances), which independently serializes the
+ * same StaffAllowance rows as raw Prisma Decimal strings. This one is
+ * server-normalized to plain numbers since it's a fresh, view-only contract.
+ */
+export interface ApiPayrollAllowance {
+  id:        string
+  type:      string
+  amount:    number
+  recurring: boolean
+  paidMonth: number | null
+  paidYear:  number | null
+  notes:     string | null
+}
+
+/**
+ * GET /payroll/my-salary — self-service current salary structure (the
+ * caller's own, or another staff member's when the caller holds
+ * hr.viewAnyPayslips — the "Viewing Employee" picker in My Pay).
+ * [PRODUCTION FIX] The route this type documents did not exist at all —
+ * useMySalaryStructure() called it and 404'd. Rebuilt against the real
+ * computation payrollService.processMonthlyPayroll() already performs
+ * (base salary + itemized StaffAllowance, not the stale flat
+ * SalaryStructure.allowances/loanBalance columns confirmed to have zero
+ * readers — see payrollService.ts's own header comment).
+ */
 export interface ApiSalaryStructure {
   id:                   string
   staffUid:             string
+  staffName:            string
+  department:           string | null
+  jobTitle:             string | null
   baseSalary:           number
-  allowances:           number
-  loanBalance:           number
   monthlyLoanDeduction: number
+  /** baseSalary + every currently-recurring allowance — the real figure
+   *  next month's payslip would show, mirroring payrollService's own gross
+   *  computation exactly. */
+  monthlyGross:         number
   updatedAt:            string
+  allowances:           ApiPayrollAllowance[]
 }
 
 export interface ApiLibraryFine {
@@ -410,6 +688,8 @@ export interface ApiLibraryFine {
   bookTitle: string
   amount: number
   reason: string
+  /** Why it was raised: overdue days, a damaged or lost copy, or a manual fine. */
+  kind: 'LATE' | 'DAMAGED' | 'LOST' | 'OTHER'
   status: 'PENDING' | 'PAID' | 'WAIVED'
   createdAt: string
   paidAt?: string
@@ -418,7 +698,9 @@ export interface ApiLibraryFine {
   student?: { firstName: string; lastName: string }
 }
 
-/** R12 — matches libraryWorkflowService.ts's ResourceRecommendation shape. */
+/** R12 — matches libraryWorkflowService.ts's ResourceRecommendation shape.
+ *  R21 — adds requesterName/requesterRole/requesterClass (display-only
+ *  fields captured on the redesigned "Recommend a Resource" form). */
 export interface ApiResourceRecommendation {
   id: string
   requestedByUid: string
@@ -428,6 +710,9 @@ export interface ApiResourceRecommendation {
   type: 'BOOK' | 'EBOOK' | 'JOURNAL' | 'OTHER'
   subject?: string
   reason: string
+  requesterName?: string
+  requesterRole?: string
+  requesterClass?: string
   status: 'PENDING' | 'APPROVED' | 'REJECTED'
   reviewedByUid?: string
   reviewNotes?: string
@@ -447,6 +732,58 @@ export interface ApiFineWaiverRequest {
   reviewNotes?: string
   reviewedAt?: string
   createdAt: string
+  /** Added for reviewers: who owes the fine, for which book, and why it was raised. */
+  borrowerName?: string
+  bookTitle?: string
+  kind?: 'LATE' | 'DAMAGED' | 'LOST' | 'OTHER'
+  fineReason?: string
+}
+
+/** Why a library fine was raised. */
+export type ApiLibraryFineKind = 'LATE' | 'DAMAGED' | 'LOST' | 'OTHER'
+
+/** One of the signed-in person's own loans (GET /library/my/borrowings). */
+export interface ApiMyBorrowing {
+  id: string
+  bookTitle: string
+  author: string
+  barcode: string | null
+  issuedAt: string
+  dueDate: string
+  returnedAt: string | null
+  /** OVERDUE is derived from the due date while the book is still out. */
+  status: 'ACTIVE' | 'OVERDUE' | 'RETURNED' | 'LOST'
+  /** How it came back: GOOD, DAMAGED or LOST. */
+  condition: 'GOOD' | 'DAMAGED' | 'LOST'
+  daysOverdue: number
+  /** Late fee building up on a book still out (days overdue × daily rate). Not charged until it is returned. */
+  accruedLateFee: number
+  /** Total of every fine raised on this loan (late, damaged, lost). */
+  chargedTotal: number
+  /** The part of chargedTotal still unpaid. */
+  chargedPending: number
+}
+
+export interface ApiMyBorrowings {
+  /** MWK charged per full day a book is overdue — the school's setting. */
+  finePerDay: number
+  loans: ApiMyBorrowing[]
+}
+
+/** One of the signed-in person's own library fines (GET /library/my/fines). */
+export interface ApiMyFine {
+  id: string
+  bookTitle: string
+  kind: ApiLibraryFineKind
+  amount: number
+  reason: string
+  status: 'PENDING' | 'PAID' | 'WAIVED'
+  borrowingId: string | null
+  createdAt: string
+  /** When it was paid or waived; null while pending. */
+  settledAt: string | null
+  /** The latest waiver request on this fine, if any. */
+  waiver: { id: string; status: 'PENDING' | 'APPROVED' | 'REJECTED'; reason: string; reviewNotes: string | null; createdAt: string } | null
 }
 
 export interface ApiFinanceSummary {
@@ -454,7 +791,8 @@ export interface ApiFinanceSummary {
   totalOutstanding: number
   totalExpenses: number
   collectionTarget: number
-  collectionPercent: number // 0–100
+  /** 0–100, one decimal; null (not 0) when nothing has been billed for the term. */
+  collectionPercent: number | null
 }
 
 export interface ApiScholarship {
@@ -465,6 +803,8 @@ export interface ApiScholarship {
   value: number
   academicYear: string
   isActive: boolean
+  sponsorType?: 'GOVERNMENT_BURSARY' | 'NGO' | 'CHURCH' | 'EMPLOYER' | 'FAMILY' | 'SCHOOL' | 'OTHER' | null
+  sponsorName?: string | null
   /** Joined from Scholarship.student — R9: replaces the raw studentId truncation the UI previously showed. */
   student?: { firstName: string; lastName: string }
 }
@@ -484,6 +824,8 @@ export interface ApiExam {
   term: number
   status: string
   createdByUid: string
+  /** Which continuous assessment this is (1..N); null for non-CA exams. */
+  caSlot?: number | null
   _count?: { marks: number }
   /** Only populated by GET /exams (examService.listExams(), R8) */
   className?:       string
@@ -515,10 +857,34 @@ export interface ApiTermResult {
   term: number
   totalMark: number
   average: number
+  /** JCE track (Forms 1-2) ONLY — the overall letter grade for the term.
+   *  Always an empty string on the MSCE track: Forms 3-4 have no overall
+   *  grade. Read aggregatePoints instead and label it "Points". */
   grade: string
+  /** MSCE track (Forms 3-4) ONLY — sum of the point values of the six best
+   *  subjects (6-54, lower is better). Null on the JCE track, and null on
+   *  the MSCE track when fewer than six subjects were recorded. */
+  aggregatePoints: number | null
+  /** The (up to six) subjects whose points make up aggregatePoints. */
+  aggregateSubjects: string[] | null
+  /** 'JCE' | 'MSCE' — which grading system produced this row. */
+  gradingTrack: 'JCE' | 'MSCE' | null
+  /** The form (1-4) of the class this result belongs to. */
+  classForm: number | null
   position: number | null
+  classPosition: number
+  classTotal: number
   passStatus: boolean
-  subjectResults: Record<string, { average: number; grade: string; pass: boolean }>
+  /** `average` is the subject's final term mark (2 d.p.). `ca`/`exam` are present
+   *  only when continuous assessments were aggregated into it (Settings >
+   *  Exam & Grading): `ca.slots` = raw % scored in CA 1..N (null = no such
+   *  assessment), `ca.points` out of `ca.weight`, `exam.points` out of
+   *  `exam.weight`; ca.points + exam.points === average. */
+  subjectResults: Record<string, {
+    average: number; grade: string; pass: boolean
+    ca?:   { slots: Array<number | null>; points: number; weight: number }
+    exam?: { points: number; weight: number }
+  }>
   attendanceDays: number
   absentDays: number
   teacherComment: string | null
@@ -526,6 +892,9 @@ export interface ApiTermResult {
   reportCardKey: string | null
   releasedAt: string | null
   classAverage: number | null
+  /** MSCE track — the class's mean aggregate, the points-to-points
+   *  equivalent of classAverage. Null when no sibling has an aggregate. */
+  classAveragePoints: number | null
   classSize: number | null
 }
 
@@ -536,19 +905,94 @@ export interface ApiRankedStudent {
   classId:        string
   className:      string
   value:          number
+  /** MSCE-track rows only — the aggregate the ranking used (lower is
+   *  better). Null on the JCE track and when no aggregate exists. */
+  points:         number | null
   position:       number
+}
+
+export interface ApiClassAnalyticsSummary {
+  classId:       string
+  className:     string
+  form:          number
+  gradingTrack:  'JCE' | 'MSCE'
+  total:         number
+  classAverage:  number | null
+  averagePoints: number | null
+  passRate:      number | null
+  atRiskCount:   number
+}
+
+/** One subject compared across the streams of a form (Form 1A vs Form 1B). */
+export interface ApiSubjectStreamComparison {
+  subject: string
+  overall: number | null
+  byClass: { classId: string; className: string; average: number; passRate: number; count: number }[]
 }
 
 export interface ApiExamAnalytics {
   metric:            'overall' | 'subject'
   subject:           string | null
+  /** What the rankings cover: one class, every stream of one form combined,
+   *  or the whole school (summary only — never ranked). */
+  scope:             'school' | 'class' | 'form'
+  classId:           string | null
+  className:         string | null
+  form:              number | null
+  gradingTrack:      'JCE' | 'MSCE' | null
+  /** True when no class was selected. `perClass` is populated and top/bottom
+   *  are empty: ranking a Form 2 JCE result against a Form 4 MSCE aggregate
+   *  compares two different grading systems and is not meaningful. */
+  schoolWide:        boolean
+  /** Populated when the selection returned nothing, explaining which of the
+   *  several possible causes applied. */
+  emptyReason:       string | null
   total:             number
   classAverage:      number | null
+  /** MSCE-track — mean aggregate points across the scope. */
+  averagePoints:     number | null
   passRate:          number | null
   atRiskCount:       number
   gradeDistribution: { grade: string; count: number }[]
   top:               ApiRankedStudent[]
   bottom:            ApiRankedStudent[]
+  perClass:          ApiClassAnalyticsSummary[]
+  /** Form scope only — each subject side by side across the streams. */
+  subjectComparison: ApiSubjectStreamComparison[]
+}
+
+/** best / worst / mean of one measure inside the student's class. `worst` is a
+ *  bare number — it is never accompanied by a name. For MSCE points "best" is
+ *  the LOWEST total. */
+export interface ApiSpread { best: number; worst: number; average: number; count: number }
+
+export interface ApiSubjectStanding {
+  subject:  string
+  you:      number
+  best:     number
+  worst:    number
+  average:  number
+  position: number
+  outOf:    number
+}
+
+/** GET /exams/results/:studentId/class-standing */
+export interface ApiStudentClassStanding {
+  classId:        string
+  className:      string
+  form:           number
+  gradingTrack:   'JCE' | 'MSCE'
+  /** True when the class is ranked on MSCE aggregate points (lower is better). */
+  rankedByPoints: boolean
+  standing: {
+    position: number
+    outOf:    number
+    overall:  { you: number } & ApiSpread
+    points:   ({ you: number } & ApiSpread) | null
+    subjects: ApiSubjectStanding[]
+  }
+  /** The class's top ten only — there is deliberately no bottom list. */
+  topTen: { position: number; name: string; value: number; points: number | null; isYou: boolean }[]
 }
 
 export interface ApiManebRecord {
@@ -566,12 +1010,29 @@ export interface ApiManebRecord {
   registrationNo: string | null
   status: 'REGISTERED' | 'SITTING' | 'RESULTS_RECEIVED' | 'CERTIFIED'
 }
+/**
+ * Minimal staff option for "pick a staff member" controls (GET /hr/staff-picker).
+ * Deliberately NOT ApiStaffProfile: roles that merely need to choose a person
+ * (e.g. Finance allocating an asset) get a name, employee number, department
+ * and job title — never contract, employment or HR-record fields.
+ */
+export interface ApiStaffPickerOption {
+  id: string
+  employeeNo: string
+  firstName: string
+  lastName: string
+  department: string
+  jobTitle: string
+}
+
 export interface ApiStaffProfile {
   id: string
   uid: string
   employeeNo: string
   firstName: string
   lastName: string
+  /** Null until HR records it; drives the dashboard profile picture. */
+  sex?: 'MALE' | 'FEMALE' | null
   role: string
   department: string
   jobTitle: string
@@ -589,10 +1050,91 @@ export interface ApiStaffProfile {
  * recent leave requests, active loans, and recent performance notes.
  * Backs the read-only staff profile page and StaffForm's edit mode.
  */
+export interface ApiSupportNeed {
+  id: string
+  type: 'LOW_VISION' | 'BLIND' | 'HARD_OF_HEARING' | 'DEAF' | 'PHYSICAL_IMPAIRMENT' | 'LEARNING_DIFFICULTY' | 'ALBINISM' | 'OTHER'
+  accommodation: string | null
+  assistiveDevice: string | null
+  identifiedAt: string | null
+  createdAt: string
+}
+
+/** Sensitive child data. Served only by the welfare endpoints (student.viewWelfare). */
+export interface ApiStudentWelfare {
+  studentId: string
+  orphanStatus: 'UNKNOWN' | 'NONE' | 'FATHER_DECEASED' | 'MOTHER_DECEASED' | 'BOTH_DECEASED'
+  isVulnerable: boolean
+  vulnerabilityNote: string | null
+  vulnerabilityReviewedAt: string | null
+  medicalAlert: string | null
+  /** Free-text note recorded when the student was archived. Sensitive. */
+  exitNote: string | null
+  supportNeeds: ApiSupportNeed[]
+}
+
+/** Counts only, never names (dashboards and the students list header). */
+export interface ApiWelfareSummary {
+  activeStudents: number
+  orphans: { total: number; father: number; mother: number; both: number }
+  vulnerable: number
+  withSupportNeeds: number
+  supportNeedsByType: Array<{ type: ApiSupportNeed['type']; count: number }>
+  /** Students whose orphan status has never been recorded. */
+  orphanStatusUnrecorded: number
+}
+
+export interface ApiStudentGuardian {
+  id: string
+  studentId: string
+  fullName: string
+  relation: string
+  phone: string
+  altPhone: string | null
+  email: string | null
+  address: string | null
+  nrbNumber: string | null
+  isPrimary: boolean
+  isFeePayer: boolean
+  isEmergencyContact: boolean
+  livesWithStudent: boolean | null
+  createdAt: string
+  updatedAt: string
+}
+
 export interface ApiStaffDetail extends ApiStaffProfile {
   email: string
   phone?: string
   salaryStructureId?: string
+  // Identity + retirement. Returned only to roles holding hr.viewStaffSensitive
+  // (admin / hr / high_rank); absent for anyone else.
+  dateOfBirth?: string | null
+  nationality?: string | null
+  homeDistrict?: string | null
+  nrbNumber?: string | null
+  tpin?: string | null
+  nextOfKinName?: string | null
+  nextOfKinPhone?: string | null
+  nextOfKinRelation?: string | null
+  isTeaching?: boolean
+  tcmRegistrationNo?: string | null
+  tcmLicenceNo?: string | null
+  tcmLicenceExpiry?: string | null
+  employmentCategory?: 'SCHOOL_EMPLOYED' | 'COMMUNITY_PAID' | 'VOLUNTEER' | 'OTHER' | null
+  payrollNo?: string | null
+  highestQualification?: 'MSCE' | 'DIPLOMA' | 'DEGREE' | 'POSTGRADUATE' | 'OTHER' | null
+  qualificationProgram?: string | null
+  trainingRoute?: 'UNIVERSITY_EDUCATION_DEGREE' | 'EDUCATION_DIPLOMA' | 'TEACHER_CERTIFICATE' | 'ODL' | 'UNTRAINED' | 'OTHER' | null
+  exitReason?: 'RESIGNED' | 'TRANSFERRED' | 'RETIRED' | 'CONTRACT_ENDED' | 'DISMISSED' | 'DECEASED' | 'OTHER' | null
+  exitDate?: string | null
+  qualifiedSubjects?: Array<{ subject: string }>
+  responsibilities?: Array<{ id: string; title: string; startDate: string; endDate: string | null }>
+  /** Computed server-side: date of birth + the school's retirement age. Null with no date of birth. */
+  retirement?: {
+    retirementAge: number
+    retirementDate: string
+    monthsRemaining: number
+    status: 'RETIRED' | 'DUE_WITHIN_YEAR' | 'OK'
+  } | null
   leaveBalances: {
     id: string
     leaveType: string
@@ -621,10 +1163,53 @@ export interface ApiLeaveRequest {
   startDate: string
   endDate: string
   days: number
+  /** How the days are paid, set when the request is approved. Zero until then. */
+  fullPayDays?: number
+  halfPayDays?: number
+  unpaidDays?: number
   reason: string
   status: string
   reviewNotes?: string
+  reviewedAt?: string | null
+  createdAt?: string
+  /** How the days are (or will be) paid, e.g. "Full pay", "Unpaid" or "10 full pay, 5 half pay". */
+  payNote?: string
   staff?: { firstName: string; lastName: string; department: string }
+}
+
+/**
+ * GET /hr/leave/options: what the signed-in staff member can ask for, with
+ * the balance left and how it is paid. Drives the Request leave form.
+ */
+export interface ApiLeaveOption {
+  leaveType: string
+  label: string
+  /** Percent of normal pay (100 full, 50 half, 0 unpaid). For sick leave, the pay on the full-pay days. */
+  payPercent: number
+  /** One line the form shows under the type, e.g. "Unpaid" or "Full pay, then half pay after 20 days". */
+  payNote: string
+  /** Largest request allowed: the balance left, or the per-request cap. Null means no cap. */
+  maxDays: number | null
+  /** Days left this year for balance-tracked types (annual, sick, emergency). Null for the rest. */
+  remainingDays: number | null
+  totalDays: number | null
+}
+
+/** GET /hr/leave/on-leave: one person whose approved leave covers today. */
+export interface ApiOnLeaveNow {
+  requestId: string
+  staffId: string
+  firstName: string
+  lastName: string
+  department: string
+  jobTitle: string
+  leaveType: string
+  startDate: string
+  endDate: string
+  /** First working day back (the Monday after a Friday end date). */
+  returnDate: string
+  /** Working days still to go, counting today. */
+  daysLeft: number
 }
 
 export interface ApiContractAlert {
@@ -662,6 +1247,10 @@ export interface ApiBook {
   totalCopies: number
   availableCopies: number
   barcode?: string
+  /** R21 — physical shelf/location label, e.g. "M-02". */
+  shelf?: string
+  /** Only present on GET /library/:id — active loans for this title. */
+  borrowings?: ApiBorrowing[]
 }
 
 export interface ApiBorrowing {
@@ -674,8 +1263,17 @@ export interface ApiBorrowing {
   dueDate: string
   returnedAt?: string
   status: string
+  condition?: string
+  notes?: string
   fineAmount?: number
-  book?: { title: string; author: string; isbn?: string }
+  /** Times this loan has been renewed (0 when never renewed). */
+  renewalCount?: number
+  lastRenewedAt?: string
+  book?: { title: string; author: string; isbn?: string; barcode?: string }
+  /** R21 — joined in listBorrowings() so the Borrowings table can show a
+   *  real borrower name/registration/class without a second round trip. */
+  student?: { firstName: string; lastName: string; registrationNo: string; class?: { name: string } }
+  staff?: { firstName: string; lastName: string; employeeNo: string; department: string }
 }
 
 export interface ApiAsset {
@@ -762,6 +1360,9 @@ export interface ApiDigitalResource {
   approved: boolean
   uploadedByUid: string
   approvedAt?: string
+  /** Set when the resource was rejected (it is then not approved and stays hidden from students). */
+  rejectedAt?: string
+  rejectionReason?: string
 }
 
 export interface ApiLibraryStats {
@@ -769,7 +1370,27 @@ export interface ApiLibraryStats {
   activeBorrowings: number
   overdueBorrowings: number
   pendingFines: number
+  /** R21 — MK total of PENDING library fines (pendingFines above stayed a
+   *  count; the redesigned summary tile needs the amount too). */
+  pendingFinesAmount: number
   digitalCount: number
+}
+
+/** R21 — one row of libraryService.getConditionReport(): a returned copy
+ *  recorded as DAMAGED or LOST, for the "no way to see how many/what books
+ *  are lost or damaged" gap in the Reports & Fines ledger. */
+export interface ApiLibraryConditionEntry {
+  id: string
+  bookId: string
+  bookTitle: string
+  condition: 'DAMAGED' | 'LOST'
+  notes?: string
+  returnedAt?: string
+  borrowerName: string
+  /** [R21.2] 'RETURN' — set via the return flow, tied to a real loan and
+   *  borrower. 'CATALOG' — a shelf copy marked directly from the Catalog
+   *  (see BookConditionLog), no borrower involved. */
+  source: 'RETURN' | 'CATALOG'
 }
 
 // ─── REPORT RESPONSE TYPES ───────────────────────────────
@@ -783,20 +1404,36 @@ export interface ApiAdminReport {
 }
 
 export interface ApiClassStat {
+  // [PRODUCTION FIX] id/form were always present in the raw response —
+  // getSchoolPerformanceReport's class.findMany() uses `include`, which
+  // never restricts scalar fields — just never declared here, so no
+  // consumer could reference them type-safely. Additive only; nothing
+  // that already read `name`/`_count.students` is affected.
+  id:     string
   name:   string
+  form:   number
   _count: { students: number }
 }
 
 export interface ApiSchoolReport {
   overall?:    { passRate: number; average: number; total: number }
   classStats?: ApiClassStat[]
+  // [PRODUCTION FIX] Computed and returned by getSchoolPerformanceReport
+  // (server/services/reportService.ts) since it was first written, but
+  // never declared here — so useSchoolReport's ApiSchoolReport type made it
+  // inaccessible to any caller even though the backend was already sending
+  // it on every response. Grouped by classId, active students only (see
+  // the groupBy's `where: { status: 'ACTIVE' }`) — despite the backend
+  // variable's name, this is not actually grouped by form/grade.
+  enrollmentByForm?: { classId: string; _count: number }[]
 }
 
 export interface ApiFinanceReport {
   collected?:     number   // NOTE: backend returns 'collected', not 'totalCollected'
   outstanding?:   number
   target?:        number
-  collectionPct?: number
+  /** null = nothing billed for the scope (never 0). */
+  collectionPct?: number | null
 }
 
 export interface ApiLibraryReport {
@@ -832,8 +1469,10 @@ export interface ApiAcademicClassSummary {
   className: string
   form:      number
   total:     number
-  passRate:  number
-  avg:       number
+  /** null = the class has no computed results (never 0). */
+  passRate:  number | null
+  /** null = the class has no computed results (never 0). */
+  avg:       number | null
 }
 
 export interface ApiAcademicReport {
@@ -850,6 +1489,11 @@ export interface ApiAuditLogEntry {
   actorUid:   string
   actorRole:  string
   createdAt:  string
+  /** [NEW] Resolved from actorUid against StaffProfile/Student — null when
+   *  the actor is neither (a deleted account, or a system/cron actor). */
+  actorName?:           string | null
+  actorEmployeeNo?:     string | null
+  actorRegistrationNo?: string | null
 }
 
 export interface ApiAuditLogResponse {
@@ -883,9 +1527,14 @@ export interface ApiActivityHeatmapCell {
 export interface ApiClassPerformanceStat {
   className:    string
   form:         number
+  /** Students on the class roster. */
   studentCount: number
-  passRate:     number
-  average:      number
+  /** Students with a computed term result. */
+  assessed:     number
+  /** null = no computed results yet (never 0); a real 0 means nobody passed. */
+  passRate:     number | null
+  /** null = no computed results yet (never 0). */
+  average:      number | null
   term:         number
 }
 
@@ -941,7 +1590,11 @@ export interface ApiStudentPerformancePoint {
   academicYear:  string
   term:          number
   average:       number
+  /** JCE track: the overall letter grade. MSCE track: the aggregate
+   *  rendered as "34 pts" — Forms 3-4 have no overall grade. */
   grade:         string
+  aggregatePoints: number | null
+  gradingTrack:  string | null
   position:      number | null
   classTotal:    number
   passStatus:    boolean
@@ -1000,8 +1653,12 @@ export interface ApiBudgetVsActualRow {
   /** ExpenseCategory enum member — the real Budget-to-Expense join key. */
   category:    string
   allocated:   number
+  /** Live APPROVED expenses (never the cached Budget.spent column). */
   spent:       number
-  utilisation: number
+  /** spent ÷ allocated (percent); null when nothing is allocated (never 0). */
+  utilisation: number | null
+  /** True for spend in a category that has no budget in scope. */
+  unbudgeted:  boolean
 }
 
 /** GET /analytics/finance/outstanding-by-class. Not a plain
@@ -1027,12 +1684,20 @@ export interface ApiScholarshipSummaryRow {
   totalDiscount:  number
 }
 
+export interface ApiScholarshipSponsorRow {
+  /** SponsorType enum member, or 'NOT_SPECIFIED' when no sponsor is recorded. */
+  sponsorType:    string
+  recipientCount: number
+  totalDiscount:  number
+}
+
 export interface ApiScholarshipSummary {
   academicYear:        string
   activeScholarships:  number
   recipientCount:      number
   totalDiscountMwk:    number
   byScholarship:       ApiScholarshipSummaryRow[]
+  bySponsor:           ApiScholarshipSponsorRow[]
 }
 
 export interface ApiAttendanceSummaryRow {
@@ -1138,6 +1803,69 @@ export interface ApiSystemHealth {
   activeUsersLastHr:  number
   services:           ApiServiceHealth[]
 }
+
+// ─── SESSIONS (Reports > Admin > Sessions tab) ────────────
+// Backs sessionService.ts — userMgmt.viewActiveSessions / .terminateSession.
+
+export type ApiSessionWindow = '10m' | '30m' | '1h' | 'all'
+
+export interface ApiUserSession {
+  id:             string
+  uid:            string
+  role:           string
+  displayName:    string | null
+  email:          string | null
+  employeeNo:     string | null
+  registrationNo: string | null
+  loginAt:        string
+  lastSeenAt:     string
+  loggedOutAt:    string | null
+  endReason:      string | null
+  isActiveNow:    boolean
+  /** Milliseconds from loginAt to (loggedOutAt ?? lastSeenAt). */
+  durationMs:     number
+}
+
+export interface ApiSessionListResponse {
+  sessions: ApiUserSession[]
+  window:   ApiSessionWindow
+  /** Server pagination — total sessions matching `window`, and this page's position. */
+  total:    number
+  page:     number
+  pages:    number
+  pageSize: number
+}
+
+export interface ApiSessionSummary {
+  activeNow: number
+  last10m:   number
+  last30m:   number
+  last1h:    number
+}
+
+// /sessions/:id/activity proxies auditService.queryByActor() (same as
+// /audit/actor/:uid) — that returns AuditLogRow, which carries `severity`
+// on top of every ApiAuditLogEntry field, so this isn't quite that type.
+export interface ApiSessionAuditEntry extends ApiAuditLogEntry {
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW'
+  /** Before/after values, field-level changes and request context, when the action recorded any. */
+  metadata?: {
+    before?:  Record<string, unknown>
+    after?:   Record<string, unknown>
+    changes?: Array<{ field: string; oldValue: unknown; newValue: unknown }>
+    context?: Record<string, unknown>
+  } | null
+}
+
+export interface ApiSessionActivityResponse {
+  session:  ApiUserSession
+  entries:  ApiSessionAuditEntry[]
+  /** Server pagination — every action in the session's window, newest first. */
+  total:    number
+  page:     number
+  pages:    number
+  pageSize: number
+}
 // ─── PLACEMENTS (R18 — university placement & advisory, redesigned) ──────────
 // Matches the "Malawi Higher Education Placement & Advisory" reference
 // module's three-status workflow: a placement is either entered directly by
@@ -1226,8 +1954,11 @@ export interface ApiPlacementRecommendation {
 }
 
 // The signed-in student's own claim/placement + graduation eligibility.
+/** The student's own placement row — staff-internal fields (notes, staff uids, recorder name) are never sent. */
+export type ApiOwnPlacementRecord = Omit<ApiUniversityPlacement, 'notes' | 'recordedByUid' | 'verifiedByUid' | 'recordedByName'>
+
 export interface ApiMyPlacementResponse {
-  record:            ApiUniversityPlacement | null
+  record:            ApiOwnPlacementRecord | null
   // True once Student.status === 'GRADUATED' — the Student Claim Portal tab
   // only ever renders when this is true (below-MSCE / still-enrolled
   // students never see it).

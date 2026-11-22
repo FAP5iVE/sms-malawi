@@ -49,9 +49,12 @@ export async function ensureFresh(type: string, staleMs: number, fn: () => Promi
   if (!(await claimSync(type, staleMs))) return
   try {
     await fn()
+    // A successful run clears any earlier error so the health report shows
+    // the *current* state, not a failure that has since recovered.
+    await prisma.monitoringSyncState.update({ where: { syncType: type }, data: { lastError: null } }).catch(() => {})
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     logger.error({ event: 'monitoring.sync.on_demand_failed', type, err: message })
     await prisma.monitoringSyncState.update({ where: { syncType: type }, data: { lastError: message } }).catch(() => {})
   }
-}
+}

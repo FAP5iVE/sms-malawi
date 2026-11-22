@@ -15,12 +15,14 @@
  *   [POST-R11 follow-up]: adds useMyLoans() — self-service loan status,
  *   a gap identified after R11 shipped (a staff member who requested a
  *   loan had no way to check on it afterward).
+ * [MAINT 2026-09-16 — Class Subject Presets / Teacher Roster]: Added
+ *   useTeacherRoster() — GET /hr/teacher-roster's client hook.
  * [DEPENDS ON]: W/lib/api-client.ts
  */
 'use client'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import type { CreateStaffInput, UpdateStaffInput, LeaveRequestInput, ReviewLeaveInput, LoanRequestInput, PerformanceNoteInput, UpdateSalaryInput, CreateAllowanceInput } from '@shared/schemas/hr'
-import type { ApiStaffLoan, ApiLeaveRequest, ApiContractAlert } from '@shared/types/api'
+import type { CreateStaffInput, UpdateStaffInput, UpdateOwnDetailsInput, TerminateStaffInput, StaffResponsibilityInput, LeaveRequestInput, ReviewLeaveInput, LoanRequestInput, PerformanceNoteInput, UpdateSalaryInput, CreateAllowanceInput } from '@shared/schemas/hr'
+import type { ApiStaffLoan, ApiLeaveRequest, ApiContractAlert, ApiStaffProfile, ApiStaffPickerOption, ApiLeaveOption, ApiOnLeaveNow } from '@shared/types/api'
 import type { ConflictCheckResult } from '@/server/services/leaveConflictService'
 import { apiFetch, queryKeys } from '@/lib/api-client'
 import { STALE } from '@/components/providers/QueryProvider'
@@ -31,6 +33,30 @@ export function useStaffDirectory(filters: { department?: string; jobTitle?: str
   return useQuery({
     queryKey: queryKeys.hr.staff(filters),
     queryFn: () => apiFetch(`/hr?${params}`),
+  })
+}
+
+// [NEW 2026-09-16 — Class Subject Presets / Teacher Roster] Searchable
+// academic-staff picker — see GET /hr/teacher-roster's own header comment
+// (hr.ts) for the full rationale. Kept separate from useStaffDirectory the
+// same way useSalaryRoster is (usePayroll.ts) — the callers here
+// (class.assignTeacher/class.assignSubject/timetable.edit*) mostly aren't
+// in the real staff directory's REVIEWERS role list either.
+export function useTeacherRoster() {
+  return useQuery({
+    queryKey: queryKeys.hr.teacherRoster(),
+    queryFn: () => apiFetch<ApiStaffProfile[]>('/hr/teacher-roster'),
+  })
+}
+
+// [FIX 2026-10] Staff options for "choose a person" controls (asset allocation).
+// Backed by GET /hr/staff-picker — usable by roles that are NOT in the real
+// staff directory's role list (finance), unlike useStaffDirectory().
+export function useStaffPicker() {
+  return useQuery({
+    queryKey: queryKeys.hr.staffPicker(),
+    queryFn: () => apiFetch<ApiStaffPickerOption[]>('/hr/staff-picker'),
+    staleTime: STALE.MEDIUM,
   })
 }
 
@@ -45,6 +71,7 @@ export function useStaffProfile(id: string) {
 export function useCreateStaff() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Staff created', failureTitle: 'Could not create staff' },
     mutationFn: (data: CreateStaffInput) => apiFetch('/hr', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.hr.all() }),
   })
@@ -53,6 +80,7 @@ export function useCreateStaff() {
 export function useUpdateStaff() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Staff updated', failureTitle: 'Could not update staff' },
     mutationFn: ({ id, data }: { id: string; data: UpdateStaffInput }) =>
       apiFetch(`/hr/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     onSuccess: (_result, { id }) => {
@@ -87,6 +115,7 @@ export function useSalary(staffId: string) {
 export function useUpdateSalary() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Salary updated', failureTitle: 'Could not update salary' },
     mutationFn: ({ staffId, data }: { staffId: string; data: UpdateSalaryInput }) =>
       apiFetch(`/hr/${staffId}/salary`, { method: 'PUT', body: JSON.stringify(data) }),
     onSuccess: (_result, { staffId }) => {
@@ -121,6 +150,7 @@ export function useAllowances(staffId: string) {
 export function useAddAllowance() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Allowance added', failureTitle: 'Could not add allowance' },
     mutationFn: ({ staffId, data }: { staffId: string; data: CreateAllowanceInput }) =>
       apiFetch<ApiAllowance>(`/hr/${staffId}/allowances`, { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: (_result, { staffId }) => {
@@ -132,6 +162,7 @@ export function useAddAllowance() {
 export function useDeleteAllowance() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Allowance deleted', failureTitle: 'Could not delete allowance' },
     mutationFn: ({ allowanceId }: { allowanceId: string; staffId: string }) =>
       apiFetch(`/hr/allowances/${allowanceId}`, { method: 'DELETE' }),
     onSuccess: (_result, { staffId }) => {
@@ -140,14 +171,49 @@ export function useDeleteAllowance() {
   })
 }
 
-export function useLeaveRequests(filters: { staffId?: string; status?: string } = {}) {
+export function useLeaveRequests(
+  filters: { staffId?: string; status?: string } = {},
+  opts: { enabled?: boolean } = {},
+) {
   const params = new URLSearchParams()
   Object.entries(filters).forEach(([k, v]) => { if (v) params.set(k, v) })
   return useQuery({
     queryKey: queryKeys.hr.leaveRequests(filters),
     queryFn: () => apiFetch(`/hr/leave/requests?${params}`),
+    // The reviewer list is role-gated server-side; non-reviewers must not call it.
+    enabled: opts.enabled ?? true,
     // Same fix and same reasoning as useLoans() above — a submission in
     // one session doesn't invalidate another already-open session's cache.
+    staleTime: STALE.REALTIME,
+    refetchInterval: STALE.REALTIME,
+  })
+}
+
+/** The signed-in staff member's own leave requests (the "My leave" list). */
+export function useMyLeaveRequests() {
+  return useQuery({
+    queryKey: queryKeys.hr.myLeave(),
+    queryFn: () => apiFetch<ApiLeaveRequest[]>('/hr/leave/mine'),
+    staleTime: STALE.REALTIME,
+    refetchInterval: STALE.REALTIME,
+  })
+}
+
+/** Leave types this person can request, with days left and how each is paid. */
+export function useMyLeaveOptions() {
+  return useQuery({
+    queryKey: queryKeys.hr.leaveOptions(),
+    queryFn: () => apiFetch<ApiLeaveOption[]>('/hr/leave/options'),
+    staleTime: STALE.REALTIME,
+  })
+}
+
+/** Everyone whose approved leave covers today. HR, admin and high_rank only. */
+export function useOnLeaveNow(enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.hr.onLeaveNow(),
+    queryFn: () => apiFetch<ApiOnLeaveNow[]>('/hr/leave/on-leave'),
+    enabled,
     staleTime: STALE.REALTIME,
     refetchInterval: STALE.REALTIME,
   })
@@ -156,6 +222,7 @@ export function useLeaveRequests(filters: { staffId?: string; status?: string } 
 export function useApplyForLeave() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Leave request submitted', failureTitle: 'Could not submit the leave request' },
     mutationFn: (data: LeaveRequestInput) => apiFetch('/hr/leave/apply', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.hr.all() }),
   })
@@ -164,6 +231,7 @@ export function useApplyForLeave() {
 export function useReviewLeave() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Leave request reviewed', failureTitle: 'Could not review the leave request' },
     mutationFn: ({ id, data }: { id: string; data: ReviewLeaveInput }) =>
       apiFetch<ApiLeaveRequest & { conflictResult: ConflictCheckResult }>(
         `/hr/leave/requests/${id}/review`,
@@ -176,6 +244,7 @@ export function useReviewLeave() {
 export function useRequestLoan() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Loan requested', failureTitle: 'Could not request loan' },
     mutationFn: (data: LoanRequestInput) => apiFetch('/hr/loans/request', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.hr.all() }),
   })
@@ -220,6 +289,7 @@ export function useMyLoans() {
 export function useApproveLoan() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Loan approved', failureTitle: 'Could not approve loan' },
     mutationFn: (loanId: string) => apiFetch<ApiStaffLoan>(`/hr/loans/${loanId}/approve`, { method: 'PATCH' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.hr.all() }),
   })
@@ -228,6 +298,7 @@ export function useApproveLoan() {
 export function useDisburseLoan() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Loan disbursed', failureTitle: 'Could not disburse the loan' },
     mutationFn: (loanId: string) => apiFetch<ApiStaffLoan>(`/hr/loans/${loanId}/disburse`, { method: 'PATCH' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.hr.all() }),
   })
@@ -236,6 +307,7 @@ export function useDisburseLoan() {
 export function useRecordLoanRepayment() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Loan repayment recorded', failureTitle: 'Could not record loan repayment' },
     mutationFn: ({ loanId, amount }: { loanId: string; amount: number }) =>
       apiFetch<ApiStaffLoan>(`/hr/loans/${loanId}/repay`, {
         method: 'PATCH',
@@ -269,7 +341,88 @@ export function useUpcomingContractExpiries(days = 60) {
 export function useAddPerformanceNote() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Performance note added', failureTitle: 'Could not add performance note' },
     mutationFn: (data: PerformanceNoteInput) => apiFetch('/hr/performance', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.hr.all() }),
+  })
+}
+
+// ─── TERMINATION + RESPONSIBILITIES ──────────────────────────────────────────
+
+export function useTerminateStaff(id: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    meta: { successMessage: 'Staff member terminated', failureTitle: 'Could not terminate staff member' },
+    mutationFn: (data: TerminateStaffInput) =>
+      apiFetch(`/hr/${id}/terminate`, { method: 'POST', body: JSON.stringify(data) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.hr.all() })
+      qc.invalidateQueries({ queryKey: queryKeys.hr.staffDetail(id) })
+    },
+  })
+}
+
+function useResponsibilityInvalidation(id: string) {
+  const qc = useQueryClient()
+  return () => {
+    qc.invalidateQueries({ queryKey: queryKeys.hr.staffDetail(id) })
+  }
+}
+
+export function useAddResponsibility(id: string) {
+  const invalidate = useResponsibilityInvalidation(id)
+  return useMutation({
+    meta: { successMessage: 'Responsibility added', failureTitle: 'Could not add responsibility' },
+    mutationFn: (data: StaffResponsibilityInput) =>
+      apiFetch(`/hr/${id}/responsibilities`, { method: 'POST', body: JSON.stringify(data) }),
+    onSuccess: invalidate,
+  })
+}
+
+export function useUpdateResponsibility(id: string) {
+  const invalidate = useResponsibilityInvalidation(id)
+  return useMutation({
+    meta: { successMessage: 'Responsibility updated', failureTitle: 'Could not update responsibility' },
+    mutationFn: ({ responsibilityId, ...data }: { responsibilityId: string } & StaffResponsibilityInput) =>
+      apiFetch(`/hr/${id}/responsibilities/${responsibilityId}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    onSuccess: invalidate,
+  })
+}
+
+export function useDeleteResponsibility(id: string) {
+  const invalidate = useResponsibilityInvalidation(id)
+  return useMutation({
+    meta: { successMessage: 'Responsibility removed', failureTitle: 'Could not remove responsibility' },
+    mutationFn: (responsibilityId: string) =>
+      apiFetch(`/hr/${id}/responsibilities/${responsibilityId}`, { method: 'DELETE' }),
+    onSuccess: invalidate,
+  })
+}
+
+// ─── OWN DETAILS (self-service: phone + next of kin) ─────────────────────────
+
+export interface OwnStaffDetails {
+  phone: string | null
+  nextOfKinName: string | null
+  nextOfKinPhone: string | null
+  nextOfKinRelation: string | null
+}
+
+export function useOwnStaffDetails(enabled: boolean) {
+  return useQuery({
+    queryKey: ['hr-own-details'] as const,
+    queryFn: () => apiFetch<OwnStaffDetails>('/hr/me/details'),
+    enabled,
+    retry: false, // 404 = this account has no staff profile; show nothing, don't retry
+  })
+}
+
+export function useUpdateOwnStaffDetails() {
+  const qc = useQueryClient()
+  return useMutation({
+    meta: { successMessage: 'Your details were saved', failureTitle: 'Could not save your details' },
+    mutationFn: (data: UpdateOwnDetailsInput) =>
+      apiFetch<OwnStaffDetails>('/hr/me/details', { method: 'PATCH', body: JSON.stringify(data) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['hr-own-details'] }),
   })
 }

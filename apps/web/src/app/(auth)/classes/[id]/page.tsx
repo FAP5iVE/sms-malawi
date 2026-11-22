@@ -36,6 +36,22 @@
  *      high_rank/exam_officer open a UI that would then 403 on every
  *      interaction, exactly the class of front-end/back-end mismatch this
  *      audit repeatedly flags.
+ *   6. [2026-10 — Attendance visibility] VIEWING and MARKING are now two
+ *      separate capabilities, both decided from the permission matrix (not
+ *      hardcoded role lists):
+ *        • class.viewAttendance — admin, high_rank, lower_rank, academic,
+ *          exam_officer: sees the Attendance tab and the full register,
+ *          read-only, for ANY class.
+ *        • class.markAttendance + being this class's assigned teacher —
+ *          the only way to get the editable register.
+ *      Roles with neither (students) don't get the tab at all. If a viewer
+ *      is somehow refused by the API, AttendanceSheet shows an inline
+ *      "restricted" panel instead of crashing the page.
+ *   7. [2026-10-28 — Assignment workflow] The Assignments tab is the full
+ *      teacher <-> student loop, implemented in components/classes/assignments/
+ *      (AssignmentsTab and friends) - this page only mounts it. It opens straight to
+ *      an assignment from the notification deep link (?assignment=<id>, with or
+ *      without ?tab=), and its tab badge uses the shared "still to do" definition.
  * [DEPENDS ON]: apps/web/src/hooks/useClasses.ts, @shared/types/api,
  *   apps/web/src/components/classes/AssignmentForm.tsx,
  *   apps/web/src/components/classes/AttendanceSheet.tsx (rewritten in the
@@ -44,24 +60,30 @@
  */
 'use client'
 
-import { useState } from 'react'
-import { useParams } from 'next/navigation'
+import { Suspense, useState } from 'react'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { useClass, useClassTimetable } from '@/hooks/useClasses'
+import { statusWord } from '@/lib/hills/statusWord'
+import { useClass, useClassTimetable, useClassAssignments, useClassSubjectAssignments } from '@/hooks/useClasses'
 import { useAuthStore } from '@/store/authStore'
+import { usePermissions } from '@/hooks/usePermissions'
+import { useEffectiveViewingPeriod } from '@/hooks/useViewingPeriod'
 import type { ApiTimetableSlot } from '@shared/types/api'
 import { RoleGuard } from '@/components/shared/RoleGuard'
 import { StudentRiskBadge } from '@/components/shared/StudentRiskBadge'
 import { AttendanceSheet } from '@/components/classes/AttendanceSheet'
-import AssignmentForm from '@/components/classes/AssignmentForm'
+import { AssignmentsTab, countOutstanding } from '@/components/classes/assignments/AssignmentsTab'
+import { ApiError } from '@/lib/api-client'
+import { SubjectTeachersPanel } from '@/components/classes/SubjectTeachersPanel'
 import { TimetableSlotForm } from '@/components/classes/TimetableSlotForm'
 import { DataTable } from '@/components/shared/DataTable'
 import type { DataColumn } from '@/components/shared/DataTable'
 import { ModuleTabs } from '@/components/shared/ModuleTabs'
+import { ModuleSurface } from '@/components/shared/ModuleSurface'
 import type { TabItem } from '@/components/shared/ModuleTabs'
-import { ArrowLeft, Users, ClipboardCheck, Clock, BookOpen, Hourglass, Plus } from 'lucide-react'
+import { ArrowLeft, Users, ClipboardCheck, Clock, BookOpen, Hourglass, Plus, GraduationCap } from 'lucide-react'
 
-type Tab = 'roster' | 'attendance' | 'timetable' | 'assignments'
+type Tab = 'roster' | 'attendance' | 'timetable' | 'assignments' | 'subjects'
 
 // Mirrors students/[id]/page.tsx's own RoleGuard allowlist exactly — a
 // student-role viewer cannot reach that page, so the Roster tab's
@@ -77,10 +99,17 @@ export default function ClassDetailPage() {
     <RoleGuard
       allowed={['admin', 'high_rank', 'lower_rank', 'academic', 'exam_officer', 'student']}
     >
-      <ClassDetailContent />
+      {/* useSearchParams() (the notification deep link) requires a Suspense boundary. */}
+      <Suspense fallback={<div className="skeleton h-40 rounded-xl" aria-busy="true" />}>
+        <ClassDetailContent />
+      </Suspense>
     </RoleGuard>
   )
 }
+
+// Stable fallback — an inline `?? []` yields a new array identity every render,
+// which AttendanceSheet's reference-based state re-seeding treats as a change.
+const NO_STUDENTS: RosterStudent[] = []
 
 interface RosterStudent {
   id: string
@@ -89,20 +118,40 @@ interface RosterStudent {
   registrationNo: string
   sex: string
   riskLevel?: 'NONE' | 'LOW' | 'MEDIUM' | 'HIGH'
+  riskScore?: number
+  riskFactors?: Array<{ id: string; domain: string; severity: 'HIGH' | 'MEDIUM' | 'LOW'; detail: string }>
 }
 
 function ClassDetailContent() {
+  const router = useRouter()
   const { id } = useParams<{ id: string }>()
   const { data: cls, isLoading } = useClass(id)
   const { role, user } = useAuthStore()
-  const [term, setTerm] = useState(1)
+   const { can } = usePermissions()
+  // Follows the universal header filter (the timetable tab's own term select was a
+  // second control for the same value and has been removed).
+  const { term } = useEffectiveViewingPeriod()
   const { data: slots = [] } = useClassTimetable(id, term)
-  const [activeTab, setActiveTab] = useState<Tab>('roster')
-  const [showAssignmentForm, setShowAssignmentForm] = useState(false)
+  // Notification deep link: /classes/<id>?tab=assignments&assignment=<assignmentId>
+  const searchParams = useSearchParams()
+  const deepLinkedAssignment = searchParams.get('assignment')
+  const [activeTab, setActiveTab] = useState<Tab>(
+    searchParams.get('tab') === 'assignments' || deepLinkedAssignment ? 'assignments' : 'roster',
+  )
   const [showSlotForm, setShowSlotForm] = useState(false)
-  // classService.getClass()'s Prisma `include` already returns assignments —
-  // no second request needed once the Assignments tab is opened.
-  const assignments = cls?.assignments ?? []
+  // [2026-10-22] Assignments come from their own scoped endpoint, not from the
+  // class payload: the server returns only what THIS viewer may see (students
+  // and subject teachers: their subject; class teacher: the whole class).
+  const { data: assignmentsData, error: assignmentsError, isLoading: assignmentsLoading, refetch: refetchAssignments } = useClassAssignments(id)
+  const assignmentsDenied = assignmentsError instanceof ApiError && assignmentsError.status === 403
+  const assignments = assignmentsData ?? []
+  const { data: subjectRows = [] } = useClassSubjectAssignments(id, role === 'student' ? undefined : cls?.academicYear)
+  const isClassTeacher = !!cls?.teacherId && cls.teacherId === user?.uid
+  // Subjects this user may set work for: the class teacher any assigned
+  // subject; a subject teacher only their own. (Server enforces the same.)
+  const assignableSubjects = role === 'academic'
+    ? subjectRows.filter((r) => isClassTeacher || r.teacherUid === user?.uid).map((r) => r.subject)
+    : []
 
   const canViewStudentProfile = role
     ? (STUDENT_PROFILE_VIEWER_ROLES as readonly string[]).includes(role)
@@ -118,12 +167,14 @@ function ClassDetailContent() {
   // render, then hit an unhandled backend error the moment it tried to
   // load. Checking ownership here means the UI can react appropriately
   // instead of surfacing that as a raw error.
-  const isAssignedTeacher = role === 'academic' && cls?.teacherId === user?.uid
-  // Other staff who hold class.viewAnalytics (school-wide oversight, not a
-  // per-class teaching relationship) — see attendance for the day,
-  // read-only, rather than either an error or a wall.
-  const canViewAttendanceReadOnly =
-    !isAssignedTeacher && (['admin', 'high_rank', 'exam_officer', 'lower_rank'].includes(role ?? '') || role === 'academic')
+  // [2026-10] Marking = holds class.markAttendance AND is this class's
+  // assigned teacher (the API enforces the same pair on POST).
+  const canMarkAttendance =
+    can('class.markAttendance') && !!cls?.teacherId && cls.teacherId === user?.uid
+  // Viewing = holds class.viewAttendance. Everyone who can see the tab but
+  // can't mark gets the same register in read-only mode — no restrictions
+  // on WHICH class they may look at.
+  const canViewAttendance = can('class.viewAttendance')
 
   if (isLoading) {
     return (
@@ -140,9 +191,21 @@ function ClassDetailContent() {
 
   const TABS: TabItem<Tab>[] = [
     { id: 'roster', label: 'Students', icon: Users },
-    ...(role !== 'student' ? [{ id: 'attendance' as Tab, label: 'Attendance', icon: ClipboardCheck }] : []),
+    // Hidden entirely for roles with no business here (e.g. students) rather
+    // than offering a tab that can only dead-end.
+    ...(canViewAttendance ? [{ id: 'attendance' as Tab, label: 'Attendance', icon: ClipboardCheck }] : []),
     { id: 'timetable', label: 'Timetable', icon: Clock },
-    { id: 'assignments', label: 'Assignments', icon: BookOpen, badge: assignments.length },
+    {
+      id: 'assignments',
+      label: 'Assignments',
+      icon: BookOpen,
+      // A student's badge counts work still to do and still on time (the shared
+      // "PENDING" definition). Staff get no badge: a total is not something to act on.
+      badge: role === 'student' ? countOutstanding(assignments) : undefined,
+      badgeNoun: 'to do',
+    },
+    // Who teaches each subject. Students have no use for it.
+    ...(role !== 'student' ? [{ id: 'subjects' as Tab, label: 'Subjects and teachers', icon: GraduationCap }] : []),
   ]
 
   // [PRODUCTION FIX 2026-07-31] Full attendance/classes audit finding: this
@@ -160,12 +223,18 @@ function ClassDetailContent() {
     },
     ...(isStudent ? [] : [
       { key: 'registrationNo', label: 'Reg No', priority: 'important' as const },
-      { key: 'sex', label: 'Sex', priority: 'optional' as const },
+      { key: 'sex', label: 'Sex', priority: 'optional' as const, render: (s: RosterStudent) => statusWord(s.sex) },
       {
         key: 'riskLevel',
         label: 'Risk',
         priority: 'optional' as const,
-        render: (s: RosterStudent) => <StudentRiskBadge riskLevel={s.riskLevel ?? 'NONE'} variant="dot" />,
+        render: (s: RosterStudent) => (
+          <StudentRiskBadge
+            riskLevel={s.riskLevel ?? 'NONE'}
+            variant="dot"
+            hint={s.riskFactors?.[0]?.detail}
+          />
+        ),
       },
       {
         key: 'profile',
@@ -173,7 +242,13 @@ function ClassDetailContent() {
         priority: 'important' as const,
         render: (s: RosterStudent) =>
           canViewStudentProfile ? (
-            <Link href={`/students/${s.id}`} className="text-brand-teal text-xs font-medium hover:underline">
+            <Link
+              href={`/students/${s.id}`}
+              // The whole row opens the profile too (onRowClick below); stop this
+              // click reaching the row so the page is opened once, not twice.
+              onClick={(e) => e.stopPropagation()}
+              className="text-tone-teal text-xs font-medium app-action"
+            >
               Profile
             </Link>
           ) : null,
@@ -197,7 +272,7 @@ function ClassDetailContent() {
       priority: 'important',
       render: (s) =>
         s.approvedAt ? null : (
-          <span className="inline-flex items-center gap-1 text-[10px] font-heading font-semibold text-brand-amber bg-brand-amber/10 border border-brand-amber/30 rounded-full px-2 py-0.5">
+          <span className="inline-flex items-center gap-1 text-xs font-heading font-semibold text-tone-amber">
             <Hourglass className="w-2.5 h-2.5" aria-hidden />
             Pending approval
           </span>
@@ -211,7 +286,7 @@ function ClassDetailContent() {
       <div className="flex items-center gap-3 flex-wrap">
         <Link
           href="/classes"
-          className="p-1.5 rounded-lg hover:bg-page border border-base"
+          className="p-1.5 rounded-lg hover:bg-page"
           aria-label="Back to classes"
         >
           <ArrowLeft className="w-4 h-4 text-muted" />
@@ -227,6 +302,11 @@ function ClassDetailContent() {
         </div>
       </div>
 
+      {/* [2026-10 — Match Exams] Tab strip + tab content sit inside the shared
+          ModuleSurface panel (same as Exams/Classes list). The header above
+          stays outside it. Everything inside draws FLAT on the panel — no
+          second bordered card per row/table/list. */}
+      <ModuleSurface>
       {/* Tabs */}
       <ModuleTabs<Tab>
         id="class-detail-tabs"
@@ -240,23 +320,33 @@ function ClassDetailContent() {
 
       {activeTab === 'roster' && (
         <DataTable<RosterStudent>
-          data={cls.students ?? []}
+          data={cls.students ?? NO_STUDENTS}
           isLoading={false}
           columns={rosterColumns}
           rowKey="id"
+          bordered={false}
           emptyMessage="No students assigned to this class yet."
+          // Tap or click a student to open their profile, for the roles that may see it.
+          onRowClick={canViewStudentProfile ? (s) => router.push(`/students/${s.id}`) : undefined}
         />
       )}
 
       {activeTab === 'attendance' && (
         <div className="space-y-3">
-          {isAssignedTeacher ? (
-            <AttendanceSheet classId={id} students={cls.students ?? []} />
-          ) : canViewAttendanceReadOnly ? (
-            <AttendanceSheet classId={id} students={cls.students ?? []} readOnly />
+          {canMarkAttendance ? (
+            <AttendanceSheet classId={id} students={cls.students ?? NO_STUDENTS} />
+          ) : canViewAttendance ? (
+            <AttendanceSheet
+              classId={id}
+              students={cls.students ?? NO_STUDENTS}
+              readOnly
+              classTeacherName={cls.teacherName}
+            />
           ) : (
-            <div className="bg-surface rounded-xl p-6 text-center text-sm text-muted">
-              Only this class&apos;s assigned teacher can mark attendance.
+            // Defensive: the tab is hidden for these roles, so this is only
+            // reachable if permissions change while the page is open.
+            <div className="py-12 text-center text-sm text-muted">
+              You don&apos;t have permission to view this class&apos;s attendance.
             </div>
           )}
         </div>
@@ -269,24 +359,13 @@ function ClassDetailContent() {
               <button
                 type="button"
                 onClick={() => setShowSlotForm(true)}
-                className="inline-flex items-center gap-2 bg-brand-teal text-white rounded-xl px-4 py-2 text-sm font-semibold hover:bg-brand-teal-light min-h-11"
+                className="inline-flex items-center gap-2 bg-btn-brand text-btn-brand-fg rounded-xl px-4 py-2 text-sm font-semibold hover:bg-btn-brand-hover min-h-11"
               >
                 <Plus className="w-4 h-4" aria-hidden />
-                Add Slot
+                Add slot
               </button>
             </RoleGuard>
-            <label className="flex items-center gap-2 text-sm text-muted ml-auto">
-              Term
-              <select
-                value={term}
-                onChange={(e) => setTerm(Number(e.target.value))}
-                className="border border-base rounded-lg px-2 py-1.5 text-sm bg-surface min-h-[36px]"
-              >
-                {[1, 2, 3].map((t) => (
-                  <option key={t} value={t}>Term {t}</option>
-                ))}
-              </select>
-            </label>
+            <span className="text-sm text-muted ml-auto" aria-label="Period shown">Term {term}</span>
           </div>
 
           {showSlotForm && (
@@ -303,47 +382,39 @@ function ClassDetailContent() {
             isLoading={false}
             columns={timetableColumns}
             rowKey="id"
+            bordered={false}
             emptyMessage={`No timetable for Term ${term}.`}
           />
         </div>
       )}
 
       {activeTab === 'assignments' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-heading font-semibold text-brand-navy">Assignments</h3>
-            <RoleGuard allowed={['admin', 'high_rank', 'academic']}>
-              <button
-                onClick={() => setShowAssignmentForm(true)}
-                className="flex items-center gap-2 bg-brand-teal text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-brand-teal-light transition-colors"
-              >
-                + New Assignment
-              </button>
-            </RoleGuard>
-          </div>
+        <AssignmentsTab
+          classId={id}
+          role={role ?? ''}
+          assignments={assignments}
+          denied={assignmentsDenied}
+          loading={assignmentsLoading}
+          loadError={assignmentsError && !assignmentsDenied ? (assignmentsError instanceof Error ? assignmentsError.message : 'Could not load the assignments.') : null}
+          onRetry={() => void refetchAssignments()}
+          assignableSubjects={assignableSubjects}
+          initialOpenId={deepLinkedAssignment}
+        />
+      )}
 
-          {assignments.length === 0 ? (
-            <div className="text-center py-12 text-muted text-sm border border-base rounded-xl">
-              No assignments yet. Click &quot;New Assignment&quot; to create one.
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {assignments.map((a) => (
-                <div key={a.id} className="bg-surface border border-base rounded-xl p-4">
-                  <p className="font-heading font-semibold text-body">{a.title}</p>
-                  <p className="text-sm text-muted mt-0.5">
-                    {a.subject} · Due: {new Date(a.dueDate).toLocaleDateString()}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
+      {activeTab === 'subjects' && (
+        <div className="space-y-4">
+          <h3 className="font-heading font-semibold text-brand-navy">Subjects &amp; teachers</h3>
+          <SubjectTeachersPanel
+            classId={id}
+            academicYear={cls.academicYear}
+            classTeacherUid={cls.teacherId}
+            canManage={can('class.assignSubject')}
+          />
         </div>
       )}
 
-      {showAssignmentForm && (
-        <AssignmentForm classId={id} onClose={() => setShowAssignmentForm(false)} />
-      )}
+        </ModuleSurface>
     </div>
   )
 }

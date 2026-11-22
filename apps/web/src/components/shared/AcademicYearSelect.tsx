@@ -34,13 +34,15 @@
 
 import { forwardRef } from 'react'
 import { usePublicSchoolInfo } from '@/hooks/usePublic'
-import { getAcademicYearOptions } from '@shared/constants/malawi'
+import { getAcademicYearOptions, getAcademicYearForDate } from '@shared/constants/malawi'
 import type { AcademicYearOptionsConfig } from '@shared/constants/malawi'
 
-// Matches the fallback already used while usePublicSchoolInfo() is loading
-// elsewhere in the app (exams/page.tsx, placements/page.tsx) — the same
-// default settingsService.ts itself falls back to server-side.
-const FALLBACK_YEAR = '2025/2026'
+// The school's stored current year (usePublicSchoolInfo().currentYear) is
+// always the source. This is only the last resort for the moment before it
+// loads, or if it is malformed — DERIVED from today's date via the academic
+// calendar (the same derivation settingsService's first-install default
+// uses), never a literal year that goes stale.
+const FALLBACK_YEAR = getAcademicYearForDate()
 
 /** getAcademicYearOptions() throws on a malformed "currentYear" (see
  *  parseAcademicYear's contract) — a stored SystemSettings value could in

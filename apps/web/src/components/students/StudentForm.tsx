@@ -1,6 +1,17 @@
 'use client'
 
 /**
+ * [CHANGE TYPE]: TARGETED EDIT (2026-11-04, student form brought level with the application form)
+ * [PURPOSE]: Creating a student now collects the same record the profile shows and
+ *   the /apply form asks for. New "Welfare" step (create mode, roles with
+ *   student.editWelfare): orphan status, vulnerability, health / medical alert,
+ *   special needs. Welfare is not part of CreateStudentSchema by design, so after the
+ *   student is created the draft is saved through the existing welfare endpoints
+ *   (permission-checked and audited). If that save fails the student still exists,
+ *   so the form closes and a toast points at the profile's Welfare card instead of
+ *   leaving the form open to be submitted twice. Editing an existing student does not
+ *   show the step: the profile's Welfare card is where welfare is edited.
+ *
  * apps/web/src/components/students/StudentForm.tsx — Phase C5
  * [CHANGE TYPE]: MAJOR REWRITE of the edit-mode data flow only (R5)
  * [R-PHASE]: R5 — Academics I: Admissions & Student Records
@@ -48,14 +59,17 @@
  *   record creation via a POST /students/:id/photo multipart request.
  */
 
-import { useState, useEffect }      from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useIsMobileSync }          from '@/hooks/use-mobile'
+import { createPortal }             from 'react-dom'
 import { z }                        from 'zod'
 import { useForm }                  from 'react-hook-form'
 import { zodResolver }              from '@hookform/resolvers/zod'
 import { AnimatePresence, motion }  from 'framer-motion'
 import { Check, ChevronLeft, ChevronRight, Loader2, User, X, AlertCircle } from 'lucide-react'
 import Image                        from 'next/image'
-import { CreateStudentSchema }      from '@shared/schemas/student'
+import { toast }                    from 'sonner'
+import { CreateStudentSchema, UpdateWelfareSchema, SupportNeedInputSchema } from '@shared/schemas/student'
 import type { CreateStudentInput }  from '@shared/schemas/student'
 
 // CreateStudentSchema has defaulted/required transforms (nationality default,
@@ -66,9 +80,19 @@ import type { CreateStudentInput }  from '@shared/schemas/student'
 type StudentFormValues = z.input<typeof CreateStudentSchema>
 import type { ApiStudent }          from '@shared/types/api'
 import { useCreateStudent, useUpdateStudent, useStudent } from '@/hooks/useStudents'
+import { usePermissions }           from '@/hooks/usePermissions'
+import { apiFetch }                 from '@/lib/api-client'
 import { StudentFeeStructure } from '@/components/students/StudentFeeStructure'
 import { uploadFileDirectly } from '@/lib/directUpload'
 import { useMotionEnabled }         from '@/store/motionStore'
+import {
+  decideClose,
+  isUserEdit,
+  UNSAVED_TITLE,
+  UNSAVED_BODY,
+  UNSAVED_KEEP,
+  UNSAVED_DISCARD,
+} from '@/lib/hills/unsaved'
 import {
   SHEET_UP_VARIANTS,
   OVERLAY_VARIANTS,
@@ -81,21 +105,28 @@ import {
   PersonalSection,
   AcademicSection,
   ContactSection,
+  WelfareSection,
   FieldDivider,
   STEP_FIELDS,
+  EMPTY_WELFARE_DRAFT,
+  welfareDraftHasData,
+  type WelfareDraft,
 } from '@/components/students/StudentFormSections'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // STEP CONFIG
 // ─────────────────────────────────────────────────────────────────────────────
 
-const STEPS = [
+const BASE_STEPS = [
   { label: 'Personal',  shortLabel: '1' },
   { label: 'Academic',  shortLabel: '2' },
   { label: 'Contact',   shortLabel: '3' },
 ] as const
 
-const STEP_COUNT = STEPS.length
+// Only offered when creating a student and the user may record welfare data.
+const WELFARE_STEP = { label: 'Welfare', shortLabel: '4' } as const
+
+type StepDef = { readonly label: string; readonly shortLabel: string }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DIRECTIONAL STEP VARIANTS
@@ -115,15 +146,17 @@ const STEP_TRANSITION = { duration: 0.18, ease: 'easeOut' } as const
 // ─────────────────────────────────────────────────────────────────────────────
 
 function StepIndicator({
+  steps,
   currentStep,
   motionEnabled,
 }: {
+  steps: readonly StepDef[]
   currentStep: number
   motionEnabled: boolean
 }) {
   return (
     <div className="flex items-center gap-0 justify-center" role="list" aria-label="Form steps">
-      {STEPS.map((step, idx) => {
+      {steps.map((step, idx) => {
         const done    = idx < currentStep
         const active  = idx === currentStep
         const future  = idx > currentStep
@@ -149,7 +182,7 @@ function StepIndicator({
               })}
               className={[
                 'w-7 h-7 rounded-full border-2 flex items-center justify-center',
-                'text-[11px] font-heading font-bold transition-colors',
+                'text-xs font-heading font-bold transition-colors',
                 done    ? 'text-white'         : '',
                 active  ? 'text-white'         : '',
                 future  ? 'text-muted'         : '',
@@ -164,7 +197,7 @@ function StepIndicator({
             </motion.div>
 
             {/* Connector line (not after last step) */}
-            {idx < STEP_COUNT - 1 && (
+            {idx < steps.length - 1 && (
               <div className="relative w-8 h-0.5 mx-0.5">
                 <div className="absolute inset-0 bg-base rounded-full" />
                 <motion.div
@@ -227,7 +260,7 @@ function PhotoUpload({ preview, onChange, compact = false }: PhotoUploadProps) {
       <div>
         <label
           htmlFor="student-photo-upload"
-          className="cursor-pointer text-sm font-heading font-semibold text-brand-teal hover:text-brand-teal/80 transition-colors"
+          className="cursor-pointer text-sm font-heading font-semibold text-tone-teal hover:text-brand-teal/80 transition-colors"
         >
           {preview ? 'Change photo' : 'Upload photo'}
         </label>
@@ -273,6 +306,15 @@ function mapStudentToFormValues(s: ApiStudent): Partial<StudentFormValues> {
     guardianRelation: s.guardianRelation,
     classId:          s.classId,
     status:           s.status as CreateStudentInput['status'],
+    nrbNumber:            s.nrbNumber ?? '',
+    traditionalAuthority: s.traditionalAuthority ?? '',
+    religion:             s.religion ?? '',
+    homeLanguage:         s.homeLanguage ?? '',
+    residenceType:        s.residenceType ?? undefined,
+    travelMinutes:        s.travelMinutes ?? null,
+    admissionType:        s.admissionType ?? 'NEW_INTAKE',
+    previousSchool:       s.previousSchool ?? '',
+    reasonForTransfer:    s.reasonForTransfer ?? '',
   }
 }
 
@@ -292,6 +334,14 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
   const { mutate: updateStudent, isPending: isUpdating } = useUpdateStudent()
   const isPending = isCreating || isUpdating
   const motionEnabled = useMotionEnabled()
+  const { can } = usePermissions()
+
+  // Welfare is collected on create only, and only for roles allowed to record it
+  // (the server enforces student.editWelfare again on each welfare request).
+  const withWelfare = !isEdit && can('student.editWelfare')
+  const steps: readonly StepDef[] = withWelfare ? [...BASE_STEPS, WELFARE_STEP] : BASE_STEPS
+  const stepCount = steps.length
+  const [welfare, setWelfare] = useState<WelfareDraft>(EMPTY_WELFARE_DRAFT)
 
   // Local visible state so exit animations complete before parent unmounts
   const [visible, setVisible]         = useState(true)
@@ -301,15 +351,23 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
   const [direction, setDirection]     = useState<1 | -1>(1)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
-  // Detect mobile at mount time — safe: component only ever mounts on click
-  const [isMobile] = useState(() =>
-    typeof window !== 'undefined' ? window.innerWidth < 768 : false,
-  )
+  // Unsaved-changes warning — the same rule and wording as the staff form (the
+  // shared dialog, lib/hills/unsaved.ts): once anything has been entered, the X,
+  // an outside click and Escape ask "Keep editing / Discard changes" instead of
+  // closing silently. A form nobody has typed in closes at once. The footer's
+  // Cancel button and the close after a successful save are unchanged.
+  const [typedIn, setTypedIn] = useState(false)
+  const [asking, setAsking]   = useState(false)
+
+  // Live breakpoint (was a one-shot read at mount, so resizing or rotating
+  // with the form open left the wrong layout). Form state lives in this
+  // component, so switching sheet <-> dialog keeps everything the user typed.
+  const isMobile = useIsMobileSync()
 
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isDirty },
     trigger,
     reset,
   } = useForm<StudentFormValues, unknown, CreateStudentInput>({
@@ -331,6 +389,39 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
     // onClose() is called by AnimatePresence onExitComplete
   }
 
+  // Anything entered counts: typed or picked fields (user-caused input events),
+  // fields set from code that react-hook-form tracks, a chosen photo, or welfare.
+  const dirty = typedIn || isDirty || photoFile !== null || welfare !== EMPTY_WELFARE_DRAFT
+
+  /** Close request from the X, the backdrop or Escape. */
+  function attemptClose() {
+    const decision = decideClose({ busy: isPending, guarded: true, dirty, asking })
+    if (decision === 'close') handleClose()
+    else if (decision === 'ask') setAsking(true)
+    else if (decision === 'keep-editing') setAsking(false)
+  }
+  const attemptCloseRef = useRef(attemptClose)
+  useEffect(() => {
+    attemptCloseRef.current = attemptClose
+  })
+
+  useEffect(() => {
+    if (!visible) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      // A picker inside the form may call preventDefault() on Escape to close itself first.
+      if (e.key !== 'Escape' || e.defaultPrevented) return
+      e.preventDefault()
+      attemptCloseRef.current()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [visible])
+
+  /** Marks the form as typed in; fired by input events bubbling up from any field. */
+  function handleFormInput(e: React.FormEvent<HTMLFormElement>) {
+    if (isUserEdit(e.nativeEvent)) setTypedIn(true)
+  }
+
   function handlePhotoChange(file: File, preview: string) {
     setPhotoFile(file)
     setPhotoPreview(preview)
@@ -341,7 +432,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
     const valid  = await trigger(fields)
     if (!valid) return
     setDirection(1)
-    setCurrentStep((s) => Math.min(s + 1, STEP_COUNT - 1))
+    setCurrentStep((s) => Math.min(s + 1, stepCount - 1))
   }
 
   function handleBack() {
@@ -366,8 +457,58 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
     }
   }
 
+  /** Builds the welfare requests from the draft, or returns the first validation message. */
+  function buildWelfareRequests():
+    | { error: string }
+    | { welfare: ReturnType<typeof UpdateWelfareSchema.parse> | null; needs: Array<ReturnType<typeof SupportNeedInputSchema.parse>> } {
+    if (!withWelfare || !welfareDraftHasData(welfare)) return { welfare: null, needs: [] }
+
+    const body: Record<string, unknown> = {}
+    if (welfare.orphanStatus !== 'UNKNOWN')   body.orphanStatus = welfare.orphanStatus
+    if (welfare.isVulnerable)                 body.isVulnerable = true
+    if (welfare.vulnerabilityNote.trim())     body.vulnerabilityNote = welfare.vulnerabilityNote
+    if (welfare.medicalAlert.trim())          body.medicalAlert = welfare.medicalAlert
+    const parsedWelfare = Object.keys(body).length > 0 ? UpdateWelfareSchema.safeParse(body) : null
+    if (parsedWelfare && !parsedWelfare.success) {
+      return { error: parsedWelfare.error.issues[0]?.message ?? 'Check the welfare details.' }
+    }
+
+    const needs: Array<ReturnType<typeof SupportNeedInputSchema.parse>> = []
+    for (const n of welfare.needs) {
+      const parsed = SupportNeedInputSchema.safeParse({
+        type: n.type,
+        accommodation: n.accommodation,
+        assistiveDevice: n.assistiveDevice,
+      })
+      if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Check the special needs.' }
+      needs.push(parsed.data)
+    }
+    return { welfare: parsedWelfare && parsedWelfare.success ? parsedWelfare.data : null, needs }
+  }
+
+  /** Saves the welfare draft against the new student. Never throws: the student already exists. */
+  async function saveWelfare(id: string, req: Exclude<ReturnType<typeof buildWelfareRequests>, { error: string }>) {
+    if (!req.welfare && req.needs.length === 0) return
+    try {
+      if (req.welfare) {
+        await apiFetch(`/students/${id}/welfare`, { method: 'PATCH', body: JSON.stringify(req.welfare) })
+      }
+      for (const need of req.needs) {
+        await apiFetch(`/students/${id}/support-needs`, { method: 'POST', body: JSON.stringify(need) })
+      }
+    } catch (e) {
+      console.error('Welfare save failed:', e)
+      toast.error('Student created, but the welfare details could not be saved. Add them from the student profile.')
+    }
+  }
+
   async function onSubmit(data: CreateStudentInput) {
     setSubmitError(null)
+    const welfareRequests = buildWelfareRequests()
+    if ('error' in welfareRequests) {
+      setSubmitError(welfareRequests.error)
+      return
+    }
     if (isEdit) {
       updateStudent(
         { id: studentId!, ...data },
@@ -384,6 +525,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
     } else {
       createStudent(data, {
         onSuccess: async (student) => {
+          await saveWelfare(student.id, welfareRequests)
           await uploadPhotoIfNeeded(student.id)
           handleClose()
         },
@@ -411,7 +553,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
   }
 
   // ── Shared section props ────────────────────────────────────────────────────
-  const sectionProps = { register, errors }
+  const sectionProps = { register, errors, selectedClassId: existingStudent?.classId }
 
   // Animation variant sets
   const backdropVariants   = reducedMotionVariants(motionEnabled, OVERLAY_VARIANTS)
@@ -442,14 +584,60 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
     <PersonalSection key="personal" {...sectionProps} />,
     <AcademicSection key="academic" {...sectionProps} />,
     <ContactSection  key="contact"  {...sectionProps} />,
+    ...(withWelfare
+      ? [<WelfareSection key="welfare" value={welfare} onChange={setWelfare} />]
+      : []),
   ]
+
+  // The question shown over the form (same markup and wording as the shared dialog).
+  const unsavedPrompt = (
+    <div
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="student-form-unsaved-title"
+      aria-describedby="student-form-unsaved-body"
+      className="app-unsaved absolute inset-0 z-10 flex items-end justify-center bg-brand-navy/40 p-4 sm:items-center"
+    >
+      <div className="w-full max-w-sm rounded-[14px] border border-base bg-surface p-5 shadow-xl">
+        <h3 id="student-form-unsaved-title" className="font-heading text-base font-bold text-brand-navy">
+          {UNSAVED_TITLE}
+        </h3>
+        <p id="student-form-unsaved-body" className="mt-1 text-sm text-muted">
+          {UNSAVED_BODY}
+        </p>
+        <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={handleClose}
+            className="inline-flex items-center justify-center gap-2 min-h-11 px-5 rounded-xl text-sm font-heading font-semibold transition-colors border border-base text-tone-coral hover:bg-page"
+          >
+            {UNSAVED_DISCARD}
+          </button>
+          <button
+            type="button"
+            autoFocus
+            onClick={() => setAsking(false)}
+            className="inline-flex items-center justify-center gap-2 min-h-11 px-5 rounded-xl text-sm font-heading font-semibold transition-colors bg-btn-brand text-btn-brand-fg hover:bg-btn-brand-hover"
+          >
+            {UNSAVED_KEEP}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+
+  // [PRODUCTION FIX] Both render paths below now portal directly under
+  // <body> instead of rendering inline in the page tree — same reasoning
+  // as AnnouncementForm.tsx/StaffForm.tsx: escapes the page-transition
+  // wrapper's stacking context/containing-block entirely.
+  if (typeof document === 'undefined') return null
 
   // ═══════════════════════════════════════════════════════════════════════════
   // MOBILE RENDER — bottom sheet + stepped navigation
   // ═══════════════════════════════════════════════════════════════════════════
 
   if (isMobile) {
-    return (
+    return createPortal(
       <AnimatePresence onExitComplete={onClose}>
         {visible && (
           <>
@@ -462,7 +650,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
               exit="exit"
               transition={backdropTransition}
               className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px]"
-              onClick={handleClose}
+              onClick={attemptClose}
               aria-hidden
             />
 
@@ -479,6 +667,8 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
               aria-label={isEdit ? 'Edit student' : 'Add new student'}
               aria-modal="true"
             >
+              {asking && unsavedPrompt}
+
               {/* Drag handle */}
               <div className="flex justify-center pt-3 pb-1 shrink-0" aria-hidden>
                 <span className="w-10 h-1 rounded-full bg-muted/25" />
@@ -491,18 +681,19 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
                     {isEdit ? 'Edit Student' : 'Add Student'}
                   </h2>
                   <p className="text-xs text-muted mt-0.5">
-                    Step {currentStep + 1} of {STEP_COUNT} — {STEPS[currentStep]!.label}
+                    Step {currentStep + 1} of {stepCount} - {steps[currentStep]!.label}
                   </p>
                 </div>
 
                 <div className="flex items-center gap-3">
                   <StepIndicator
+                    steps={steps}
                     currentStep={currentStep}
                     motionEnabled={motionEnabled}
                   />
                   <button
                     type="button"
-                    onClick={handleClose}
+                    onClick={attemptClose}
                     className="min-h-11 min-w-11 flex items-center justify-center rounded-xl text-muted hover:bg-page hover:text-body transition-colors"
                     aria-label="Close form"
                   >
@@ -514,6 +705,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
               {/* Scrollable step content */}
               <form
                 onSubmit={handleSubmit(onSubmit, onInvalid)}
+                onInput={handleFormInput}
                 className="flex-1 min-h-0 overflow-hidden flex flex-col"
               >
                 {/* Photo upload — Step 1 only */}
@@ -554,17 +746,17 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
                     same gating pattern as the submit-error message right
                     below (isEdit + last step), so it doesn't compete with
                     the personal/academic fields on earlier steps. */}
-                {isEdit && studentId && currentStep === STEP_COUNT - 1 && (
+                {isEdit && studentId && currentStep === stepCount - 1 && (
                   <div className="mx-5 mb-3">
                     <StudentFeeStructure studentId={studentId} />
                   </div>
                 )}
 
                 {/* Submit error */}
-                {submitError && currentStep === STEP_COUNT - 1 && (
+                {submitError && currentStep === stepCount - 1 && (
                   <p
                     role="alert"
-                    className="mx-5 mb-3 flex items-start gap-2 text-xs text-brand-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3"
+                    className="mx-5 mb-3 flex items-start gap-2 text-xs text-tone-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3"
                   >
                     <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden />
                     {submitError}
@@ -588,11 +780,11 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
                   )}
 
                   {/* Next / Submit */}
-                  {currentStep < STEP_COUNT - 1 ? (
+                  {currentStep < stepCount - 1 ? (
                     <button
                       type="button"
                       onClick={handleNext}
-                      className="flex items-center gap-1.5 min-h-11 px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors"
+                      className="flex items-center gap-1.5 min-h-11 px-5 rounded-xl text-sm font-heading font-semibold bg-brand-deep text-white hover:brightness-110 transition-colors"
                     >
                       Next
                       <ChevronRight className="w-4 h-4" aria-hidden />
@@ -601,7 +793,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
                     <button
                       type="submit"
                       disabled={isPending}
-                      className="flex items-center gap-2 min-h-11 px-6 rounded-xl text-sm font-heading font-semibold bg-brand-teal text-white hover:bg-brand-teal/90 transition-colors disabled:opacity-60"
+                      className="flex items-center gap-2 min-h-11 px-6 rounded-xl text-sm font-heading font-semibold bg-btn-brand text-btn-brand-fg hover:bg-btn-brand-hover transition-colors disabled:opacity-60"
                     >
                       {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden />}
                       {isPending ? 'Saving…' : isEdit ? 'Save Changes' : 'Add Student'}
@@ -612,7 +804,8 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
             </motion.div>
           </>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+      document.body,
     )
   }
 
@@ -620,7 +813,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
   // DESKTOP RENDER — centred dialog, all sections visible simultaneously
   // ═══════════════════════════════════════════════════════════════════════════
 
-  return (
+  return createPortal(
     <AnimatePresence onExitComplete={onClose}>
       {visible && (
         <motion.div
@@ -635,7 +828,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
           {/* Dim backdrop */}
           <div
             className="absolute inset-0 bg-brand-navy/50 backdrop-blur-sm"
-            onClick={handleClose}
+            onClick={attemptClose}
             aria-hidden
           />
 
@@ -652,6 +845,8 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
             aria-label={isEdit ? 'Edit student' : 'Add new student'}
             aria-modal="true"
           >
+            {asking && unsavedPrompt}
+
             {/* Dialog header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-base shrink-0">
               <div>
@@ -666,7 +861,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
               </div>
               <button
                 type="button"
-                onClick={handleClose}
+                onClick={attemptClose}
                 className="min-h-11 min-w-11 flex items-center justify-center rounded-xl hover:bg-page text-muted hover:text-body transition-colors"
                 aria-label="Close dialog"
               >
@@ -677,6 +872,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
             {/* Scrollable form body */}
             <form
               onSubmit={handleSubmit(onSubmit, onInvalid)}
+              onInput={handleFormInput}
               className="flex-1 overflow-y-auto flex flex-col"
             >
               {/* Photo upload row */}
@@ -689,21 +885,31 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
               <div className="px-6 py-5 space-y-1">
                 {/* Personal section */}
                 <div className="grid grid-cols-2 gap-x-5 gap-y-1">
-                  <FieldDivider title="Personal Details" />
+                  <FieldDivider title="Personal details" />
                 </div>
                 <PersonalSection {...sectionProps} />
 
                 {/* Academic section */}
                 <div className="grid grid-cols-2 gap-x-5 gap-y-1 mt-2">
-                  <FieldDivider title="Academic Details" />
+                  <FieldDivider title="Academic details" />
                 </div>
                 <AcademicSection {...sectionProps} />
 
                 {/* Contact section */}
                 <div className="grid grid-cols-2 gap-x-5 gap-y-1 mt-2">
-                  <FieldDivider title="Contact Details" />
+                  <FieldDivider title="Contact details" />
                 </div>
                 <ContactSection {...sectionProps} />
+
+                {/* Welfare & Health — create mode, student.editWelfare only */}
+                {withWelfare && (
+                  <>
+                    <div className="grid grid-cols-2 gap-x-5 gap-y-1 mt-2">
+                      <FieldDivider title="Welfare and health" />
+                    </div>
+                    <WelfareSection value={welfare} onChange={setWelfare} />
+                  </>
+                )}
 
                 {/* [PRODUCTION FIX] Mirrors StaffForm.tsx's SalarySection
                     for students — "how staff has a salary structure,
@@ -720,7 +926,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
                 {submitError && (
                   <p
                     role="alert"
-                    className="flex items-start gap-2 text-xs text-brand-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3 mt-2"
+                    className="flex items-start gap-2 text-xs text-tone-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3 mt-2"
                   >
                     <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden />
                     {submitError}
@@ -740,7 +946,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="min-h-11 px-6 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors flex items-center gap-2 disabled:opacity-60"
+                  className="min-h-11 px-6 rounded-xl text-sm font-heading font-semibold bg-brand-deep text-white hover:brightness-110 transition-colors flex items-center gap-2 disabled:opacity-60"
                 >
                   {isPending && (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden />
@@ -752,6 +958,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   )
-}
+}

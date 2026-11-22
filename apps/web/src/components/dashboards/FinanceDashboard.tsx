@@ -27,22 +27,18 @@
  */
 
 import {
-  Banknote,
-  TrendingUp,
-  TrendingDown,
-  Clock,
   PlusCircle,
   FileText,
   Users,
   Receipt,
 } from 'lucide-react'
-import { StatCard, StatCardGrid, statValue } from '@/components/shared/StatCard'
 import { QuickActions } from '@/components/shared/QuickActions'
-import { FeeCollectionRadial } from '@/components/finances/FeeCollectionRadial'
 import { IncomeExpenseChart } from '@/components/finances/IncomeExpenseChart'
-import { useFinanceSummary } from '@/hooks/useFinances'
-import { useCurrentAcademicPeriod } from '@/hooks/useSettings'
-import { formatMWK } from '@shared/constants/malawi'
+import { useFinanceOverview, useFinanceAttention } from '@/hooks/reporting/useFinanceReporting'
+import { DashboardAttention } from './DashboardReport'
+import { PrimaryOverviewKpis, ReportLinks, SecondaryKpis } from './DashboardSections'
+import type { ReportLink } from './DashboardSections'
+import { useViewingPeriod } from '@/hooks/useViewingPeriod'
 import type { QuickAction } from '@/components/shared/QuickActions'
 
 const QUICK_ACTIONS: QuickAction[] = [
@@ -56,22 +52,22 @@ const QUICK_ACTIONS: QuickAction[] = [
     // there's no longer a separate "new invoice" mode to deep-link into,
     // so ?action=new was dropped; landing on the tab and searching for the
     // student now IS the new-invoice flow.
-    label: 'New Invoice',
+    label: 'New invoice',
     href: '/finances?tab=invoices',
     icon: FileText,
     color: 'bg-brand-navy/10',
     text: 'text-brand-navy',
   },
   {
-    label: 'Record Payment',
+    label: 'Record payment',
     // R15: payments live in the Invoices tab (page reads ?tab= as of this phase)
     href: '/finances?tab=invoices',
     icon: PlusCircle,
     color: 'bg-brand-teal/10',
-    text: 'text-brand-teal',
+    text: 'text-tone-teal',
   },
   {
-    label: 'Generate Receipt',
+    label: 'Generate receipt',
     // R15: receipts are issued from a recorded payment — same Invoices tab
     href: '/finances?tab=invoices',
     icon: Receipt,
@@ -79,90 +75,55 @@ const QUICK_ACTIONS: QuickAction[] = [
     text: 'text-emerald-600',
   },
   {
-    label: 'Fee Reports',
+    label: 'Fee reports',
     href: '/reports',
     icon: FileText,
     color: 'bg-blue-50',
     text: 'text-blue-600',
   },
   {
-    label: 'Student Balances',
+    label: 'Student balances',
     href: '/finances?tab=invoices',
     icon: Users,
     color: 'bg-brand-amber/10',
-    text: 'text-brand-amber',
+    text: 'text-tone-amber',
   },
 ]
 
-export function FinanceDashboard() {
-  const { academicYear, term, isLoading: periodLoading } = useCurrentAcademicPeriod()
-  const { data: summary, isLoading: summaryLoading } = useFinanceSummary(
-    academicYear ?? '',
-    term ?? 0,
-  )
+/** Lead with collection and what is owed; the rest sit in "More figures". */
+const PREFERRED = ['collectionRate', 'outstanding', 'overdue', 'budgetUtilisation']
 
-  const isLoading = periodLoading || summaryLoading
-  const mwk = (v: number | undefined): string | undefined =>
-    v === undefined ? undefined : formatMWK(v)
+const REPORT_LINKS: ReportLink[] = [
+  { label: 'Fee collection', href: '/reports?tab=collection', description: 'Billed, collected and rate by term' },
+  { label: 'Receivables ageing', href: '/reports?tab=aging', description: 'Overdue invoices by age' },
+  { label: 'Outstanding by class', href: '/reports?tab=outstanding', description: 'Who owes what, by class' },
+  { label: 'Expenses and budget', href: '/reports?tab=expenses', description: 'Spend against budget' },
+  { label: 'Cash flow', href: '/reports?tab=cashflow', description: 'Money in and out' },
+  { label: 'Payments', href: '/reports?tab=payments', description: 'Receipts and methods' },
+]
+
+export function FinanceDashboard() {
+  const { academicYear, term, isLoading: periodLoading } = useViewingPeriod()
+  const period = { academicYear: academicYear ?? '', term: term ?? undefined }
+  const overview = useFinanceOverview(period)
+  const attention = useFinanceAttention(period)
 
   return (
-    <div className="space-y-6">
-      <StatCardGrid className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard
-          label="Total Collected"
-          value={statValue(isLoading, mwk(summary?.totalCollected))}
-          icon={TrendingUp}
-          trend="neutral"
-          trendLabel={term ? `Term ${term}` : 'this term'}
-          iconColor="bg-emerald-50"
-          iconText="text-emerald-600"
-          href="/finances?tab=invoices"
-        />
-        <StatCard
-          label="Outstanding Fees"
-          value={statValue(isLoading, mwk(summary?.totalOutstanding))}
-          icon={TrendingDown}
-          trend="neutral"
-          trendLabel="unpaid"
-          iconColor="bg-brand-coral/10"
-          iconText="text-brand-coral"
-          href="/finances?tab=invoices"
-        />
-        <StatCard
-          label="Total Expenses"
-          value={statValue(isLoading, mwk(summary?.totalExpenses))}
-          icon={Banknote}
-          trend="neutral"
-          trendLabel="approved"
-          iconColor="bg-brand-teal/10"
-          iconText="text-brand-teal"
-          href="/finances?tab=expenses"
-        />
-        <StatCard
-          label="Collection Rate"
-          value={statValue(
-            isLoading,
-            summary ? `${summary.collectionPercent}%` : undefined,
-          )}
-          icon={Clock}
-          trend="neutral"
-          trendLabel="of target"
-          iconColor="bg-brand-amber/10"
-          iconText="text-brand-amber"
-        />
-      </StatCardGrid>
-      <QuickActions actions={QUICK_ACTIONS} />
-      <div className="grid md:grid-cols-2 gap-4">
-        <FeeCollectionRadial
-          academicYear={academicYear ?? ''}
-          term={term ?? 0}
-          periodLoading={periodLoading}
-        />
-        <IncomeExpenseChart
-          academicYear={academicYear ?? ''}
-          periodLoading={periodLoading}
-        />
-      </div>
+    <div className="space-y-4 md:space-y-6">
+      <PrimaryOverviewKpis
+        title="Finance"
+        summary="See what has come in, what is still owed and how spending compares with the budget."
+        academicYear={academicYear}
+        term={term}
+        overview={overview}
+        preferred={PREFERRED}
+        reportsHref="/reports?tab=overview"
+      />
+      <IncomeExpenseChart academicYear={academicYear ?? ''} periodLoading={periodLoading} />
+      <DashboardAttention query={attention} title="Finance exceptions" limit={5} />
+      <SecondaryKpis title="More figures and findings" overview={overview} preferred={PREFERRED} showInsights />
+      <QuickActions actions={QUICK_ACTIONS} compact />
+      <ReportLinks links={REPORT_LINKS} />
     </div>
   )
 }

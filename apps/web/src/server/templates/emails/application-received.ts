@@ -14,7 +14,7 @@
 import 'server-only'
 
 import { format } from 'date-fns'
-import { buildEmailHtml, buildEmailText, TOKEN, type EmailMessage, type SchoolBranding } from './base'
+import { buildEmailHtml, buildEmailText, details, fitSubject, para, type EmailMessage, type SchoolBranding } from './base'
 
 export type ApplicationReceivedRecipient = 'applicant' | 'guardian'
 
@@ -34,66 +34,36 @@ export function renderApplicationReceived(
   const submittedLabel = format(data.submittedAt, 'EEEE, d MMMM yyyy')
   const greetingName   = data.recipient === 'applicant' ? data.applicantName : data.guardianName
 
-  const subject = data.recipient === 'applicant'
-    ? `Application Received — ${school.schoolName}`
-    : `Application Submitted for ${data.applicantName} — ${school.schoolName}`
+  const subject = fitSubject(
+    data.recipient === 'applicant'
+      ? 'We received your application'
+      : `Application received for ${data.applicantName}`,
+  )
 
   const bodyHtml = `
-    <!-- Greeting -->
-    <tr>
-      <td style="padding:32px 32px 0;font-family:${TOKEN.FONT_STACK};font-size:15px;color:${TOKEN.TEXT_BODY};line-height:1.7;">
-        <p style="margin:0 0 8px;">Dear ${greetingName},</p>
-        <p style="margin:0;">
-          ${data.recipient === 'applicant'
-            ? `Thank you for submitting your application to <strong>${school.schoolName}</strong>.`
-            : `An application has been submitted to <strong>${school.schoolName}</strong> on behalf of <strong>${data.applicantName}</strong>.`}
-        </p>
-      </td>
-    </tr>
-
-    <!-- Divider -->
-    <tr>
-      <td style="padding:16px 32px 0;">
-        <hr style="border:none;border-top:1px solid ${TOKEN.BORDER};margin:0;" />
-      </td>
-    </tr>
-
-    <!-- Application summary -->
-    <tr>
-      <td style="padding:20px 32px 0;">
-        <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;">
-          <tr>
-            <td style="padding:0 0 10px;font-family:${TOKEN.FONT_STACK};font-size:13px;color:${TOKEN.TEXT_MUTED};">Application reference</td>
-            <td style="padding:0 0 10px;font-family:${TOKEN.FONT_STACK};font-size:13px;color:${TOKEN.TEXT_DARK};font-weight:bold;text-align:right;">${data.applicationId}</td>
-          </tr>
-          <tr>
-            <td style="padding:0 0 10px;font-family:${TOKEN.FONT_STACK};font-size:13px;color:${TOKEN.TEXT_MUTED};">Applying for</td>
-            <td style="padding:0 0 10px;font-family:${TOKEN.FONT_STACK};font-size:13px;color:${TOKEN.TEXT_DARK};font-weight:bold;text-align:right;">${data.classApplying}</td>
-          </tr>
-          <tr>
-            <td style="padding:0;font-family:${TOKEN.FONT_STACK};font-size:13px;color:${TOKEN.TEXT_MUTED};">Submitted</td>
-            <td style="padding:0;font-family:${TOKEN.FONT_STACK};font-size:13px;color:${TOKEN.TEXT_DARK};font-weight:bold;text-align:right;">${submittedLabel}</td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-
-    <!-- Next steps -->
-    <tr>
-      <td style="padding:24px 32px 0;font-family:${TOKEN.FONT_STACK};font-size:14px;color:${TOKEN.TEXT_BODY};line-height:1.7;">
-        <p style="margin:0;">
-          Our admissions office will review the application and be in touch via this email
+    ${para(
+      `Dear ${greetingName},`,
+      data.recipient === 'applicant'
+        ? `Thank you for submitting your application to <strong>${school.schoolName}</strong>.`
+        : `An application has been submitted to <strong>${school.schoolName}</strong> on behalf of <strong>${data.applicantName}</strong>.`,
+    )}
+    ${details({
+      title: 'Application summary',
+      rows: [
+        { label: 'Application reference', value: data.applicationId },
+        { label: 'Applying for',          value: data.classApplying },
+        { label: 'Submitted',             value: submittedLabel },
+      ],
+    })}
+    ${para(
+      `Our admissions office will review the application and be in touch via this email
           address or the phone number provided. The review process typically takes 5–10
-          business days. Please retain this email as proof of submission.
-        </p>
-      </td>
-    </tr>
-
-    <tr><td style="padding:24px 0 0;"></td></tr>
+          business days. Please keep this email as proof of submission.`,
+    )}
   `
 
   const html = buildEmailHtml({
-    previewText: `Application received for ${data.applicantName} — reference ${data.applicationId}`,
+    previewText: `Application received for ${data.applicantName}. Reference ${data.applicationId}.`,
     headerLabel: 'Admissions',
     body:        bodyHtml,
     school,

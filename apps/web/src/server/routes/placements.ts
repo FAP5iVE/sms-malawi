@@ -17,7 +17,8 @@
  *       POST /placements/advisory    placement.view
  *
  *     PLACEMENT REGISTRY & ANALYTICS (all roles)
- *       GET  /placements/registry    placement.view
+ *       GET  /placements/registry    placement.viewAnalytics (staff roles; never student —
+ *                                     it lists other students' names, candidate numbers and points)
  *       GET  /placements/catalogue   placement.view OR placement.viewOwn
  *
  *     STAFF PLACEMENT ENTRY (admin, high_rank, lower_rank)
@@ -40,7 +41,7 @@
 import { Router } from 'express'
 import { verifyAuth } from '@/lib/verifyAuth'
 import { requirePermission, requireAnyPermission } from '@/server/middleware/verifyPermission'
-import { createRateLimiter } from '@/lib/ratelimit'
+import { rateLimit } from '@/lib/ratelimit'
 import { sendError } from '@/server/lib/sendError'
 import * as placementService from '@/server/services/placementService'
 import { explainRecommendation } from '@/server/services/placementAdvisoryAIService'
@@ -136,7 +137,7 @@ placementsRouter.post(
   '/advisory/explain',
   verifyAuth,
   requirePermission('placement.view'),
-  createRateLimiter('ai'),
+  rateLimit('ai-explain'),
   async (req, res) => {
     const parsed = ExplainRecommendationSchema.safeParse(req.body)
     if (!parsed.success) {
@@ -159,13 +160,13 @@ placementsRouter.post(
 )
 
 // ─────────────────────────────────────────────────────────
-//  PLACEMENT REGISTRY & ANALYTICS — everyone
+//  PLACEMENT REGISTRY & ANALYTICS — staff roles (placement.viewAnalytics)
 // ─────────────────────────────────────────────────────────
 
 placementsRouter.get(
   '/registry',
   verifyAuth,
-  requirePermission('placement.view'),
+  requirePermission('placement.viewAnalytics'),
   async (req, res) => {
     try {
       const academicYear =

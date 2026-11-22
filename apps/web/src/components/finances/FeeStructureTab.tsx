@@ -37,7 +37,9 @@ import {
 } from '@shared/constants/malawi'
 import type { ApiFeeStructure } from '@shared/types/api'
 import type { CreateFeeStructureInput } from '@shared/schemas/finance'
-import { Plus, Loader2, Globe, Pencil, Archive, ArchiveRestore, X, Wallet } from 'lucide-react'
+import { Plus, Loader2, Globe, Pencil, Archive, ArchiveRestore, Wallet } from 'lucide-react'
+import { Modal, MODAL_BTN_PRIMARY, MODAL_BTN_SECONDARY } from '@/components/shared/Modal'
+import { chipClass } from '@/lib/hills/chip'
 
 // ─────────────────────────────────────────────────────────────────────────
 // BADGE HELPERS — literal-palette + explicit dark: variants, following
@@ -47,19 +49,19 @@ import { Plus, Loader2, Globe, Pencil, Archive, ArchiveRestore, X, Wallet } from
 // ─────────────────────────────────────────────────────────────────────────
 
 const CATEGORY_TONE: Record<string, string> = {
-  TUITION:   'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/25 dark:text-blue-400 dark:border-blue-800/50',
-  TRANSPORT: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/25 dark:text-amber-400 dark:border-amber-800/50',
-  UNIFORM:   'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/25 dark:text-purple-400 dark:border-purple-800/50',
-  BOARDING:  'bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-950/25 dark:text-cyan-400 dark:border-cyan-800/50',
-  LEVY:      'bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800/40 dark:text-slate-300 dark:border-slate-700',
-  ACTIVITY:  'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/25 dark:text-emerald-400 dark:border-emerald-800/50',
-  OTHER:     'bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800/40 dark:text-gray-300 dark:border-gray-700',
+  TUITION:   'text-status-info',
+  TRANSPORT: 'text-status-warning',
+  UNIFORM:   'text-status-accent',
+  BOARDING:  'text-status-cyan',
+  LEVY:      'text-status-neutral',
+  ACTIVITY:  'text-status-success',
+  OTHER:     'text-status-neutral',
 }
 
 function CategoryBadge({ category }: { category: string }) {
   const tone = CATEGORY_TONE[category] ?? CATEGORY_TONE.OTHER
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-heading font-semibold border ${tone}`}>
+    <span className={`inline-flex items-center text-xs font-heading font-semibold ${tone}`}>
       {FEE_CATEGORY_LABELS[category as keyof typeof FEE_CATEGORY_LABELS] ?? category}
     </span>
   )
@@ -67,10 +69,10 @@ function CategoryBadge({ category }: { category: string }) {
 
 function ScheduleBadge({ mandatory, schedule }: { mandatory: boolean; schedule: string }) {
   const tone = mandatory
-    ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/25 dark:text-amber-400 dark:border-amber-800/50'
-    : 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/25 dark:text-blue-400 dark:border-blue-800/50'
+    ? 'text-status-warning'
+    : 'text-status-info'
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-heading font-semibold border ${tone} whitespace-nowrap`}>
+    <span className={`inline-flex items-center text-xs font-heading font-semibold ${tone} whitespace-nowrap`}>
       {formatFeeScheduleBadge(mandatory, schedule as 'PER_TERM' | 'ANNUAL' | 'ONE_TIME')}
     </span>
   )
@@ -137,15 +139,15 @@ export function FeeStructureTab({ academicYear }: { academicYear: string }) {
     },
     {
       key: 'name',
-      label: 'Fee Name & Description',
+      label: 'Fee name and description',
       priority: 'critical',
       render: (row) => (
         <div className="min-w-0">
           <p className="font-medium text-body truncate">{row.name}</p>
           {row.description && <p className="text-xs text-muted truncate">{row.description}</p>}
           {!row.classId && !row.term && (
-            <span className="text-[11px] text-brand-teal inline-flex items-center gap-1 mt-0.5">
-              <Globe className="w-3 h-3" /> Applies to all classes &amp; terms
+            <span className="text-xs text-tone-teal inline-flex items-center gap-1 mt-0.5">
+              <Globe className="w-3 h-3" /> Applies to all classes and terms
             </span>
           )}
         </div>
@@ -159,13 +161,13 @@ export function FeeStructureTab({ academicYear }: { academicYear: string }) {
     },
     {
       key: 'schedule',
-      label: 'Status & Schedule',
+      label: 'Status and schedule',
       priority: 'important',
       render: (row) => <ScheduleBadge mandatory={row.mandatory} schedule={row.schedule} />,
     },
     {
       key: 'amount',
-      label: 'Standard Rate',
+      label: 'Standard rate',
       priority: 'critical',
       sortable: true,
       render: (row) => <span className="tabular font-semibold whitespace-nowrap">{formatMWK(row.amount)}</span>,
@@ -201,17 +203,17 @@ export function FeeStructureTab({ academicYear }: { academicYear: string }) {
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="font-heading font-semibold text-body">Fee Catalog &amp; Accounting Settings</h2>
+          <h2 className="font-heading font-semibold text-body">Fee catalog and accounting settings</h2>
           <p className="text-xs text-muted mt-0.5">
-            Configure fee categories, standard rates, and how each fee bills — sourced across invoices and fee structures.
+            Configure fee categories, standard rates, and how each fee bills. Sourced across invoices and fee structures.
           </p>
         </div>
         <button
           type="button"
           onClick={openCreate}
-          className="inline-flex items-center gap-1.5 bg-brand-teal text-white rounded-lg px-3.5 py-2 text-sm font-semibold hover:bg-brand-teal-light min-h-11"
+          className="inline-flex items-center gap-1.5 bg-btn-brand text-btn-brand-fg rounded-lg px-3.5 py-2 text-sm font-semibold hover:bg-brand-teal-light min-h-11"
         >
-          <Plus className="w-4 h-4" /> Add Fee Category
+          <Plus className="w-4 h-4" /> Add fee category
         </button>
       </div>
 
@@ -222,7 +224,7 @@ export function FeeStructureTab({ academicYear }: { academicYear: string }) {
       <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800/50 rounded-xl p-3 text-xs text-blue-800 dark:text-blue-300 flex items-start gap-2">
         <Wallet className="w-4 h-4 shrink-0 mt-0.5" />
         <p>
-          <strong>Ledger Preservation Policy:</strong> archiving a fee removes it from new invoice line-item pickers only —
+          <strong>Ledger preservation policy:</strong> archiving a fee removes it from new invoice line-item pickers only, 
           every existing invoice, line item, and receipt that already reference it stay exactly as they are, and an
           archived fee can be restored at any time.
         </p>
@@ -235,9 +237,7 @@ export function FeeStructureTab({ academicYear }: { academicYear: string }) {
             key={f}
             type="button"
             onClick={() => setFilter(f)}
-            className={`px-3 py-1.5 rounded-full text-xs font-semibold capitalize ${
-              filter === f ? 'bg-brand-navy text-white' : 'bg-page text-muted hover:text-body'
-            }`}
+            className={`${chipClass(filter === f)} capitalize`}
           >
             {f} ({counts[f]})
           </button>
@@ -257,26 +257,27 @@ export function FeeStructureTab({ academicYear }: { academicYear: string }) {
         mobileActions={[
           { label: 'Edit', icon: Pencil, onClick: openEdit },
           {
-            label: 'Archive / Restore',
+            label: 'Archive / restore',
             icon: Archive,
             onClick: (row) => (row.isActive ? setArchiveTarget(row) : updateFee.mutate({ id: row.id, data: { isActive: true } })),
           },
         ]}
+        bordered={false}
       />
 
       {/* System Configured Payment Modes — these are the channels the
           system itself supports end to end (receipts, allocation, ledger
           posting); not a free-text list an admin edits here. */}
-      <div className="bg-surface border border-base rounded-xl p-4">
-        <h3 className="font-heading text-sm font-semibold text-body mb-1">System Configured Payment Modes</h3>
+      <div className="pt-2">
+        <h3 className="font-heading text-sm font-semibold text-body mb-1">System configured payment modes</h3>
         <p className="text-xs text-muted mb-3">
-          These payment options populate the mode-of-payment picker in Invoice Entry &amp; Allocation.
+          These payment options populate the mode-of-payment picker in Invoice Entry and Allocation.
         </p>
         <div className="flex flex-wrap gap-2">
           {PAYMENT_METHOD_OPTIONS.map((m) => (
             <span
               key={m.value}
-              className="inline-flex items-center gap-1.5 bg-page border border-base rounded-full px-3 py-1.5 text-xs font-medium text-body"
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-body"
             >
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
               {m.label}
@@ -380,138 +381,134 @@ function FeeFormModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true">
-      <div className="bg-surface rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-base">
-          <h3 className="font-heading font-semibold text-body">{isEditing ? 'Edit Fee Category' : 'Add Fee Category'}</h3>
-          <button type="button" onClick={onClose} className="p-1 rounded-lg hover:bg-page text-muted" aria-label="Close">
-            <X className="w-5 h-5" />
-          </button>
+    <Modal
+      title={isEditing ? 'Edit Fee Category' : 'Add Fee Category'}
+      onClose={onClose}
+      size="l"
+      busy={isPending}
+      bodyClassName="space-y-3"
+      footer={
+        <>
+        <button
+          type="button" onClick={onClose}
+          className={MODAL_BTN_SECONDARY}
+        >
+          Cancel
+        </button>
+        <button
+          type="button" onClick={handleSubmit} disabled={isPending || !canSubmit}
+          className={MODAL_BTN_PRIMARY}
+        >
+          {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+          {isPending ? 'Saving…' : isEditing ? 'Save Changes' : 'Save Fee Category'}
+        </button>
+        </>
+      }
+    >
+      <div className="grid sm:grid-cols-2 gap-3">
+        <div className="sm:col-span-2">
+          <label htmlFor="fee-name" className="text-xs text-muted mb-1 block">Fee name</label>
+          <input
+            id="fee-name" value={name} onChange={(e) => setName(e.target.value)}
+            placeholder="School Fee (Tuition)"
+            className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+          />
         </div>
-
-        <div className="p-5 space-y-3">
-          <div className="grid sm:grid-cols-2 gap-3">
-            <div className="sm:col-span-2">
-              <label htmlFor="fee-name" className="text-xs text-muted mb-1 block">Fee name</label>
-              <input
-                id="fee-name" value={name} onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. School Fee (Tuition)"
-                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-              />
-            </div>
-            <div>
-              <label htmlFor="fee-code" className="text-xs text-muted mb-1 block">Code</label>
-              <input
-                id="fee-code" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())}
-                placeholder="e.g. TUI-01"
-                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11 font-mono"
-              />
-            </div>
-            <div>
-              <label htmlFor="fee-category" className="text-xs text-muted mb-1 block">Category</label>
-              <select
-                id="fee-category" value={category} onChange={(e) => setCategory(e.target.value as typeof category)}
-                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-              >
-                {FEE_CATEGORY_OPTIONS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="fee-amount" className="text-xs text-muted mb-1 block">Standard rate (MWK)</label>
-              <input
-                id="fee-amount" type="number" min="1" value={amount} onChange={(e) => setAmount(e.target.value)}
-                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-              />
-            </div>
-            <div>
-              <label htmlFor="fee-schedule" className="text-xs text-muted mb-1 block">Billing schedule</label>
-              <select
-                id="fee-schedule" value={schedule} onChange={(e) => setSchedule(e.target.value as typeof schedule)}
-                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-              >
-                {FEE_SCHEDULE_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-              </select>
-            </div>
-          </div>
-
-          <label className="flex items-start gap-2.5 cursor-pointer">
-            <input
-              type="checkbox" checked={mandatory} onChange={(e) => setMandatory(e.target.checked)}
-              className="mt-0.5 w-4 h-4 rounded border-base"
-            />
-            <span className="text-sm text-body">
-              <span className="font-medium">Mandatory</span>
-              <span className="block text-xs text-muted">
-                {mandatory
-                  ? 'Applies automatically to every student in scope — no per-student opt-in needed.'
-                  : 'Optional add-on — students are billed only after being enrolled via Finance Fee Structure.'}
-              </span>
-            </span>
-          </label>
-
-          <div>
-            <label htmlFor="fee-description" className="text-xs text-muted mb-1 block">
-              Description <span className="text-muted/70">(optional)</span>
-            </label>
-            <textarea
-              id="fee-description" value={description} onChange={(e) => setDescription(e.target.value)}
-              rows={2}
-              className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page resize-none"
-            />
-          </div>
-
-          <div className="grid sm:grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="fee-class" className="text-xs text-muted mb-1 block">
-                Class <span className="text-muted/70">(optional — blank = all classes)</span>
-              </label>
-              <select
-                id="fee-class" value={classId} onChange={(e) => setClassId(e.target.value)}
-                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-              >
-                <option value="">All classes</option>
-                {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="fee-term" className="text-xs text-muted mb-1 block">
-                Term <span className="text-muted/70">(optional — blank = all terms)</span>
-              </label>
-              <select
-                id="fee-term" value={term} onChange={(e) => setTerm(e.target.value)}
-                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-              >
-                <option value="">All terms</option>
-                <option value="1">Term 1</option>
-                <option value="2">Term 2</option>
-                <option value="3">Term 3</option>
-              </select>
-            </div>
-          </div>
-
-          {error && (
-            <p className="text-sm text-brand-coral">
-              {error instanceof Error ? error.message : 'Failed to save fee category.'}
-            </p>
-          )}
+        <div>
+          <label htmlFor="fee-code" className="text-xs text-muted mb-1 block">Code</label>
+          <input
+            id="fee-code" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())}
+            placeholder="TUI-01"
+            className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11 font-mono"
+          />
         </div>
-
-        <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-base">
-          <button
-            type="button" onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-muted hover:text-body min-h-11"
+        <div>
+          <label htmlFor="fee-category" className="text-xs text-muted mb-1 block">Category</label>
+          <select
+            id="fee-category" value={category} onChange={(e) => setCategory(e.target.value as typeof category)}
+            className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
           >
-            Cancel
-          </button>
-          <button
-            type="button" onClick={handleSubmit} disabled={isPending || !canSubmit}
-            className="inline-flex items-center gap-2 bg-brand-navy text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-60 min-h-11"
+            {FEE_CATEGORY_OPTIONS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="fee-amount" className="text-xs text-muted mb-1 block">Standard rate (MWK)</label>
+          <input
+            id="fee-amount" type="number" min="1" value={amount} onChange={(e) => setAmount(e.target.value)}
+            className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+          />
+        </div>
+        <div>
+          <label htmlFor="fee-schedule" className="text-xs text-muted mb-1 block">Billing schedule</label>
+          <select
+            id="fee-schedule" value={schedule} onChange={(e) => setSchedule(e.target.value as typeof schedule)}
+            className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
           >
-            {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-            {isPending ? 'Saving…' : isEditing ? 'Save Changes' : 'Save Fee Category'}
-          </button>
+            {FEE_SCHEDULE_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+          </select>
         </div>
       </div>
-    </div>
+
+      <label className="flex items-start gap-2.5 cursor-pointer">
+        <input
+          type="checkbox" checked={mandatory} onChange={(e) => setMandatory(e.target.checked)}
+          className="mt-0.5 w-4 h-4 rounded border-base"
+        />
+        <span className="text-sm text-body">
+          <span className="font-medium">Mandatory</span>
+          <span className="block text-xs text-muted">
+            {mandatory
+              ? 'Applies automatically to every student in scope. No per-student opt-in is needed.'
+              : 'Optional add-on: students are billed only after being enrolled via Finance Fee Structure.'}
+          </span>
+        </span>
+      </label>
+
+      <div>
+        <label htmlFor="fee-description" className="text-xs text-muted mb-1 block">
+          Description <span className="text-muted">(optional)</span>
+        </label>
+        <textarea
+          id="fee-description" value={description} onChange={(e) => setDescription(e.target.value)}
+          rows={2}
+          className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page resize-none"
+        />
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-3">
+        <div>
+          <label htmlFor="fee-class" className="text-xs text-muted mb-1 block">
+            Class <span className="text-muted">(optional: blank = all classes)</span>
+          </label>
+          <select
+            id="fee-class" value={classId} onChange={(e) => setClassId(e.target.value)}
+            className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+          >
+            <option value="">All classes</option>
+            {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="fee-term" className="text-xs text-muted mb-1 block">
+            Term <span className="text-muted">(optional: blank = all terms)</span>
+          </label>
+          <select
+            id="fee-term" value={term} onChange={(e) => setTerm(e.target.value)}
+            className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+          >
+            <option value="">All terms</option>
+            <option value="1">Term 1</option>
+            <option value="2">Term 2</option>
+            <option value="3">Term 3</option>
+          </select>
+        </div>
+      </div>
+
+      {error && (
+        <p className="text-sm text-tone-coral">
+          {error instanceof Error ? error.message : 'Failed to save fee category.'}
+        </p>
+      )}
+    </Modal>
   )
 }

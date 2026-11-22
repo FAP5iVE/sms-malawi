@@ -44,6 +44,7 @@
 
 import { useState } from 'react'
 import { motion } from 'framer-motion'
+import { toast } from 'sonner'
 import {
   FileText,
   CheckCircle2,
@@ -69,11 +70,13 @@ import {
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import { AcademicYearSelect } from '@/components/shared/AcademicYearSelect'
 import { useClasses } from '@/hooks/useClasses'
-import { useCurrentAcademicPeriod } from '@/hooks/useSettings'
+import { useViewingPeriod } from '@/hooks/useViewingPeriod'
+import { useEffectiveAcademicPeriod } from '@/hooks/useSettings'
 import { useBulkGenerateInvoices } from '@/hooks/useFinances'
 import { formatMWK } from '@shared/constants/malawi'
 import type { ApiBulkInvoiceResult, ApiBulkInvoiceStudentResult } from '@shared/types/api'
 import type { BulkGenerateInvoicesInput } from '@shared/schemas/finance'
+import { chipClass } from '@/lib/hills/chip'
 
 type Outcome = ApiBulkInvoiceStudentResult['outcome']
 
@@ -84,18 +87,18 @@ type Outcome = ApiBulkInvoiceStudentResult['outcome']
 const OUTCOME_CONFIG: Record<Outcome, { icon: React.ElementType; chip: string; label: string }> = {
   CREATED: {
     icon: CheckCircle2,
-    chip: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/25 dark:text-emerald-400 dark:border-emerald-800/50',
+    chip: 'text-status-success',
     label: 'Created',
   },
   EXISTING: {
     icon: SkipForward,
-    chip: 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/25 dark:text-blue-400 dark:border-blue-800/50',
+    chip: 'text-status-info',
     label: 'Existing',
   },
-  SKIPPED: { icon: SkipForward, chip: 'bg-page text-muted border-base', label: 'Skipped' },
+  SKIPPED: { icon: SkipForward, chip: 'text-muted', label: 'Skipped' },
   ERROR: {
     icon: XCircle,
-    chip: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/25 dark:text-rose-400 dark:border-rose-800/50',
+    chip: 'text-status-danger',
     label: 'Error',
   },
 }
@@ -104,7 +107,7 @@ function OutcomeBadge({ outcome }: { outcome: Outcome }) {
   const { icon: Icon, chip, label } = OUTCOME_CONFIG[outcome]
   return (
     <span
-      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${chip}`}
+      className={`inline-flex items-center gap-1 text-xs font-semibold ${chip}`}
     >
       <Icon className="w-3 h-3" aria-hidden /> {label}
     </span>
@@ -118,13 +121,13 @@ function OutcomeBadge({ outcome }: { outcome: Outcome }) {
 function SummaryCards({ result }: { result: ApiBulkInvoiceResult }) {
   const cards = [
     {
-      label: 'Invoices Created',
+      label: 'Invoices created',
       value: result.created,
       color: 'text-emerald-600',
       bg: 'bg-emerald-50 dark:bg-emerald-950/20',
     },
     {
-      label: 'Already Existed',
+      label: 'Already existed',
       value: result.existing,
       color: 'text-blue-600',
       bg: 'bg-blue-50 dark:bg-blue-950/20',
@@ -146,7 +149,7 @@ function SummaryCards({ result }: { result: ApiBulkInvoiceResult }) {
         </div>
       ))}
       <div className="col-span-2 sm:col-span-4 bg-brand-teal/8 border border-brand-teal/25 rounded-xl p-4 flex items-center gap-3">
-        <Banknote className="w-5 h-5 text-brand-teal shrink-0" aria-hidden />
+        <Banknote className="w-5 h-5 text-tone-teal shrink-0" aria-hidden />
         <div>
           <p className="font-heading font-bold text-brand-navy text-lg tabular">
             {formatMWK(result.totalRevenue)}
@@ -221,7 +224,7 @@ function RosterRow({
           <p className="text-xs text-muted tabular">Net: {formatMWK(row.totalAmount)}</p>
         )}
         {!!row.priorArrears && (
-          <p className="text-[11px] text-rose-600 tabular">
+          <p className="text-xs text-rose-600 tabular">
             Arrears: +{formatMWK(row.priorArrears)}
           </p>
         )}
@@ -250,16 +253,16 @@ function ImpactProjection({
   const netReceivable = readyToGenerate.reduce((sum, r) => sum + (r.totalAmount ?? 0), 0)
 
   const stats = [
-    { label: 'Target Cohort Count', value: preview ? `${preview.students.length} Students` : '—' },
-    { label: 'Ready to Generate', value: preview ? `${readyToGenerate.length} Invoices` : '—' },
-    { label: 'Scholarships Absorbed', value: preview ? `-${formatMWK(scholarshipTotal)}` : '—' },
-    { label: 'Advance Credit Consumed', value: preview ? `-${formatMWK(creditTotal)}` : '—' },
+    { label: 'Target cohort count', value: preview ? `${preview.students.length} Students` : '—' },
+    { label: 'Ready to generate', value: preview ? `${readyToGenerate.length} Invoices` : '—' },
+    { label: 'Scholarships absorbed', value: preview ? `-${formatMWK(scholarshipTotal)}` : '—' },
+    { label: 'Advance credit consumed', value: preview ? `-${formatMWK(creditTotal)}` : '—' },
   ]
 
   return (
-    <div className="bg-brand-navy rounded-xl p-4 text-white space-y-2.5">
-      <h3 className="font-heading text-xs font-semibold uppercase tracking-wide text-white/70 flex items-center gap-1.5">
-        <PiggyBank className="w-3.5 h-3.5" /> Financial Impact Projection
+    <div className="bg-brand-deep rounded-xl p-4 text-white space-y-2.5">
+      <h3 className="font-heading text-xs font-semibold text-white/70 flex items-center gap-1.5">
+        <PiggyBank className="w-3.5 h-3.5" /> Financial impact projection
       </h3>
       {stats.map((s) => (
         <div key={s.label} className="flex items-center justify-between text-sm">
@@ -268,7 +271,7 @@ function ImpactProjection({
         </div>
       ))}
       <div className="border-t border-white/15 pt-2.5 flex items-center justify-between">
-        <span className="text-xs text-white/70">Net Projected Receivable</span>
+        <span className="text-xs text-white/70">Net projected receivable</span>
         <span className="font-heading font-bold text-lg tabular">
           {preview ? formatMWK(netReceivable) : formatMWK(0)}
         </span>
@@ -283,8 +286,14 @@ function ImpactProjection({
 
 export function BulkInvoiceGenerator() {
   const motionEnabled = useMotionEnabled()
-  const { data: classes = [] } = useClasses()
-  const { academicYear: currentYear, term: currentTerm } = useCurrentAcademicPeriod()
+  // [MAINT 2026-10-23] Cohort list = the school's CURRENT-year classes. Class
+  // rows are one-per-year and the bulk generator matches students by exact
+  // classId (bulkInvoiceService), and enrolled students sit in the current
+  // year's rows. Unscoped, every class appeared once per year and picking a
+  // past year's row would match nobody.
+  const { academicYear: schoolYear } = useEffectiveAcademicPeriod()
+  const { data: classes = [] } = useClasses(schoolYear)
+  const { academicYear: currentYear, term: currentTerm } = useViewingPeriod()
 
   const [classId, setClassId] = useState('ALL')
   const [academicYear, setAcademicYear] = useState(currentYear ?? '')
@@ -302,7 +311,29 @@ export function BulkInvoiceGenerator() {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const bulkGenerate = useBulkGenerateInvoices()
+  // [BUGFIX — ERR-10, 2026-09-16] `bulkGenerate` used to be one shared
+  // useMutation() instance for BOTH the dry-run preview call AND the real
+  // commit call. Two knock-on problems:
+  //   1. The "Preview Roster" button's spinner/label
+  //      (`bulkGenerate.isPending && !finalResult`) can't tell preview and
+  //      commit apart — finalResult isn't set until the commit *finishes*,
+  //      so while a commit is in flight this condition is also true, and
+  //      the button behind the still-open ConfirmDialog flips back to
+  //      "Running preview…". That's the "goes back to the same review
+  //      loading state" you saw — it's not actually re-running the
+  //      preview, it's the commit's own pending state being misread as a
+  //      preview.
+  //   2. commit() had no re-entrancy guard, and ConfirmDialog's Confirm
+  //      button (see below) had no pending state of its own — clicking it
+  //      did nothing visible until the request resolved, so a user
+  //      unsure whether the click registered had nothing to stop them
+  //      clicking it again, firing a second concurrent commit.
+  // Splitting into two independent mutations fixes both: each has its own
+  // isPending, so the preview button can no longer be confused by the
+  // commit's state, and commit() below now checks commitMutation.isPending
+  // itself before doing anything.
+  const previewMutation = useBulkGenerateInvoices()
+  const commitMutation   = useBulkGenerateInvoices()
 
   function baseRequest(dryRun: boolean, studentIds?: string[]): BulkGenerateInvoicesInput {
     return {
@@ -322,7 +353,7 @@ export function BulkInvoiceGenerator() {
     setError(null)
     setFinalResult(null)
     try {
-      const result = await bulkGenerate.mutateAsync(baseRequest(true))
+      const result = await previewMutation.mutateAsync(baseRequest(true))
       setPreview(result)
       setSelected(
         new Set(result.students.filter((s) => s.outcome === 'CREATED').map((s) => s.studentId))
@@ -333,19 +364,23 @@ export function BulkInvoiceGenerator() {
   }
 
   async function commit() {
-    if (!preview) return
+    if (!preview || commitMutation.isPending) return
     setError(null)
     try {
       const studentIds = preview.students
         .filter((s) => s.outcome === 'CREATED' && selected.has(s.studentId))
         .map((s) => s.studentId)
-      const result = await bulkGenerate.mutateAsync(baseRequest(false, studentIds))
+      const result = await commitMutation.mutateAsync(baseRequest(false, studentIds))
       setFinalResult(result)
       setPreview(null)
       setConfirmOpen(false)
+      const createdCount = result.students.filter((s) => s.outcome === 'CREATED').length
+      toast.success(createdCount > 0 ? `${createdCount} invoice(s) generated.` : 'Invoice generation complete.')
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Generation failed.')
+      const message = e instanceof Error ? e.message : 'Generation failed.'
+      setError(message)
       setConfirmOpen(false)
+      toast.error(message)
     }
   }
 
@@ -379,7 +414,7 @@ export function BulkInvoiceGenerator() {
     <div className="space-y-6">
       <div>
         <h2 className="font-heading font-bold text-xl text-brand-navy flex items-center gap-2">
-          <FileText className="w-5 h-5" aria-hidden /> Bulk Invoice Generator
+          <FileText className="w-5 h-5" aria-hidden /> Bulk invoice generator
         </h2>
         <p className="text-sm text-muted mt-0.5">
           Generate term invoices across a cohort, with a full preview before anything is committed.
@@ -388,12 +423,12 @@ export function BulkInvoiceGenerator() {
 
       <div className="grid lg:grid-cols-3 gap-4 items-start">
         {/* 1. Cohort & target selection */}
-        <div className="bg-surface border border-base rounded-xl p-4 space-y-3">
-          <h3 className="font-heading text-xs font-semibold uppercase tracking-wide text-muted flex items-center gap-1.5">
-            <Users className="w-3.5 h-3.5" /> Cohort &amp; Target Selection
+        <div className="space-y-3">
+          <h3 className="font-heading text-xs font-semibold text-muted flex items-center gap-1.5">
+            <Users className="w-3.5 h-3.5" /> Cohort and target selection
           </h3>
           <div>
-            <label className="block text-xs text-muted mb-1">Academic Year</label>
+            <label className="block text-xs text-muted mb-1">Academic year</label>
             <AcademicYearSelect
               value={academicYear}
               onChange={(e) => setAcademicYear(e.target.value)}
@@ -401,7 +436,7 @@ export function BulkInvoiceGenerator() {
             />
           </div>
           <div>
-            <label className="block text-xs text-muted mb-1">Billing Term</label>
+            <label className="block text-xs text-muted mb-1">Billing term</label>
             <select
               value={term}
               onChange={(e) => setTerm(Number(e.target.value))}
@@ -413,13 +448,13 @@ export function BulkInvoiceGenerator() {
             </select>
           </div>
           <div>
-            <label className="block text-xs text-muted mb-1">Target Student Cohort</label>
+            <label className="block text-xs text-muted mb-1">Target student cohort</label>
             <select
               value={classId}
               onChange={(e) => setClassId(e.target.value)}
               className="w-full min-h-11 border border-base rounded-lg px-3 py-2 text-sm bg-page"
             >
-              <option value="ALL">Entire School (All Grades &amp; Forms)</option>
+              <option value="ALL">Entire school (all grades and forms)</option>
               {classes.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -430,30 +465,30 @@ export function BulkInvoiceGenerator() {
         </div>
 
         {/* 2. Accounting rules & fee automation */}
-        <div className="bg-surface border border-base rounded-xl p-4 space-y-2.5">
-          <h3 className="font-heading text-xs font-semibold uppercase tracking-wide text-muted flex items-center gap-1.5">
-            <Wallet2 className="w-3.5 h-3.5" /> Accounting Rules &amp; Fee Automation
+        <div className="space-y-2.5">
+          <h3 className="font-heading text-xs font-semibold text-muted flex items-center gap-1.5">
+            <Wallet2 className="w-3.5 h-3.5" /> Accounting rules and fee automation
           </h3>
           <RuleCheckbox
-            label="Include Mandatory Core Levies"
+            label="Include mandatory core levies"
             hint="Tuition, statutory levies, and other required fees per term schedule."
             checked={includeMandatory}
             onChange={setIncludeMandatory}
           />
           <RuleCheckbox
-            label="Include Enrolled Optional Services"
+            label="Include enrolled optional services"
             hint="Bill students only for the add-ons (transport, boarding, uniform, ...) they're actually enrolled in."
             checked={includeEnrolledOptional}
             onChange={setIncludeEnrolledOptional}
           />
           <RuleCheckbox
-            label="Apply Scholarship &amp; Staff Discounts"
+            label="Apply scholarship and staff discounts"
             hint="Deduct each student's active scholarship from their tuition line automatically."
             checked={applyScholarships}
             onChange={setApplyScholarships}
           />
           <RuleCheckbox
-            label="Consume Prior Advance Credit"
+            label="Consume prior advance credit"
             hint="Offset new bills against any overpayment carried over from a prior term."
             checked={consumeAdvanceCredit}
             onChange={setConsumeAdvanceCredit}
@@ -467,20 +502,20 @@ export function BulkInvoiceGenerator() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <p className="text-xs text-muted flex items-center gap-1.5">
           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-          Double-Billing Safe — students already invoiced for this term are automatically skipped.
+          Double-Billing Safe: students already invoiced for this term are automatically skipped.
         </p>
         <button
           type="button"
           onClick={runPreview}
-          disabled={bulkGenerate.isPending || !academicYear}
-          className="inline-flex items-center gap-2 min-h-11 px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy-light disabled:opacity-60"
+          disabled={previewMutation.isPending || commitMutation.isPending || !academicYear}
+          className="inline-flex items-center gap-2 min-h-11 px-5 rounded-xl text-sm font-heading font-semibold bg-brand-deep text-white hover:brightness-125 disabled:opacity-60"
         >
-          {bulkGenerate.isPending && !finalResult ? (
+          {previewMutation.isPending ? (
             <Loader2 className="w-4 h-4 animate-spin" />
           ) : (
             <Eye className="w-4 h-4" />
           )}
-          {bulkGenerate.isPending && !finalResult ? 'Running preview…' : 'Preview Roster'}
+          {previewMutation.isPending ? 'Running preview…' : 'Preview Roster'}
         </button>
       </div>
 
@@ -501,20 +536,20 @@ export function BulkInvoiceGenerator() {
               <button
                 type="button"
                 onClick={() => setSelected(new Set(eligibleRows.map((s) => s.studentId)))}
-                className="text-xs font-medium text-brand-teal hover:underline"
+                className="text-xs font-medium text-tone-teal app-action"
               >
-                Select All Eligible
+                Select all eligible
               </button>
               <button
                 type="button"
                 onClick={() => setSelected(new Set())}
-                className="text-xs font-medium text-muted hover:underline"
+                className="text-xs font-medium text-muted app-action"
               >
-                Deselect All
+                Deselect all
               </button>
             </div>
           </div>
-          <div className="border border-base rounded-xl overflow-hidden">
+          <div className="overflow-hidden">
             {[...eligibleRows, ...nonEligibleRows].map((row) => (
               <RosterRow
                 key={row.studentId}
@@ -528,7 +563,7 @@ export function BulkInvoiceGenerator() {
             <button
               type="button"
               onClick={() => setConfirmOpen(true)}
-              disabled={selected.size === 0 || bulkGenerate.isPending}
+              disabled={selected.size === 0 || commitMutation.isPending}
               className="inline-flex items-center gap-2 min-h-11 px-5 rounded-xl text-sm font-heading font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60"
             >
               <FileText className="w-4 h-4" />
@@ -548,11 +583,7 @@ export function BulkInvoiceGenerator() {
                 key={o}
                 type="button"
                 onClick={() => setFilterOutcome(o)}
-                className={`px-3 py-1.5 rounded-full text-xs font-heading font-semibold border min-h-9 ${
-                  filterOutcome === o
-                    ? 'bg-brand-navy text-white border-brand-navy'
-                    : 'bg-surface border-base text-muted hover:border-brand-navy/30'
-                }`}
+                className={chipClass(filterOutcome === o)}
               >
                 {o === 'ALL' ? 'All' : o}
                 {o !== 'ALL' && (
@@ -568,7 +599,7 @@ export function BulkInvoiceGenerator() {
             variants={containerVariants}
             initial="hidden"
             animate="visible"
-            className="border border-base rounded-xl overflow-hidden"
+            className="overflow-hidden"
           >
             {filteredFinalStudents.length === 0 ? (
               <div className="text-center py-12 text-muted text-sm">
@@ -585,7 +616,7 @@ export function BulkInvoiceGenerator() {
         </div>
       )}
 
-      {!preview && !finalResult && !bulkGenerate.isPending && (
+      {!preview && !finalResult && !previewMutation.isPending && !commitMutation.isPending && (
         <div className="text-center py-16 text-muted text-sm border border-dashed border-base rounded-xl">
           Configure the options above and click Preview Roster to see exactly who would be billed
           before generating anything.
@@ -597,8 +628,10 @@ export function BulkInvoiceGenerator() {
         title="Generate invoices?"
         description={`${selected.size} invoice(s) will be created for the selected students in ${selectedClassName}, Term ${term} ${academicYear}. This creates real financial records.`}
         confirmLabel={`Generate ${selected.size} Invoices`}
+        confirming={commitMutation.isPending}
+        confirmingLabel="Generating…"
         onConfirm={() => void commit()}
-        onCancel={() => setConfirmOpen(false)}
+        onCancel={() => { if (!commitMutation.isPending) setConfirmOpen(false) }}
       />
     </div>
   )

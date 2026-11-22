@@ -13,19 +13,28 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { MarkAttendanceInput } from '@shared/schemas/student'
 import type { ApiAttendanceRecord } from '@shared/types/api'
-import { apiFetch, queryKeys } from '@/lib/api-client'
+import { apiFetch, queryKeys, ApiError } from '@/lib/api-client'
 
 export function useClassAttendance(classId: string, date: string) {
   return useQuery({
     queryKey: queryKeys.attendance.class(classId, date),
     queryFn:  () => apiFetch<ApiAttendanceRecord[]>(`/attendance/class/${classId}?date=${date}`),
     enabled:  !!classId && !!date,
+    // A 401/403/404 is a definitive answer ("not allowed" / "no such class"),
+    // not a transient failure — retrying it just keeps the user staring at a
+    // loading skeleton for ~6s (the app-wide default is 2 retries with
+    // exponential back-off) before the real answer is shown.
+    retry: (failureCount, error) => {
+      if (error instanceof ApiError && [401, 403, 404].includes(error.status)) return false
+      return failureCount < 2
+    },
   })
 }
 
 export function useMarkAttendance() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Attendance saved', failureTitle: 'Could not save attendance', affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
     mutationFn: ({ classId, ...data }: { classId: string } & MarkAttendanceInput) =>
       apiFetch<{ message: string }>(`/attendance/class/${classId}`, {
         method: 'POST',

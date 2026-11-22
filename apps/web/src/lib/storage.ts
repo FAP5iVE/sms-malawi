@@ -77,6 +77,17 @@ export const FILE_PREFIX = {
   LOAN_DOCUMENT:    'loan_doc',
   APPLICATION_DOC:  'application_doc',
   ASSIGNMENT_SUBMISSION: 'assignment_submission',
+  // [2026-10-27 Assignment workflow] Teacher-side assignment material.
+  //   ASSIGNMENT_FILE  - attached documents (private; class members only, via
+  //                      the /api/files proxy + assignmentService.canAccessAssignmentFile).
+  //   ASSIGNMENT_IMAGE - pictures attached to / embedded in an assignment. These
+  //                      must load in an <img> tag (no Authorization header), so
+  //                      they sit in PUBLIC_FILE_PREFIXES like announcement
+  //                      images: readable by anyone holding the unguessable
+  //                      file URL, listed nowhere. Keep exam papers out of
+  //                      pictures if that matters - attach them as files.
+  ASSIGNMENT_FILE:  'assignment_file',
+  ASSIGNMENT_IMAGE: 'assignment_image',
   FINANCIAL_REPORT: 'financial_report',
   DIGITAL_RESOURCE: 'digital_resource',
   // [PRODUCTION FIX 2026-07-28] Public landing-page assets — served via
@@ -90,6 +101,15 @@ export const FILE_PREFIX = {
   // view URL by /public/leadership the same way ANNOUNCEMENT_IMAGE/
   // SCHOOL_GALLERY already are. Same public, no-signed-proxy pattern.
   LEADERSHIP_PHOTO:   'leadership_photo',
+  // [NEW] Discover-section card preview photo — SETTING_KEYS.SCHOOL_DISCOVER_CARDS
+  // entries reference this via DiscoverCardImage.photoKey, resolved to a
+  // view URL by /public/school-info the same way LEADERSHIP_PHOTO is by
+  // /public/leadership. Deliberately two underscore-segments ('discover',
+  // 'photo'), matching every other FILE_PREFIX value — canReadFile()'s
+  // `fileId.split('_').slice(0, 2)` only ever inspects the first two
+  // segments of a fileId, so a three-segment prefix here would silently
+  // fail to match its own READ_ROLES entry.
+  DISCOVER_PHOTO:     'discover_photo',
 } as const
 
 export type FilePrefix = typeof FILE_PREFIX[keyof typeof FILE_PREFIX]
@@ -105,7 +125,7 @@ const READ_ROLES: Record<FilePrefix, string[]> = {
   payslip:          ['admin', 'finance', 'hr', '__self'],   // __self = the staff member who owns it
   report_card:      ['admin', 'high_rank', 'exam_officer', 'academic', '__self'],
   transcript:       ['admin', 'high_rank', 'exam_officer', '__self'],
-  receipt:          ['admin', 'finance'],
+  receipt:          ['admin', 'high_rank', 'finance', '__self'],   // __self = the student whose invoice was paid
   ebook:            ['admin', 'library', 'academic', 'student'],
   past_paper:       ['admin', 'library', 'academic', 'student'],
   expense_receipt:  ['admin', 'finance'],
@@ -113,6 +133,10 @@ const READ_ROLES: Record<FilePrefix, string[]> = {
   loan_doc:         ['admin', 'hr', 'finance'],
   application_doc:  ['admin', 'high_rank', 'lower_rank'],
   assignment_submission: ['admin', 'high_rank', 'academic', '__self'],
+  // Role gate only - the route ALSO verifies class membership / teaching
+  // relationship (assignmentService.canAccessAssignmentFile).
+  assignment_file:  ['admin', 'high_rank', 'academic', 'exam_officer', 'student'],
+  assignment_image: ['admin', 'high_rank', 'finance', 'library', 'lower_rank', 'academic', 'hr', 'exam_officer', 'student'],
   financial_report: ['admin', 'finance', 'high_rank'],
   digital_resource: ['admin', 'high_rank', 'finance', 'library', 'academic', 'hr', 'exam_officer', 'student'],
   // Public assets — every internal role may view them too (used by any
@@ -122,11 +146,35 @@ const READ_ROLES: Record<FilePrefix, string[]> = {
   announcement_image: ['admin', 'high_rank', 'finance', 'library', 'lower_rank', 'academic', 'hr', 'exam_officer', 'student'],
   school_gallery:     ['admin', 'high_rank', 'finance', 'library', 'lower_rank', 'academic', 'hr', 'exam_officer', 'student'],
   leadership_photo:   ['admin', 'high_rank', 'finance', 'library', 'lower_rank', 'academic', 'hr', 'exam_officer', 'student'],
+  // [NEW] Same public-asset tier as school_gallery/leadership_photo above.
+  discover_photo:     ['admin', 'high_rank', 'finance', 'library', 'lower_rank', 'academic', 'hr', 'exam_officer', 'student'],
 }
 
+// [PRODUCTION FIX] The previous `fileId.split('_').slice(0, 2).join('_')`
+// extraction assumed every FilePrefix has exactly two underscore-separated
+// segments (student_photo, school_gallery, ...). Every single-segment
+// prefix — payslip, receipt, ebook, transcript — instead reconstructed the
+// WHOLE fileId (prefix + unique suffix) as the "prefix", which never
+// matches a READ_ROLES key, so all four categories silently fell through to
+// `userRole === 'admin'` regardless of role or __self ownership. This is
+// the direct cause of "even self payslips don't work for any user" — a
+// staff member downloading their own payslip went through the file proxy's
+// __self ownership resolution correctly (that part was already fixed —
+// see api/files/[fileId]/route.ts's own header comment), then got denied
+// here anyway because "payslip" was never recognized as a valid prefix.
+// Matches against every real FILE_PREFIX value by startsWith(), preferring
+// the longest match — no two current prefixes collide, but this keeps a
+// future prefix like "receipt_reversal" from being misread as "receipt".
 export function canReadFile(fileId: string, userRole: string, userUid: string, ownerUid?: string): boolean {
-  const prefix = fileId.split('_').slice(0, 2).join('_') as FilePrefix
-  const allowed = READ_ROLES[prefix]
+  // [Guardian portal] A parent is never authorised by role or by the __self rule.
+  // Their access is decided per request from a verified guardian link (see the
+  // guardian branch in app/api/files/[fileId]/route.ts), so this role-based table
+  // must stay closed to them even if a uid were ever (wrongly) shared with an owner.
+  if (userRole === 'parent') return false
+  const prefix = (Object.values(FILE_PREFIX) as string[])
+    .filter((p) => fileId === p || fileId.startsWith(`${p}_`))
+    .sort((a, b) => b.length - a.length)[0] as FilePrefix | undefined
+  const allowed = prefix ? READ_ROLES[prefix] : undefined
   if (!allowed) return userRole === 'admin'
   if (allowed.includes(userRole)) return true
   if (allowed.includes('__self') && ownerUid && userUid === ownerUid) return true
@@ -232,6 +280,13 @@ const PUBLIC_FILE_PREFIXES: readonly FilePrefix[] = [
   FILE_PREFIX.ANNOUNCEMENT_IMAGE,
   FILE_PREFIX.SCHOOL_GALLERY,
   FILE_PREFIX.LEADERSHIP_PHOTO,
+  // [NEW] Without this, discover-photo uploads would get non-public
+  // Appwrite file permissions and getPublicViewUrl() would 403 for
+  // unauthenticated landing-page visitors — same reasoning as
+  // LEADERSHIP_PHOTO/SCHOOL_GALLERY above.
+  FILE_PREFIX.DISCOVER_PHOTO,
+  // Assignment pictures render inside rich-text <img> tags - see FILE_PREFIX.ASSIGNMENT_IMAGE.
+  FILE_PREFIX.ASSIGNMENT_IMAGE,
 ]
 
 export interface DirectUploadTicket {
@@ -304,21 +359,23 @@ export async function createDirectUploadTicket(
 
 // ─── SIGNED / PRESIGNED VIEW URL ─────────────────────────────────────────────
 
-const SIGNED_URL_TTL_SECONDS = 3600 // 1 hour
+const SIGNED_URL_TTL_SECONDS = 3600 // retained as the intended proxy-session lifetime
 
 /**
- * Returns a short-lived signed URL for viewing a file.
+ * Returns the protected same-origin proxy URL used for viewing a file.
  * All sensitive file access must go through this — never expose raw Appwrite URLs.
  */
 export async function getSignedViewUrl(fileId: string): Promise<string> {
   getClient() // throws if APPWRITE_ENDPOINT/PROJECT_ID/API_KEY are missing
   // Appwrite Node SDK getFilePreview / getFileView returns a URL object.
-  // For sensitive docs we use createFileDownload which allows TTL in newer SDKs.
-  // Since Appwrite free tier doesn't support JWT-scoped URLs out of the box,
-  // we proxy the download through our own API route (see /api/files/[fileId]/route.ts).
-  // This function returns our internal proxy URL, not a direct Appwrite URL.
-  const proxyBase = process.env.NEXT_PUBLIC_APP_URL ?? 'https://sms-malawi.vercel.app'
-  return `${proxyBase}/api/files/${encodeURIComponent(fileId)}?ttl=${SIGNED_URL_TTL_SECONDS}`
+  // Appwrite file URLs are deliberately never exposed for protected documents.
+  // The browser receives only our same-origin proxy URL and must authenticate
+  // the actual byte request with a Firebase Bearer token.
+  // Keep this same-origin and relative. The browser fetches the file through
+  // /api/files/[fileId] with the Firebase Bearer token. This avoids coupling
+  // local development to the production domain and avoids putting auth
+  // credentials in the URL.
+  return `/api/files/${encodeURIComponent(fileId)}`
 }
 
 /**

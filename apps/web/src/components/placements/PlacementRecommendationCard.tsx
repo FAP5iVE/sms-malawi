@@ -4,8 +4,8 @@
  * [PURPOSE]: Presents one programme recommendation, redesigned to match the
  *   "Malawi Higher Education Placement & Advisory" reference module's card:
  *   university badge + eligibility pill, duration/cutoff line, a synthesized
- *   "Analysis Verdict" paragraph, the full mandatory-prerequisite compliance
- *   table (Prerequisite | Required Grade | Your Grade | Status), and an NCHE
+ *   "Analysis verdict" paragraph, the full mandatory-prerequisite compliance
+ *   table (Prerequisite | Required Grade | Your grade | Status), and an NCHE
  *   Application Strategy tip. Every figure shown is real, already-computed
  *   catalogue/engine data (@shared/constants/universities +
  *   placementMatchingService) — nothing here is invented placeholder copy;
@@ -17,9 +17,10 @@
 'use client'
 
 import { useState } from 'react'
-import { CheckCircle2, XCircle, Info, Lightbulb, Sparkles, Loader2, Send } from 'lucide-react'
+import { CheckCircle2, Info, Lightbulb, Sparkles, Loader2, Send } from 'lucide-react'
 import type { ApiPlacementRecommendation } from '@shared/types/api'
 import { useExplainRecommendation } from '@/hooks/usePlacements'
+import { StatusText } from '@/components/shared/StatusText'
 
 interface Props {
   recommendation: ApiPlacementRecommendation
@@ -39,7 +40,7 @@ function buildVerdict(r: ApiPlacementRecommendation): string {
     return `You do not meet the mandatory subject prerequisite(s) for ${r.programmeName}: missing credit in ${r.missingSubjects.join(', ')}.`
   }
   if (r.meetsCutOff === true) {
-    return `Fully eligible! Your MSCE aggregate (${r.aggregate} points) comfortably meets or surpasses the typical cutoff (${r.cutOffPoints} points).`
+    return `Fully eligible. Your MSCE aggregate (${r.aggregate} points) comfortably meets or surpasses the typical cutoff (${r.cutOffPoints} points).`
   }
   if (r.meetsCutOff === false) {
     return `Prerequisites are met, but your aggregate (${r.aggregate} points) is above the typical competitive cutoff (${r.cutOffPoints} points).`
@@ -59,9 +60,9 @@ function buildStrategy(r: ApiPlacementRecommendation): string {
 
 export function PlacementRecommendationCard({ recommendation: r, action, rank, grades }: Props) {
   const eligible = r.eligible
-  const cutOffLabel = r.meetsCutOff === true ? 'Eligible \u2014 within cutoff'
-    : r.meetsCutOff === false ? 'Eligible \u2014 competitive cutoff'
-    : eligible ? 'Meets minimums' : 'Not eligible \u2014 missing prerequisites'
+  const cutOffLabel = r.meetsCutOff === true ? 'Eligible, within cutoff'
+    : r.meetsCutOff === false ? 'Eligible, competitive cutoff'
+    : eligible ? 'Meets minimums' : 'Not eligible, missing prerequisites'
 
   const explain = useExplainRecommendation()
   const [aiOpen, setAiOpen] = useState(false)
@@ -75,17 +76,17 @@ export function PlacementRecommendationCard({ recommendation: r, action, rank, g
   }
 
   return (
-    <div className={`rounded-xl border p-4 space-y-3 ${eligible ? 'border-brand-teal/40 bg-brand-teal/5' : 'border-brand-coral/30 bg-page'}`}>
+    <div className="app-tint rounded-xl p-4 space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex items-start gap-2">
           {rank !== undefined && (
-            <span className="shrink-0 w-6 h-6 rounded-full bg-brand-navy text-white text-xs font-bold flex items-center justify-center mt-0.5">
+            <span className="shrink-0 w-6 h-6 rounded-full bg-brand-deep text-white text-xs font-bold flex items-center justify-center mt-0.5">
               {rank}
             </span>
           )}
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="inline-flex items-center rounded bg-brand-navy/10 text-brand-navy text-[11px] font-bold px-1.5 py-0.5 uppercase tracking-wide">
+              <span className="inline-flex items-center text-status-info text-xs font-bold">
                 {r.universityId}
               </span>
               <span className="text-xs text-muted">{r.universityName}</span>
@@ -93,60 +94,56 @@ export function PlacementRecommendationCard({ recommendation: r, action, rank, g
             <p className="font-heading font-semibold text-sm leading-snug mt-1">{r.programmeName}</p>
             {(r.durationYears || r.cutOffPoints) && (
               <p className="text-xs text-muted mt-0.5">
-                {r.durationYears ? `Duration: ${r.durationYears} Years` : null}
+                {r.durationYears ? `Duration: ${r.durationYears} years` : null}
                 {r.durationYears && r.cutOffPoints ? ' \u00b7 ' : null}
-                {r.cutOffPoints ? `Typical Cutoff: ~${r.cutOffPoints} pts` : null}
+                {r.cutOffPoints ? `Typical cutoff: ~${r.cutOffPoints} pts` : null}
               </p>
             )}
           </div>
         </div>
-        <span
-          className={`inline-flex items-center gap-1 text-xs font-semibold shrink-0 rounded-full px-2.5 py-1 ${
-            eligible
-              ? r.meetsCutOff === false ? 'bg-brand-amber/10 text-brand-amber' : 'bg-brand-teal/10 text-brand-teal'
-              : 'bg-brand-coral/10 text-brand-coral'
-          }`}
+        <StatusText
+          tone={eligible ? (r.meetsCutOff === false ? 'warning' : 'success') : 'danger'}
+          className="shrink-0"
         >
-          {eligible ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
           {cutOffLabel}
-        </span>
+        </StatusText>
       </div>
 
       {(eligible || r.matchedPreferredField || r.matchedPreferredCareer) && (
         <div className="flex flex-wrap gap-1.5">
           {eligible && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-brand-teal/10 text-brand-teal text-[11px] font-medium px-2 py-0.5">
+            <span className="inline-flex items-center gap-1 text-tone-teal text-xs font-medium">
               <CheckCircle2 className="w-3 h-3" /> Meets requirements
             </span>
           )}
           {r.matchedPreferredField && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-brand-navy/10 text-brand-navy text-[11px] font-medium px-2 py-0.5">
+            <span className="inline-flex items-center gap-1 text-brand-navy text-xs font-medium">
               <CheckCircle2 className="w-3 h-3" /> Matches your field preference
             </span>
           )}
           {r.matchedPreferredCareer && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-brand-navy/10 text-brand-navy text-[11px] font-medium px-2 py-0.5">
+            <span className="inline-flex items-center gap-1 text-brand-navy text-xs font-medium">
               <CheckCircle2 className="w-3 h-3" /> Matches your career interest
             </span>
           )}
         </div>
       )}
 
-      <div className="bg-surface border border-base rounded-lg p-3">
-        <p className="text-[11px] font-semibold text-muted uppercase tracking-wide mb-1">Analysis Verdict</p>
+      <div className="bg-surface rounded-lg p-3">
+        <p className="text-xs font-semibold text-muted mb-1">Analysis verdict</p>
         <p className="text-sm text-body">{buildVerdict(r)}</p>
       </div>
 
       {r.prerequisiteAudit.length > 0 && (
         <div>
-          <p className="text-[11px] font-semibold text-muted uppercase tracking-wide mb-1.5">Mandatory Prerequisite Audit</p>
+          <p className="text-xs font-semibold text-muted mb-1.5">Mandatory prerequisite check</p>
           <div className="overflow-x-auto -mx-1">
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-left text-muted">
                   <th className="font-medium px-1 py-1">Prerequisite</th>
                   <th className="font-medium px-1 py-1">Required</th>
-                  <th className="font-medium px-1 py-1">Your Grade</th>
+                  <th className="font-medium px-1 py-1">Your grade</th>
                   <th className="font-medium px-1 py-1">Status</th>
                 </tr>
               </thead>
@@ -156,7 +153,7 @@ export function PlacementRecommendationCard({ recommendation: r, action, rank, g
                     <td className="px-1 py-1.5">{row.label}</td>
                     <td className="px-1 py-1.5 text-muted">{row.requiredGrade !== null ? `\u2264 ${row.requiredGrade}` : (row.note ?? '\u2014')}</td>
                     <td className="px-1 py-1.5 font-medium">{row.yourGrade !== null ? row.yourGrade : '\u2014'}</td>
-                    <td className={`px-1 py-1.5 font-medium ${row.satisfied ? 'text-brand-teal' : 'text-brand-coral'}`}>
+                    <td className={`px-1 py-1.5 font-medium ${row.satisfied ? 'text-tone-teal' : 'text-tone-coral'}`}>
                       {row.satisfied ? 'Satisfied' : 'Deficient'}
                     </td>
                   </tr>
@@ -174,10 +171,10 @@ export function PlacementRecommendationCard({ recommendation: r, action, rank, g
         </p>
       )}
 
-      <div className="bg-brand-navy/5 border border-brand-navy/15 rounded-lg p-3 flex items-start gap-2">
+      <div className="bg-brand-navy/5 rounded-lg p-3 flex items-start gap-2">
         <Lightbulb className="w-4 h-4 text-brand-navy mt-0.5 shrink-0" />
         <div>
-          <p className="text-[11px] font-semibold text-brand-navy uppercase tracking-wide mb-0.5">NCHE Application Strategy</p>
+          <p className="text-xs font-semibold text-brand-navy mb-0.5">NCHE application strategy</p>
           <p className="text-xs text-body">{buildStrategy(r)}</p>
         </div>
       </div>
@@ -196,22 +193,22 @@ export function PlacementRecommendationCard({ recommendation: r, action, rank, g
             <button
               type="button"
               onClick={() => askAI()}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-navy hover:underline"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-navy app-action"
             >
               <Sparkles className="w-3.5 h-3.5" /> Ask AI to explain this
             </button>
           ) : (
             <div className="space-y-2">
-              <p className="text-[11px] font-semibold text-brand-navy uppercase tracking-wide flex items-center gap-1">
-                <Sparkles className="w-3.5 h-3.5" /> AI Explanation
+              <p className="text-xs font-semibold text-brand-navy flex items-center gap-1">
+                <Sparkles className="w-3.5 h-3.5" /> AI explanation
               </p>
               {explain.isPending ? (
                 <p className="text-xs text-muted flex items-center gap-1.5"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Thinking…</p>
               ) : explain.data?.explanation ? (
-                <p className="text-xs text-body bg-page border border-base rounded-lg p-2.5">{explain.data.explanation}</p>
+                <p className="text-xs text-body bg-surface rounded-lg p-2.5">{explain.data.explanation}</p>
               ) : (
                 <p className="text-xs text-muted italic">
-                  AI explanation is not available right now — the standard explanation above still applies.
+                  AI explanation is not available right now. The standard explanation above still applies.
                 </p>
               )}
 

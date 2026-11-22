@@ -67,9 +67,12 @@
 
 import 'server-only'
 import { Router } from 'express'
+import { rateLimit } from '@/lib/ratelimit'
+import { idempotent } from '@/server/middleware/idempotency'
+import { parseDateRange, parsePageParams } from '@/lib/requestLimits'
 import multer from 'multer'
 import { verifyAuth, requireRole } from '@/lib/verifyAuth'
-import { requirePermission } from '@/server/middleware/verifyPermission'
+import { requirePermission, requireAnyPermission } from '@/server/middleware/verifyPermission'
 import {
   RecordPaymentSchema,
   GenerateInvoiceSchema,
@@ -88,8 +91,10 @@ import {
 import { Prisma, InvoiceStatus, FineStatus } from '@prisma/client'
 import * as feeService from '@/server/services/feeService'
 import * as budgetService from '@/server/services/budgetService'
+import * as expenseApprovalService from '@/server/services/expenseApprovalService'
 import * as installmentService from '@/server/services/installmentService'
 import * as studentService from '@/server/services/studentService'
+import * as settingsService from '@/server/services/settingsService'
 // [BUG FIX 2026-09-06] See lib/serialize.ts's header comment -- Decimal
 // fields (FeeStructure.amount, Invoice.totalAmount/balance,
 // InvoiceLineItem.amount/balance, StudentCredit.amount, ...) serialize to
@@ -107,7 +112,10 @@ import { prisma } from '@/lib/prisma'
 import { bulkGenerateInvoices } from '@/server/services/bulkInvoiceService'
 import * as Sentry from '@sentry/nextjs'
 import { logger } from '@/lib/logger'
+import * as budgetWindowService from '@/server/services/budgetWindowService'
+import { CreateBudgetWindowSchema, SetBudgetWindowStatusSchema } from '@shared/schemas/assetsInventoryProcurement'
 import { sendError } from '@/server/lib/sendError'
+import { isStaffRole } from '@shared/types/roles'
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }) // 10MB
 
@@ -121,10 +129,20 @@ const VALID_REPORT_TYPES: ReportType[] = [
   'fee_collection', 'outstanding_balances', 'expense_breakdown', 'payroll_summary',
 ]
 
+/** Academic year from an explicit ?academicYear=, otherwise the school's
+ *  CURRENT year from SystemSettings. Every route below that used to default
+ *  to a literal '2025/2026' goes through this instead — a literal default
+ *  quietly queries a stale (often empty) slice of data once the calendar
+ *  moves on, which is exactly how the Finances summary cards ended up
+ *  showing MK 0.00 against a fully-seeded database. */
+async function yearFrom(value: unknown): Promise<string> {
+  return (await settingsService.resolvePeriod({ academicYear: value })).academicYear
+}
+
 // ── SUMMARY
 financesRouter.get('/summary', verifyAuth, requireRole([...FINANCE_ROLES]), async (req, res) => {
-  const { academicYear = '2025/2026', term = '1' } = req.query
-  const summary = await feeService.getFinanceSummary(academicYear as string, Number(term))
+  const { academicYear, term } = await settingsService.resolvePeriod(req.query)
+  const summary = await feeService.getFinanceSummary(academicYear, term)
   res.json(summary)
 })
 
@@ -140,7 +158,12 @@ financesRouter.get(
   requireRole([...FINANCE_ROLES, 'high_rank', 'student']),
   async (req, res) => {
     try {
-      const { academicYear = '2025/2026', studentId, term, includeArchived } = req.query
+      const { studentId, term, includeArchived } = req.query
+      // Year and (for per-student eligibility) term default to the school's
+      // CURRENT period. `term` deliberately stays optional for the catalog
+      // listing below, where omitting it means "every term".
+      const period = await settingsService.resolvePeriod(req.query)
+      const academicYear = period.academicYear
 
       if (req.user!.role === 'student') {
         // A student-role client only ever knows its own Firebase UID --
@@ -152,8 +175,8 @@ financesRouter.get(
         }
         const fees = await feeService.getEligibleFeeStructuresForStudent(
           student.id,
-          academicYear as string,
-          term ? Number(term) : 1,
+          academicYear,
+          term ? Number(term) : period.term,
         )
         return res.json(serializeDecimals(fees))
       }
@@ -168,8 +191,8 @@ financesRouter.get(
       if (studentId) {
         const fees = await feeService.getEligibleFeeStructuresForStudent(
           String(studentId),
-          academicYear as string,
-          term ? Number(term) : 1,
+          academicYear,
+          term ? Number(term) : period.term,
         )
         return res.json(serializeDecimals(fees))
       }
@@ -251,10 +274,10 @@ financesRouter.get(
   verifyAuth,
   requireRole([...FINANCE_ROLES, 'high_rank']),
   async (req, res) => {
-    const { studentId, academicYear = '2025/2026' } = req.query
+    const { studentId } = req.query
     if (!studentId) return res.status(400).json({ error: 'studentId is required' })
     try {
-      const commitments = await feeService.listStudentFeeCommitments(String(studentId), academicYear as string)
+      const commitments = await feeService.listStudentFeeCommitments(String(studentId), await yearFrom(req.query.academicYear))
       res.json(serializeDecimals(commitments))
     } catch (err: unknown) {
       return sendError(res, err, { tags: { module: 'finances', route: 'fee-commitments-list' } })
@@ -295,8 +318,13 @@ financesRouter.patch(
 )
 
 // ── INVOICES
+// [ALGOLIA ROLLOUT — Tier 2 item 7] Was hardcoded to `take: 100` with no
+// pagination at all — the same silent-truncation bug class as the
+// original User Management item (invoices past the 100th just never
+// appeared, no error). Real page/pageSize now, same shape as
+// applicationService.listApplications()'s envelope.
 financesRouter.get('/invoices', verifyAuth, requireRole([...FINANCE_ROLES]), async (req, res) => {
-  const { studentId, academicYear, term, status } = req.query
+  const { studentId, academicYear, term, status, page, pageSize } = req.query
   const where: Prisma.InvoiceWhereInput = {}
   if (studentId) where.studentId = String(studentId)
   if (academicYear) where.academicYear = String(academicYear)
@@ -304,20 +332,33 @@ financesRouter.get('/invoices', verifyAuth, requireRole([...FINANCE_ROLES]), asy
   // Cast to InvoiceStatus enum directly — NOT InvoiceWhereInput['status']
   // because that indexed type includes undefined which violates exactOptionalPropertyTypes
   if (status) where.status = String(status) as InvoiceStatus
-  const invoices = await prisma.invoice.findMany({
-    where,
-    orderBy: { createdAt: 'desc' },
-    take: 100,
-    // [R9] Joined student name — the frontend never resolves a raw
-    // studentId to a name itself (InvoicesTab.tsx's "Student" column).
-    // [PRODUCTION FIX] lineItems included — the payment modal needs each
-    // fee type's own balance to build the allocation table.
-    include: {
-      student: { select: { firstName: true, lastName: true } },
-      lineItems: true,
-    },
+
+  // [Issue 6] An oversized pageSize is rejected (400) before the query runs, not silently clamped.
+  const { page: safePage, pageSize: safePageSize } = parsePageParams({ page, pageSize }, { defaultSize: 50, maxSize: 200 })
+
+  const [invoices, total] = await Promise.all([
+    prisma.invoice.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip: (safePage - 1) * safePageSize,
+      take: safePageSize,
+      // [R9] Joined student name — the frontend never resolves a raw
+      // studentId to a name itself (InvoicesTab.tsx's "Student" column).
+      // [PRODUCTION FIX] lineItems included — the payment modal needs each
+      // fee type's own balance to build the allocation table.
+      include: {
+        student: { select: { firstName: true, lastName: true } },
+        lineItems: true,
+      },
+    }),
+    prisma.invoice.count({ where }),
+  ])
+  res.json({
+    invoices: serializeDecimals(invoices),
+    total,
+    page:  safePage,
+    pages: Math.max(Math.ceil(total / safePageSize), 1),
   })
-  res.json(serializeDecimals(invoices))
 })
 
 // [PRODUCTION FIX] Single-invoice fetch with line items — needed when
@@ -400,9 +441,36 @@ financesRouter.get(
       }
       id = student.id
     }
-    const { academicYear = '2025/2026' } = req.query
-    const result = await feeService.getStudentBalance(id, academicYear as string)
-    res.json(serializeDecimals(result))
+    // [FINANCE PAYMENT HISTORY] Staff may pass academicYear=all to get the
+    // student's invoices + payments across every year (the full fee payment
+    // history). Students are always limited to one year, as before.
+    // Positive check: `!== 'student'` would treat any role added to the
+    // requireRole list above (or any future role) as staff.
+    const isStaff = isStaffRole(req.user!.role)
+    const allYears = isStaff && req.query.academicYear === 'all'
+    const result = await feeService.getStudentBalance(
+      id,
+      allYears ? undefined : await yearFrom(req.query.academicYear),
+    )
+    if (!isStaff) return res.json(serializeDecimals(result))
+
+    // Staff also see WHO recorded each payment (Payment.recordedByUid is a
+    // plain Firebase-UID string with no Prisma relation, so resolve manually).
+    const uids = [...new Set(result.invoices.flatMap((inv) => inv.payments.map((p) => p.recordedByUid)))]
+    const profiles = uids.length
+      ? await prisma.staffProfile.findMany({
+          where: { uid: { in: uids } },
+          select: { uid: true, firstName: true, lastName: true },
+        })
+      : []
+    const nameByUid = new Map(profiles.map((s) => [s.uid, `${s.firstName} ${s.lastName}`]))
+    res.json(serializeDecimals({
+      ...result,
+      invoices: result.invoices.map((inv) => ({
+        ...inv,
+        payments: inv.payments.map((p) => ({ ...p, recordedByName: nameByUid.get(p.recordedByUid) ?? null })),
+      })),
+    }))
   }
 )
 
@@ -451,6 +519,12 @@ financesRouter.post(
       if (err instanceof feeService.OverpaymentConfirmationRequiredError) {
         return res.status(409).json({ error: err.message, overpayments: err.overpayments })
       }
+      // [FIXED 2026-10-22] Same invoice, amount, method and reference (or an
+      // identical payment seconds ago) -- an accidental double-submit. 409, no
+      // `overpayments` field, so the client shows it as an error message.
+      if (err instanceof feeService.DuplicatePaymentError) {
+        return res.status(409).json({ error: err.message, duplicate: true })
+      }
       return sendError(res, err, { tags: { module: 'finances', route: 'record-payment' } })
     }
   }
@@ -460,7 +534,10 @@ financesRouter.post(
 financesRouter.get(
   '/payments/:id/receipt',
   verifyAuth,
-  requireRole(['admin', 'finance', 'student']),
+  // Same staff set that can open the Finances workspace and see invoices
+  // (FINANCE_ROLES = admin/high_rank/finance), plus the owning student.
+  // high_rank was missing here, so they could list payments but never open one.
+  requireRole([...FINANCE_ROLES, 'student']),
   async (req, res) => {
     const payment = await prisma.payment.findUniqueOrThrow({
       where: { id: String(req.params.id) },
@@ -473,16 +550,27 @@ financesRouter.get(
     if (req.user!.role === 'student') {
       await studentService.assertStudentOwnership(req.user!.uid, payment.invoice.studentId)
     }
-    if (!payment.receiptKey) return res.status(404).json({ error: 'Receipt not yet generated' })
-    const url = await getSignedViewUrl(payment.receiptKey)
+    // Self-heal: if generation failed when the payment was recorded (it is
+    // deliberately non-fatal there), build the receipt now instead of
+    // answering 404 for the rest of the payment's life.
+    let receiptKey = payment.receiptKey
+    if (!receiptKey) {
+      try {
+        receiptKey = await feeService.ensurePaymentReceipt(payment.id)
+      } catch (err) {
+        return sendError(res, err, { tags: { module: 'finances', route: 'receipt-regenerate' } })
+      }
+    }
+    if (!receiptKey) return res.status(404).json({ error: 'Receipt not yet generated' })
+    const url = await getSignedViewUrl(receiptKey)
     res.json({ url })
   }
 )
 
 // ── EXPENSES
 financesRouter.get('/expenses', verifyAuth, requireRole([...FINANCE_ROLES]), async (req, res) => {
-  const { academicYear = '2025/2026', term } = req.query
-  const where: Prisma.ExpenseWhereInput = { academicYear: academicYear as string }
+  const { term } = req.query
+  const where: Prisma.ExpenseWhereInput = { academicYear: await yearFrom(req.query.academicYear) }
   if (term) where.term = Number(term)
   const expenses = await prisma.expense.findMany({ where, orderBy: { incurredAt: 'desc' } })
   res.json(expenses)
@@ -500,21 +588,6 @@ financesRouter.post('/expenses', verifyAuth, requireRole(['admin', 'finance']), 
   })
   res.status(201).json(expense)
 })
-
-// [R9] Maps each ExpenseCategory to the chart-of-accounts expense code
-// accountingService.seedChartOfAccounts() seeds. LIBRARY and TRANSPORT
-// have no dedicated seeded account — mapped to 5900 Miscellaneous Expense
-// rather than adding new accounts, since this phase makes no change to
-// accountingService.ts's own ledger logic (the seeded chart is untouched).
-const EXPENSE_CATEGORY_ACCOUNT: Record<string, string> = {
-  SALARIES: '5000',
-  UTILITIES: '5100',
-  MAINTENANCE: '5200',
-  PROCUREMENT: '5300',
-  LIBRARY: '5900',
-  TRANSPORT: '5900',
-  MISCELLANEOUS: '5900',
-}
 
 // [R9] Receipt upload — an Appwrite file ID stored on Expense.receiptKey,
 // matching the field this session's schema.prisma comment fix corrects
@@ -568,64 +641,28 @@ financesRouter.get(
   }
 )
 
+// [Approvals Hub] The approve/reject logic now lives in
+// expenseApprovalService so this route and the Approvals page share one
+// implementation — and both now refuse a non-PENDING expense (the inline
+// version could be approved twice, posting the journal entry and the budget
+// spend twice).
 financesRouter.patch(
   '/expenses/:id/approve',
   verifyAuth,
   requireRole(['admin', 'high_rank']),
   async (req, res) => {
-    // [PRODUCTION FIX 2026-07-27] paidImmediately decides which ledger
-    // account the approval posts against: Cash (already paid) or Accounts
-    // Payable (owed — a vendor/company debt, cleared later via mark-paid).
-    // Defaults to true so any caller that doesn't yet send this field keeps
-    // today's behaviour (approval = paid) rather than silently starting to
-    // create payables it never intended.
+    // paidImmediately decides which ledger account the approval posts
+    // against: Cash (already paid) or Accounts Payable (owed). Defaults to
+    // true so callers that don't send it keep approval = paid.
     const paidImmediately = req.body?.paidImmediately !== false
-    const expense = await prisma.expense.update({
-      where: { id: String(req.params.id) },
-      data: {
-        status: 'APPROVED',
-        approvedByUid: req.user!.uid,
-        approvedAt: new Date(),
-        ...(paidImmediately ? { paidAt: new Date(), paidByUid: req.user!.uid } : {}),
-      },
-    })
-    await budgetService.updateBudgetSpent(expense.category, expense.academicYear, Number(expense.amount))
-    // [R9] Reconnect approved expenses to the double-entry ledger — Phase
-    // 4B confirmed no money-movement operation reached accountingService
-    // before this session (not just payments). A posting failure is
-    // logged for reconciliation rather than reverting the already-applied
-    // approval, matching feeService.recordPayment()'s identical pattern.
     try {
-      const accountCode = EXPENSE_CATEGORY_ACCOUNT[expense.category] ?? '5900'
-      const entryId = await accountingService.createJournalEntry({
-        reference: `EXP-${expense.id.slice(-8).toUpperCase()}`,
-        description: `Expense approved — ${expense.description} (${expense.category})`,
-        entryDate: new Date(),
-        actorUid: req.user!.uid,
-        lines: paidImmediately
-          ? [
-              { accountCode, debit: Number(expense.amount), description: expense.description },
-              { accountCode: '1000', credit: Number(expense.amount), description: 'Cash paid for expense' },
-            ]
-          : [
-              { accountCode, debit: Number(expense.amount), description: expense.description },
-              { accountCode: '2000', credit: Number(expense.amount), description: `Owed — ${expense.description}` },
-            ],
-      })
-      await accountingService.postEntry(entryId, req.user!.uid)
-    } catch (err) {
-      // Best-effort accounting-ledger posting — the primary operation
-      // (expense/fine record) already succeeded and stays 200; this is
-      // purely a secondary-write failure. Previously only logger.error'd,
-      // meaning a real financial-integrity gap (a record exists with no
-      // posted journal entry) was invisible to Sentry. Now captured, tagged
-      // 'finances' — sentry.server.config.ts's own beforeSend additionally
-      // auto-escalates to level:fatal + critical_module:'finance' if the
-      // thrown message mentions JOURNAL/PAYROLL/INVOICE.
-      logger.error({ event: 'accounting.expense_posting_failed', expenseId: expense.id, err })
-      Sentry.captureException(err, { tags: { module: 'finances', event: 'accounting.expense_posting_failed' } })
+      const expense = await expenseApprovalService.approveExpense(
+        String(req.params.id), req.user!.uid, req.user!.role, paidImmediately,
+      )
+      res.json(expense)
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'finances', route: 'expense-approve' } })
     }
-    res.json(expense)
   }
 )
 
@@ -710,11 +747,15 @@ financesRouter.patch(
   verifyAuth,
   requirePermission('finance.rejectExpense'),
   async (req, res) => {
-    const expense = await prisma.expense.update({
-      where: { id: String(req.params.id) },
-      data: { status: 'REJECTED' },
-    })
-    res.json(expense)
+    const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim().slice(0, 500) : undefined
+    try {
+      const expense = await expenseApprovalService.rejectExpense(
+        String(req.params.id), req.user!.uid, req.user!.role, reason,
+      )
+      res.json(expense)
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'finances', route: 'expense-reject' } })
+    }
   }
 )
 
@@ -752,9 +793,9 @@ financesRouter.post('/scholarships', verifyAuth, requireRole(['admin', 'finance'
 
 // ── BUDGET
 financesRouter.get('/budget', verifyAuth, requireRole([...FINANCE_ROLES, 'high_rank']), async (req, res) => {
-  const { academicYear = '2025/2026', term } = req.query
+  const { term } = req.query
   const data = await budgetService.getBudgetVsActual(
-    academicYear as string,
+    await yearFrom(req.query.academicYear),
     term ? Number(term) : undefined
   )
   res.json(data)
@@ -789,9 +830,9 @@ financesRouter.get(
   verifyAuth,
   requireRole([...FINANCE_ROLES]),
   async (req, res) => {
-    const { from, to } = req.query as { from?: string; to?: string }
-    if (!from || !to) return res.status(400).json({ error: 'from and to are required' })
-    const statement = await accountingService.getIncomeStatement(new Date(from), new Date(to))
+    // [Issue 6] Bounded span, validated before any ledger query is issued.
+    const range = parseDateRange(req.query)!
+    const statement = await accountingService.getIncomeStatement(range.from, range.to)
     res.json(statement)
   }
 )
@@ -810,12 +851,9 @@ financesRouter.get(
   verifyAuth,
   requireRole([...FINANCE_ROLES]),
   async (req, res) => {
-    const { from, to } = req.query as { from?: string; to?: string }
-    const lines = await accountingService.getAccountLedger(
-      String(req.params.code),
-      from ? new Date(from) : undefined,
-      to ? new Date(to) : undefined
-    )
+    // [Issue 6] A ledger with no range was an all-time scan; from/to are now required and bounded.
+    const range = parseDateRange(req.query)!
+    const lines = await accountingService.getAccountLedger(String(req.params.code), range.from, range.to)
     res.json(lines)
   }
 )
@@ -828,12 +866,11 @@ financesRouter.get(
   verifyAuth,
   requireRole([...FINANCE_ROLES]),
   async (req, res) => {
-    const { academicYear = '2025/2026', forwardMonths } = req.query as {
-      academicYear?: string
+    const { forwardMonths } = req.query as {
       forwardMonths?: string
     }
     const report = await forecastService.getCashFlowForecast(
-      academicYear,
+      await yearFrom(req.query.academicYear),
       forwardMonths ? Number(forwardMonths) : undefined
     )
     res.json(report)
@@ -937,6 +974,12 @@ financesRouter.post(
   '/invoices/bulk-generate',
   verifyAuth,
   requireRole(['admin', 'finance']),
+  // [Issue 6] Many writes per request. Rate limited per user (dry runs too — the
+  // roster preview is itself heavy) and idempotent for REAL runs, so a client retrying
+  // after a timeout gets the original result instead of a second concurrent run whose
+  // response would report everything as EXISTING.
+  rateLimit('bulk-mutation'),
+  idempotent({ applies: (req) => (req.body as { dryRun?: unknown } | undefined)?.dryRun !== true }),
   async (req, res) => {
     const parsed = BulkGenerateInvoicesSchema.safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
@@ -982,6 +1025,13 @@ financesRouter.get(
     res.json(
       fines.map((fine) => ({
         ...fine,
+        // [FIX] Same Decimal-as-string issue fixed in libraryService.ts's
+        // listFines() — LibraryFine.amount is a Prisma Decimal, which
+        // JSON.stringify serializes as a string. ApiLibraryFine.amount is
+        // typed `number`; without this coercion that type was a lie, and
+        // any future summary/total built from this endpoint would hit the
+        // same string-concatenation bug the Reports & Fines ledger had.
+        amount: Number(fine.amount),
         student: fine.studentId && studentById.get(fine.studentId)
           ? {
               firstName: studentById.get(fine.studentId)!.firstName,
@@ -1069,11 +1119,8 @@ financesRouter.post(
   verifyAuth,
   requireRole(['admin', 'finance', 'high_rank']),
   async (req, res) => {
-    const { type, academicYear = '2025/2026', term = 1 } = req.body as {
-      type: string
-      academicYear: string
-      term: number
-    }
+    const { type } = req.body as { type: string }
+    const { academicYear, term } = await settingsService.resolvePeriod(req.body)
     if (!VALID_REPORT_TYPES.includes(type as ReportType)) {
       return res.status(400).json({ error: `type must be one of: ${VALID_REPORT_TYPES.join(', ')}` })
     }
@@ -1094,15 +1141,12 @@ financesRouter.get(
   verifyAuth,
   requireRole(['admin', 'finance', 'high_rank']),
   async (req, res) => {
-    const { type, academicYear = '2025/2026', term = '1' } = req.query as {
-      type: string
-      academicYear: string
-      term: string
-    }
+    const { type } = req.query as { type: string }
+    const { academicYear, term } = await settingsService.resolvePeriod(req.query)
     if (!VALID_REPORT_TYPES.includes(type as ReportType)) {
       return res.status(400).json({ error: `type must be one of: ${VALID_REPORT_TYPES.join(', ')}` })
     }
-    const yearNum = Number(term)
+    const yearNum = term
 
     if (type === 'fee_collection') {
       const invoices = await prisma.invoice.findMany({
@@ -1147,3 +1191,51 @@ financesRouter.get(
     })))
   }
 )
+// ── BUDGET WINDOWS (R22 — additive; does not touch existing Budget/Expense routes above) ──
+// finance.manageBudgetWindows — POST/status-change. Viewing a window's status feeds
+// procurementService.createPurchaseRequisition's budgetWindowId flow; kept here rather
+// than a new router since it's a Finance-owned concept the UI already expects at
+// /finances/budget-windows.
+
+// Readable by anyone who can view budgets OR raise a requisition: requesters
+// (academic/hr) need to see which windows are open to raise one under.
+financesRouter.get('/budget-windows', verifyAuth, requireAnyPermission(['finance.viewBudget', 'procurement.createRequisition']),
+  async (req, res) => {
+    const { academicYear, status } = req.query as { academicYear?: string; status?: string }
+    return res.json(await budgetWindowService.listBudgetWindows({ academicYear, status }))
+  })
+
+financesRouter.post('/budget-windows', verifyAuth, requirePermission('finance.manageBudgetWindows'),
+  async (req, res) => {
+    if (!req.user) return res.status(401).json({ error: 'Not authenticated.' })
+    const parsed = CreateBudgetWindowSchema.safeParse(req.body)
+    if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
+    return res.status(201).json(await budgetWindowService.createBudgetWindow(parsed.data, req.user.uid, req.user.role))
+  })
+
+// Generic transition (DRAFT/OPEN/REVIEW/CLOSED/ARCHIVED). /open and /close stay for compatibility.
+financesRouter.post('/budget-windows/:id/status', verifyAuth, requirePermission('finance.manageBudgetWindows'),
+  async (req, res) => {
+    if (!req.user) return res.status(401).json({ error: 'Not authenticated.' })
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id
+    if (!id) return res.status(400).json({ error: 'Budget window id is required.' })
+    const parsed = SetBudgetWindowStatusSchema.safeParse(req.body)
+    if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
+    return res.json(await budgetWindowService.setBudgetWindowStatus(id, parsed.data.status, req.user.uid, req.user.role))
+  })
+
+financesRouter.post('/budget-windows/:id/open', verifyAuth, requirePermission('finance.manageBudgetWindows'),
+  async (req, res) => {
+    if (!req.user) return res.status(401).json({ error: 'Not authenticated.' })
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id
+    if (!id) return res.status(400).json({ error: 'Budget window id is required.' })
+    return res.json(await budgetWindowService.setBudgetWindowStatus(id, 'OPEN', req.user.uid, req.user.role))
+  })
+
+financesRouter.post('/budget-windows/:id/close', verifyAuth, requirePermission('finance.manageBudgetWindows'),
+  async (req, res) => {
+    if (!req.user) return res.status(401).json({ error: 'Not authenticated.' })
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id
+    if (!id) return res.status(400).json({ error: 'Budget window id is required.' })
+    return res.json(await budgetWindowService.setBudgetWindowStatus(id, 'CLOSED', req.user.uid, req.user.role))
+  })

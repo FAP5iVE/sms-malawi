@@ -46,12 +46,19 @@
  *      left role-gated — no dedicated permission exists for either.
  * [DEPENDS ON]: hrService.ts (listLoans, reviewLeave conflicts, getMyLoans
  *   — same phase/follow-up)
+ *
+ * [MAINT 2026-09-16 — Class Subject Presets / Teacher Roster]: Added GET
+ *   /teacher-roster — see its own inline header note for the full
+ *   rationale and permission gate.
  */
 import 'server-only'
 import { Router } from 'express'
+import { rateLimit } from '@/lib/ratelimit'
+import { boundedInt, REQUEST_LIMITS } from '@/lib/requestLimits'
 import { verifyAuth, requireRole } from '@/lib/verifyAuth'
 import { requirePermission, requireAnyPermission } from '@/server/middleware/verifyPermission'
-import { CreateStaffSchema, UpdateStaffSchema, LeaveRequestSchema, ReviewLeaveSchema, LoanRequestSchema, PerformanceNoteSchema, UpdateSalarySchema, CreateAllowanceSchema } from '@shared/schemas/hr'
+import { hasPermission } from '@shared/types/permissions'
+import { CreateStaffSchema, UpdateStaffSchema, UpdateOwnDetailsSchema, TerminateStaffSchema, StaffResponsibilitySchema, LeaveRequestSchema, ReviewLeaveSchema, LoanRequestSchema, PerformanceNoteSchema, UpdateSalarySchema, CreateAllowanceSchema } from '@shared/schemas/hr'
 import * as hrService from '@/server/services/hrService'
 import { getSignedViewUrl, createDirectUploadTicket, FILE_PREFIX } from '@/lib/storage'
 import { sendError } from '@/server/lib/sendError'
@@ -70,15 +77,153 @@ hrRouter.get('/', verifyAuth, requireRole([...REVIEWERS]),
     return res.json(staff)
   })
 
+// [PRODUCTION FIX — Salary Structure & Allowances tab, user-requested]
+// finance holds hr.manageSalaryStructure/finance.manageSalaryStructure and
+// genuinely needs a staff picker to use it, but GET / (the real staff
+// directory, immediately above) is role-gated to REVIEWERS
+// (admin/hr/high_rank) — finance was never in that list and has no other
+// route in this file that lists staff at all. A lightweight roster scoped
+// to the exact same permission pair the salary/allowance routes below
+// already use, rather than widening the real directory's role list (a
+// broader change than this tab needs, and not this task's to make).
+// Registered before GET /:id (immediately below) so this literal path
+// can't be shadowed by that single-segment catch-all.
+//
+// [PRODUCTION FIX, user-requested] Also now doubles as the roster behind
+// My Pay (Self-Service)'s "Viewing Employee" picker — that picker used
+// GET / (the real directory) directly, which works for hr/high_rank (both
+// are in REVIEWERS) but not finance, who was just granted
+// hr.viewAnyPayslips and needs the exact same picker to work. Rather than
+// widen the real directory's role list for this too, added
+// hr.viewAnyPayslips as a third qualifying permission here — same
+// reasoning as above, and it keeps both pickers (salary editing, payslip
+// viewing) sharing one lightweight, correctly-scoped roster instead of
+// each route re-deriving its own.
+hrRouter.get('/salary-roster', verifyAuth,
+  requireAnyPermission(['hr.manageSalaryStructure', 'finance.manageSalaryStructure', 'hr.viewAnyPayslips']),
+  async (req, res) => {
+    const staff = await hrService.listStaff({ status: 'ACTIVE' })
+    return res.json(staff)
+  })
+
+// [NEW 2026-09-16 — Class Subject Presets / Teacher Roster] The searchable
+// staff picker behind "assign a class teacher" (classService.
+// assertNotAlreadyClassTeacher's UI counterpart), timetable slot teachers,
+// and subject-teacher assignment — every place this codebase previously
+// asked for a raw Firebase UID in a free-text field. role: 'academic' is
+// this system's existing definition of "teacher" (see ExamForm.tsx's
+// isTeacher check) — non-teaching staff never appear here, matching the
+// requirement that this list "strictly contain the names of teachers
+// only." Gated to the union of permissions actually used to assign a
+// teacher somewhere (class.assignTeacher: class teacher;
+// class.assignSubject: subject-teacher pairing, also held by exam_officer;
+// timetable.editDirect/editWithApproval: timetable slot teacher, covering
+// admin via class.assignSubject and high_rank/exam_officer directly).
+// Registered before GET /:id for the same shadowing reason as
+// /salary-roster above.
+hrRouter.get('/teacher-roster', verifyAuth,
+  requireAnyPermission(['class.assignTeacher', 'class.assignSubject', 'timetable.editDirect', 'timetable.editWithApproval']),
+  async (req, res) => {
+    const staff = await hrService.listStaff({ role: 'academic', status: 'ACTIVE' })
+    return res.json(staff)
+  })
+
+// [FIX 2026-10 — Assets "Allocate" dropdown was empty for Finance Staff]
+// The Allocate dialog filled its staff <select> from GET / (the real directory),
+// which is role-gated to admin/hr/high_rank. finance — the only role holding
+// assets.allocateItem — got a 403, the hook swallowed it, and the dropdown
+// rendered with just "Select…". Same remedy as /salary-roster and
+// /teacher-roster above: a purpose-scoped picker route rather than widening
+// the directory. Unlike those two it returns a MINIMAL projection (id, name,
+// employee no., department, job title) via hrService.listStaffForPicker().
+// Registered before GET /:id so the literal path isn't shadowed.
+hrRouter.get('/staff-picker', verifyAuth,
+  requireAnyPermission(['assets.allocateItem', 'hr.viewAnyProfile']),
+  async (_req, res) => {
+    return res.json(await hrService.listStaffForPicker())
+  })
+
+// ── Terminate: records WHY and WHEN. Needs hr.terminateStaff. The login stays
+//    enabled until it is disabled in User Management (a separate permission).
+hrRouter.post('/:id/terminate', verifyAuth, requirePermission('hr.terminateStaff'),
+  async (req, res) => {
+    const parsed = TerminateStaffSchema.safeParse(req.body)
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Exit reason and date are required.' })
+    }
+    try {
+      return res.json(await hrService.terminateStaff(String(req.params.id), parsed.data, { uid: req.user!.uid, role: req.user!.role }))
+    } catch (err) {
+      return sendError(res, err, { defaultStatus: 400, fallbackMessage: 'Could not terminate this staff member.', tags: { module: 'hr' } })
+    }
+  })
+
+// ── Responsibilities (Head of Department, house master, patron ...) ──────────
+hrRouter.post('/:id/responsibilities', verifyAuth, requirePermission('hr.editStaff'),
+  async (req, res) => {
+    const parsed = StaffResponsibilitySchema.safeParse(req.body)
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid responsibility.' })
+    try {
+      return res.status(201).json(await hrService.addResponsibility(String(req.params.id), parsed.data, { uid: req.user!.uid, role: req.user!.role }))
+    } catch (err) {
+      return sendError(res, err, { defaultStatus: 400, fallbackMessage: 'Could not add the responsibility.', tags: { module: 'hr' } })
+    }
+  })
+
+hrRouter.patch('/:id/responsibilities/:responsibilityId', verifyAuth, requirePermission('hr.editStaff'),
+  async (req, res) => {
+    const parsed = StaffResponsibilitySchema.safeParse(req.body)
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid responsibility.' })
+    try {
+      return res.json(await hrService.updateResponsibility(
+        String(req.params.id), String(req.params.responsibilityId), parsed.data, { uid: req.user!.uid, role: req.user!.role },
+      ))
+    } catch (err) {
+      return sendError(res, err, { defaultStatus: 400, fallbackMessage: 'Could not update the responsibility.', tags: { module: 'hr' } })
+    }
+  })
+
+hrRouter.delete('/:id/responsibilities/:responsibilityId', verifyAuth, requirePermission('hr.editStaff'),
+  async (req, res) => {
+    try {
+      await hrService.deleteResponsibility(
+        String(req.params.id), String(req.params.responsibilityId), { uid: req.user!.uid, role: req.user!.role },
+      )
+      return res.json({ ok: true })
+    } catch (err) {
+      return sendError(res, err, { defaultStatus: 400, fallbackMessage: 'Could not remove the responsibility.', tags: { module: 'hr' } })
+    }
+  })
+
+// Identity, next-of-kin and retirement data are returned only to roles holding
+// hr.viewStaffSensitive (admin / hr / high_rank today). The role gate above
+// already limits this route to those roles; the redaction keeps the rule in
+// force if the gate is ever widened.
+const STAFF_IDENTITY_KEYS = [
+  'dateOfBirth', 'nationality', 'homeDistrict', 'nrbNumber', 'tpin',
+  'nextOfKinName', 'nextOfKinPhone', 'nextOfKinRelation',
+  // Compliance / payroll-adjacent fields are HR-only as well.
+  'payrollNo', 'tcmRegistrationNo', 'tcmLicenceNo', 'tcmLicenceExpiry',
+  'highestQualification', 'qualificationProgram', 'trainingRoute',
+] as const
+
 hrRouter.get('/:id', verifyAuth, requireRole([...REVIEWERS]),
-  async (req, res) => {return res.json(await hrService.getStaffProfile(String(req.params.id)))})
+  async (req, res) => {
+    const profile = await hrService.getStaffProfile(String(req.params.id))
+    const canSeeSensitive = hasPermission(req.user!.role, 'hr.viewStaffSensitive', req.user!.superUser === true)
+    return res.json(canSeeSensitive ? profile : hrService.redactStaffSensitive(profile))
+  })
 
 hrRouter.patch('/:id', verifyAuth, requirePermission('hr.editStaff'),
   async (req, res) => {
     const parsed = UpdateStaffSchema.safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
+    const touchesIdentity = STAFF_IDENTITY_KEYS.some((k) => parsed.data[k] !== undefined)
+    if (touchesIdentity && !hasPermission(req.user!.role, 'hr.viewStaffSensitive', req.user!.superUser === true)) {
+      return res.status(403).json({ error: 'You do not have permission to change staff identity details.' })
+    }
     try {
-      return res.json(await hrService.updateStaff(String(req.params.id), parsed.data))
+      return res.json(await hrService.updateStaff(String(req.params.id), parsed.data, { uid: req.user!.uid, role: req.user!.role }))
     } catch (err) {
       const status = (err as { status?: number }).status ?? 500
       return res.status(status).json({ error: (err as Error).message ?? 'Failed to update staff member.' })
@@ -170,6 +315,7 @@ hrRouter.post('/', verifyAuth, requireRole([...HR_ADMIN]),
 // resulting file gets no public read permission — viewing it still goes
 // through getSignedViewUrl()'s role-checked proxy, same as before.
 hrRouter.post('/:id/photo/upload-ticket', verifyAuth, requireRole([...HR_ADMIN]),
+  rateLimit('upload-ticket'),
   async (_req, res) => {
     try {
       const ticket = await createDirectUploadTicket(FILE_PREFIX.STAFF_PHOTO)
@@ -204,7 +350,7 @@ hrRouter.post('/:id/photo', verifyAuth, requireRole([...HR_ADMIN]),
 // ── CONTRACT EXPIRY ALERTS ──
 hrRouter.get('/alerts/contracts', verifyAuth, requireRole([...HR_ADMIN]),
   async (req, res) => {
-    const days = Number(req.query.days ?? 60)
+    const days = boundedInt(req.query.days, 60, REQUEST_LIMITS.maxDays, 'days')
     return res.json(await hrService.getContractExpiryAlert(days))
   })
 
@@ -214,11 +360,31 @@ hrRouter.get('/alerts/contracts', verifyAuth, requireRole([...HR_ADMIN]),
 // the wrong data source for a "what's coming up" display.
 hrRouter.get('/alerts/contracts-upcoming', verifyAuth, requireRole([...HR_ADMIN]),
   async (req, res) => {
-    const days = Number(req.query.days ?? 60)
+    const days = boundedInt(req.query.days, 60, REQUEST_LIMITS.maxDays, 'days')
     return res.json(await hrService.getUpcomingContractExpiries(days))
   })
 
 // ── LEAVE ──
+// Self-service: the signed-in staff member's own requests. (The reviewer list
+// below is for HR and cannot be used for this: it is role-gated and keyed by
+// StaffProfile.id, not the sign-in uid.)
+hrRouter.get('/leave/mine', verifyAuth,
+  async (req, res) => {
+    return res.json(await hrService.listMyLeaveRequests(req.user!.uid))
+  })
+
+// What this person can ask for, the days left, and how each type is paid.
+hrRouter.get('/leave/options', verifyAuth,
+  async (req, res) => {
+    return res.json(await hrService.getMyLeaveOptions(req.user!.uid))
+  })
+
+// Who is away today. Not filtered by request status: it is about dates.
+hrRouter.get('/leave/on-leave', verifyAuth, requireRole([...REVIEWERS]),
+  async (_req, res) => {
+    return res.json(await hrService.listOnLeaveNow())
+  })
+
 hrRouter.get('/leave/requests', verifyAuth, requireRole([...REVIEWERS]),
   async (req, res) => {
     const { staffId, status } = req.query as Record<string, string>
@@ -235,6 +401,12 @@ hrRouter.post('/leave/apply', verifyAuth,
     })
     if (!staffProfile) return res.status(404).json({ error: 'Staff profile not found for this user.' })
     return res.status(201).json(await hrService.applyForLeave(staffProfile.id, parsed.data))
+  })
+
+// [NEW — Approvals Hub] Applicant withdraws their own pending request.
+hrRouter.patch('/leave/requests/:id/cancel', verifyAuth,
+  async (req, res) => {
+    return res.json(await hrService.cancelLeave(String(req.params.id), req.user!.uid))
   })
 
 hrRouter.patch('/leave/requests/:id/review', verifyAuth, requireRole([...REVIEWERS]),
@@ -264,6 +436,27 @@ hrRouter.get('/loans', verifyAuth, requireRole(['admin', 'hr', 'finance', 'high_
 // "mine" segment is never captured by a later :id param route (Express
 // matches in registration order; not strictly required here since no
 // existing route is a bare GET /loans/:id, but kept for clarity).
+// ── Own details (phone, next of kin). The subject is the token's uid only.
+hrRouter.get('/me/details', verifyAuth, requirePermission('hr.editOwnLimitedFields'),
+  async (req, res) => {
+    try {
+      return res.json(await hrService.getOwnDetails(req.user!.uid))
+    } catch (err) {
+      return sendError(res, err, { defaultStatus: 400, fallbackMessage: 'Could not load your details.', tags: { module: 'hr' } })
+    }
+  })
+
+hrRouter.patch('/me/details', verifyAuth, requirePermission('hr.editOwnLimitedFields'),
+  async (req, res) => {
+    const parsed = UpdateOwnDetailsSchema.safeParse(req.body)
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid details.' })
+    try {
+      return res.json(await hrService.updateOwnDetails(req.user!.uid, parsed.data, req.user!.role))
+    } catch (err) {
+      return sendError(res, err, { defaultStatus: 400, fallbackMessage: 'Could not save your details.', tags: { module: 'hr' } })
+    }
+  })
+
 hrRouter.get('/loans/mine', verifyAuth,
   async (req, res) => {
     return res.json(await hrService.getMyLoans(req.user!.uid))
@@ -290,6 +483,15 @@ hrRouter.post('/loans/request', verifyAuth,
 // either action in the matrix, so there is no real mismatch to correct.
 hrRouter.patch('/loans/:id/approve', verifyAuth, requirePermission('hr.approveLoan'),
   async (req, res) => {return res.json(await hrService.approveLoan(String(req.params.id), req.user!.uid))})
+
+// [NEW — Approvals Hub] The missing half of loan review — the schema has a
+// REJECTED status but nothing could ever set it.
+hrRouter.patch('/loans/:id/reject', verifyAuth, requirePermission('hr.approveLoan'),
+  async (req, res) => {
+    const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim().slice(0, 500) : ''
+    if (!reason) return res.status(400).json({ error: 'A reason is required to reject a loan.' })
+    return res.json(await hrService.rejectLoan(String(req.params.id), req.user!.uid, req.user!.role, reason))
+  })
 
 hrRouter.patch('/loans/:id/disburse', verifyAuth, requireRole(['admin','finance']),
   async (req, res) => {return res.json(await hrService.disburseLoan(String(req.params.id)))})

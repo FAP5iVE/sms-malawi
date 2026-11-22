@@ -54,6 +54,14 @@ import { subDays, subMonths, startOfDay, endOfDay, format, startOfWeek, endOfWee
 import { getAttendanceSummaryForTerm, getTermDateRange } from '@/server/services/attendanceService'
 import { getPassingGrades, isPassingClassification, isDistinctionGrade, type ExamTypeKey } from '@/server/services/gradeService'
 import { findUniversity } from '@shared/constants/universities'
+import type { ApiPayrollBreakdownPoint } from '@shared/types/api'
+import { loadBudgetPosition } from '@/server/services/analytics/financeAnalytics'
+import {
+  PAYROLL_COUNTED_STATUSES,
+  groupOutstandingByClass,
+  payrollForTerm,
+  type PayrollRunPeriod,
+} from '@/server/services/analytics/financeLogic'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
@@ -79,9 +87,14 @@ export interface CategoryBreakdown {
 export interface ClassPerformanceStat {
   className: string
   form: number
+  /** Students on the class roster. */
   studentCount: number
-  passRate: number
-  average: number
+  /** Students with a computed term result (0 → nothing to measure yet). */
+  assessed: number
+  /** Null — never 0 — when the class has no computed results. A real 0 means nobody passed. */
+  passRate: number | null
+  /** Null — never 0 — when the class has no computed results. */
+  average: number | null
   term: number
 }
 
@@ -137,7 +150,11 @@ export interface StudentPerformancePoint {
   academicYear: string
   term: number
   average: number
+  /** JCE track: the overall letter grade. MSCE track: the aggregate
+   *  rendered as "34 pts" — Forms 3-4 have no overall grade. */
   grade: string
+  aggregatePoints: number | null
+  gradingTrack: string | null
   position: number | null
   classTotal: number
   passStatus: boolean
@@ -213,13 +230,24 @@ export interface BudgetVsActualRow {
   /** ExpenseCategory enum member — the real Budget-to-Expense join key. */
   category: ExpenseCategory
   allocated: number
+  /** Live APPROVED expenses. */
   spent: number
-  utilisation: number
+  /** spent ÷ allocated (percent); null when nothing is allocated. */
+  utilisation: number | null
+  /** Spend in a category that has no budget in scope. */
+  unbudgeted: boolean
 }
 
 export interface ScholarshipSummaryRow {
   name: string
   discountType: 'PERCENTAGE' | 'FIXED_AMOUNT'
+  recipientCount: number
+  totalDiscount: number
+}
+
+export interface ScholarshipSponsorRow {
+  /** SponsorType enum member, or 'NOT_SPECIFIED' for awards with no sponsor recorded. */
+  sponsorType: string
   recipientCount: number
   totalDiscount: number
 }
@@ -230,6 +258,8 @@ export interface ScholarshipSummary {
   recipientCount: number
   totalDiscountMwk: number
   byScholarship: ScholarshipSummaryRow[]
+  /** Who funds the awards. Learners sponsored by each type, and the discount involved. */
+  bySponsor: ScholarshipSponsorRow[]
 }
 
 export interface AttendanceSummaryRow {
@@ -296,55 +326,17 @@ function monthLabel(d: Date): string {
 }
 
 /**
- * [R14] The calendar months each Malawian school term spans. A Malawi
- * academic year runs September–July, so Term 1 falls in the FIRST calendar
- * year named in an academicYear string ("2025/2026" → 2025) while Terms 2
- * and 3 fall in the second (→ 2026).
- */
-const TERM_MONTHS: Readonly<Record<number, readonly number[]>> = {
-  1: [9, 10, 11, 12],
-  2: [1, 2, 3, 4],
-  3: [5, 6, 7],
-}
-
-interface PayrollRunPeriod {
-  month: number
-  year: number
-  totalNet: unknown
-}
-
-/**
- * [R14] Total completed payroll (PayrollRun.totalNet) falling inside a given
- * academic-year term.
+ * Every payroll run that is real payroll — the one source both cash-flow and
+ * financial-summary payroll figures are derived from.
  *
- * Extracted as a single shared helper because getFinanceCashFlow() and
- * getHighRankFinancialSummary() answer the SAME business question ("what did
- * we spend on payroll this term?") for two different roles — and before R14
- * only the first of them computed it at all, while the second returned a
- * hardcoded 0. Two independent copies of this arithmetic is exactly how the
- * two roles' answers drifted apart in the first place, so there is now one.
+ * Was `status: 'COMPLETED'` only. A run is COMPLETED just transiently, on its
+ * way COMPLETED → PENDING_APPROVAL → APPROVED → LOCKED, so that filter dropped
+ * every approved month and overstated net cash flow. It now uses the same
+ * statuses as the payroll trend (see PAYROLL_COUNTED_STATUSES).
  */
-function payrollForTerm(
-  runs: readonly PayrollRunPeriod[],
-  academicYear: string,
-  term: number,
-): number {
-  const firstYear = Number.parseInt(academicYear.split('/')[0] ?? '', 10)
-  if (Number.isNaN(firstYear)) return 0
-
-  const months = TERM_MONTHS[term] ?? []
-  const calendarYear = term === 1 ? firstYear : firstYear + 1
-
-  return runs
-    .filter((r) => r.year === calendarYear && months.includes(r.month))
-    .reduce((sum, r) => sum + Number(r.totalNet), 0)
-}
-
-/** [R14] Every COMPLETED payroll run — the one source both cash-flow and
- *  financial-summary payroll figures are derived from. */
 async function completedPayrollRuns(): Promise<PayrollRunPeriod[]> {
   return prisma.payrollRun.findMany({
-    where: { status: 'COMPLETED' },
+    where: { status: { in: [...PAYROLL_COUNTED_STATUSES] } },
     select: { month: true, year: true, totalNet: true },
   })
 }
@@ -537,18 +529,23 @@ export async function getHighRankClassComparison(
   ])
 
   return classes
-    .map((cls) => {
+    .map((cls): ClassPerformanceStat => {
       const clsResults = termResults.filter((r) => r.classId === cls.id)
+      const assessed = clsResults.length
+      // A class with no computed results has no pass rate or average — report
+      // null so "not computed yet" is never mistaken for a measured 0%.
       return {
         className: cls.name,
         form: cls.form,
         studentCount: cls._count.students,
-        passRate: pct(clsResults.filter((r) => r.passStatus).length, clsResults.length),
-        average: avg(clsResults.map((r) => Number(r.average))),
+        assessed,
+        passRate: assessed > 0 ? pct(clsResults.filter((r) => r.passStatus).length, assessed) : null,
+        average: assessed > 0 ? avg(clsResults.map((r) => Number(r.average))) : null,
         term,
       }
     })
-    .sort((a, b) => b.average - a.average)
+    // Highest average first; classes with nothing computed sink to the bottom.
+    .sort((a, b) => (b.average ?? -1) - (a.average ?? -1))
 }
 
 /**
@@ -728,34 +725,8 @@ export async function getHighRankEnrollmentTrend(months = 12): Promise<Enrollmen
 export async function getHighRankFinancialSummary(
   academicYear: string,
 ): Promise<CashFlowRow[]> {
-  const payrollRuns = await completedPayrollRuns()
-
-  return Promise.all(
-    [1, 2, 3].map(async (term) => {
-      const [invoices, expenses] = await Promise.all([
-        prisma.invoice.aggregate({
-          _sum: { paidAmount: true },
-          where: { academicYear, term },
-        }),
-        prisma.expense.aggregate({
-          _sum: { amount: true },
-          where: { academicYear, term, status: 'APPROVED' },
-        }),
-      ])
-      const revenue = Number(invoices._sum.paidAmount ?? 0)
-      const expenseTotal = Number(expenses._sum.amount ?? 0)
-      const payroll = payrollForTerm(payrollRuns, academicYear, term)
-
-      return {
-        academicYear,
-        term,
-        revenue: Math.round(revenue),
-        expenses: Math.round(expenseTotal),
-        payroll: Math.round(payroll),
-        net: Math.round(revenue - expenseTotal - payroll),
-      }
-    }),
-  )
+  // One implementation: the two roles can never see different answers again.
+  return getFinanceCashFlow(academicYear)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -835,7 +806,6 @@ export async function getFinanceOutstandingByClass(
       where: {
         academicYear,
         ...(term !== undefined ? { term } : {}),
-        status: { in: ['UNPAID', 'PARTIAL', 'OVERDUE'] },
         balance: { gt: 0 },
       },
       select: {
@@ -846,25 +816,13 @@ export async function getFinanceOutstandingByClass(
     }),
   ])
 
-  const classMap = new Map(classes.map((c) => [c.id, c.name]))
-  const breakdown: Record<string, { outstanding: number; students: Set<string> }> = {}
-
-  for (const inv of invoices) {
-    const classId = inv.student.classId
-    if (!classId) continue
-    const bucket = breakdown[classId] ?? (breakdown[classId] = { outstanding: 0, students: new Set() })
-    bucket.outstanding += Number(inv.balance)
-    bucket.students.add(inv.studentId)
-  }
-
-  return Object.entries(breakdown)
-    .map(([classId, b]) => ({
-      classId,
-      className: classMap.get(classId) ?? classId,
-      outstanding: Math.round(b.outstanding),
-      studentCount: b.students.size,
-    }))
-    .sort((a, b) => b.outstanding - a.outstanding)
+  // Students without a class (or in a class outside this year) are kept in an
+  // explicit "No class" row so this report's total always equals the finance
+  // overview's outstanding balance — never silently dropped.
+  return groupOutstandingByClass(
+    invoices.map((i) => ({ studentId: i.studentId, balance: Number(i.balance), classId: i.student.classId })),
+    new Map(classes.map((c) => [c.id, c.name])),
+  )
 }
 
 /**
@@ -917,38 +875,16 @@ export async function getFinanceBudgetVsActual(
   academicYear: string,
   term?: number,
 ): Promise<BudgetVsActualRow[]> {
-  const [budgets, expenses] = await Promise.all([
-    prisma.budget.groupBy({
-      by: ['category'],
-      _sum: { allocated: true },
-      where: { academicYear, ...(term !== undefined ? { term } : {}) },
-      orderBy: { category: 'asc' },
-    }),
-    prisma.expense.groupBy({
-      by: ['category'],
-      _sum: { amount: true },
-      where: {
-        academicYear,
-        ...(term !== undefined ? { term } : {}),
-        status: 'APPROVED',
-      },
-    }),
-  ])
-
-  const spentByCategory = new Map<ExpenseCategory, number>(
-    expenses.map((e) => [e.category, Number(e._sum.amount ?? 0)]),
-  )
-
-  return budgets.map((b) => {
-    const allocated = Number(b._sum.allocated ?? 0)
-    const spent = spentByCategory.get(b.category) ?? 0
-    return {
-      category: b.category,
-      allocated: Math.round(allocated),
-      spent: Math.round(spent),
-      utilisation: pct(spent, allocated),
-    }
-  })
+  // Same live, category-level position the finance overview's "Budget used"
+  // KPI and the attention queue use (see financeLogic.budgetPosition).
+  const position = await loadBudgetPosition(academicYear, term ?? null)
+  return position.rows.map((r) => ({
+    category: r.category as ExpenseCategory,
+    allocated: Math.round(r.allocated),
+    spent: Math.round(r.spent),
+    utilisation: r.utilisation,
+    unbudgeted: r.unbudgeted,
+  }))
 }
 
 /**
@@ -993,19 +929,65 @@ export async function getFinanceCashFlow(academicYear: string): Promise<CashFlow
   )
 }
 
+// A run only ever sits at COMPLETED transiently, on its way through the
+// approval workflow (COMPLETED → PENDING_APPROVAL → APPROVED → LOCKED —
+// see payrollApprovalService.ts). Every month that has actually finished
+// that workflow is one of the other three statuses, so filtering to
+// COMPLETED alone silently excludes almost every real month from both
+// functions below the moment it's approved. PROCESSING (mid-generation)
+// and FAILED are the only statuses genuinely worth excluding.
+const PAYROLL_TREND_STATUSES = PAYROLL_COUNTED_STATUSES
+
 /**
  * Payroll trend — monthly totalNet for the last N months.
+ * [PRODUCTION FIX] `where: { status: 'COMPLETED' }` excluded every run past
+ * the moment it's submitted for approval — i.e. almost every run that ever
+ * reaches its normal end state (LOCKED) — leaving this trend all-but-empty
+ * for a school with a working approval workflow. Broadened to every
+ * non-transient status.
  */
 export async function getFinancePayrollTrend(months = 12): Promise<TimeSeriesPoint[]> {
   const since = subMonths(new Date(), months)
   const runs = await prisma.payrollRun.findMany({
-    where: { status: 'COMPLETED', createdAt: { gte: since } },
+    where: { status: { in: [...PAYROLL_TREND_STATUSES] }, createdAt: { gte: since } },
     select: { month: true, year: true, totalNet: true },
     orderBy: [{ year: 'asc' }, { month: 'asc' }],
   })
   return runs.map((r) => ({
     label: format(new Date(r.year, r.month - 1, 1), 'MMM yy'),
     value: Math.round(Number(r.totalNet)),
+  }))
+}
+
+/**
+ * Payroll breakdown — one point per run in the last N months with the full
+ * gross/PAYE/pension/net split and enrolled staff count, for Payroll's
+ * Financial Insights & Trends tab. Same non-transient-status scope as
+ * getFinancePayrollTrend() above (see its own comment for why), kept as a
+ * separate function rather than widening that one's return shape — reports/
+ * page.tsx's existing single-series chart consumes the {label,value} shape
+ * as-is and shouldn't need to change to gain this.
+ */
+export async function getFinancePayrollBreakdown(months = 12): Promise<ApiPayrollBreakdownPoint[]> {
+  const since = subMonths(new Date(), months)
+  const runs = await prisma.payrollRun.findMany({
+    where: { status: { in: [...PAYROLL_TREND_STATUSES] }, createdAt: { gte: since } },
+    select: {
+      month: true, year: true, totalGross: true, totalNet: true,
+      payslips: { select: { paye: true, pension: true } },
+      _count: { select: { payslips: true } },
+    },
+    orderBy: [{ year: 'asc' }, { month: 'asc' }],
+  })
+  return runs.map((r) => ({
+    month: r.month,
+    year: r.year,
+    label: format(new Date(r.year, r.month - 1, 1), 'MMM yy'),
+    totalGross: Math.round(Number(r.totalGross)),
+    totalPaye: Math.round(r.payslips.reduce((sum, p) => sum + Number(p.paye), 0)),
+    totalPension: Math.round(r.payslips.reduce((sum, p) => sum + Number(p.pension), 0)),
+    totalNet: Math.round(Number(r.totalNet)),
+    staffCount: r._count.payslips,
   }))
 }
 
@@ -1327,7 +1309,8 @@ export async function getAcademicAssignmentCompletion(
       title: true,
       subject: true,
       dueDate: true,
-      _count: { select: { submissions: true } },
+      // [2026-10-27] Only real hand-ins count: a teacher's explicit "not submitted" marker is a MISSING row.
+      _count: { select: { submissions: { where: { status: { not: 'MISSING' } } } } },
     },
     orderBy: { dueDate: 'desc' },
     take: 30,
@@ -1405,6 +1388,8 @@ export async function getStudentPerformanceTrend(
       term: true,
       average: true,
       grade: true,
+      aggregatePoints: true,
+      gradingTrack: true,
       classPosition: true,
       classTotal: true,
       passStatus: true,
@@ -1426,7 +1411,14 @@ export async function getStudentPerformanceTrend(
         academicYear: r.academicYear,
         term: r.term,
         average: Number(r.average),
-        grade: r.grade,
+        // MSCE track (Forms 3-4) has no overall grade — the term's overall
+        // result is its aggregate of points. Surface the aggregate as the
+        // headline figure there and leave `grade` to the JCE track.
+        grade: r.gradingTrack === 'MSCE'
+          ? (r.aggregatePoints != null ? `${r.aggregatePoints} pts` : '—')
+          : r.grade,
+        aggregatePoints: r.aggregatePoints,
+        gradingTrack: r.gradingTrack,
         position: r.classPosition,
         classTotal: r.classTotal,
         passStatus: r.passStatus,
@@ -1741,6 +1733,7 @@ export async function getFinanceScholarshipSummary(
       studentId: true,
       discountType: true,
       value: true,
+      sponsorType: true,
     },
     orderBy: { name: 'asc' },
   })
@@ -1752,6 +1745,7 @@ export async function getFinanceScholarshipSummary(
       recipientCount: 0,
       totalDiscountMwk: 0,
       byScholarship: [],
+      bySponsor: [],
     }
   }
 
@@ -1782,10 +1776,19 @@ export async function getFinanceScholarshipSummary(
   // several students, and the summary is reported per award, not per row.
   const grouped = new Map<string, ScholarshipSummaryRow>()
   const recipients = new Set<string>()
+  // Per sponsor type: distinct learners (a learner with two awards from one
+  // sponsor is counted once) and the discount those awards are worth.
+  const sponsors = new Map<string, { students: Set<string>; total: number }>()
 
   for (const sc of scholarships) {
     recipients.add(sc.studentId)
     const amount = discountValue(sc.discountType, Number(sc.value), sc.studentId)
+
+    const sponsorKey = sc.sponsorType ?? 'NOT_SPECIFIED'
+    const sponsor = sponsors.get(sponsorKey) ?? { students: new Set<string>(), total: 0 }
+    sponsor.students.add(sc.studentId)
+    sponsor.total += amount
+    sponsors.set(sponsorKey, sponsor)
 
     const existing = grouped.get(sc.name)
     if (existing) {
@@ -1811,6 +1814,9 @@ export async function getFinanceScholarshipSummary(
     recipientCount: recipients.size,
     totalDiscountMwk: byScholarship.reduce((sum, r) => sum + r.totalDiscount, 0),
     byScholarship,
+    bySponsor: [...sponsors.entries()]
+      .map(([sponsorType, s]) => ({ sponsorType, recipientCount: s.students.size, totalDiscount: Math.round(s.total) }))
+      .sort((a, b) => b.totalDiscount - a.totalDiscount),
   }
 }
 
@@ -1999,4 +2005,4 @@ export async function getPlacementAnalytics(academicYear: string): Promise<Place
     genderBreakdown: { male, female },
     topUniversities,
   }
-}
+}

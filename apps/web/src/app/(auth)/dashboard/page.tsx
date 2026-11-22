@@ -20,8 +20,11 @@
  * [DEPENDS ON]: W/components/dashboards/* (this phase's rewrites)
  */
 
-import { Hand } from 'lucide-react'
+import { useState } from 'react'
 import { useAuthStore } from '@/store/authStore'
+import { SuperUserRoleSwitcher } from '@/components/shared/SuperUserRoleSwitcher'
+import { ROLE_LABELS, type UserRole } from '@shared/types/roles'
+import { WelcomeHeader } from '@/components/shared/WelcomeHeader'
 import { AdminDashboard } from '@/components/dashboards/AdminDashboard'
 import { HighRankDashboard } from '@/components/dashboards/HighRankDashboard'
 import { FinanceDashboard } from '@/components/dashboards/FinanceDashboard'
@@ -31,6 +34,8 @@ import { AcademicDashboard } from '@/components/dashboards/AcademicDashboard'
 import { HRDashboard } from '@/components/dashboards/HRDashboard'
 import { ExamOfficerDashboard } from '@/components/dashboards/ExamOfficerDashboard'
 import { StudentDashboard } from '@/components/dashboards/StudentDashboard'
+import { ModuleSurface } from '@/components/shared/ModuleSurface'
+import { useViewingPeriod } from '@/hooks/useViewingPeriod'
 
 /** Time-of-day greeting: morning until noon, afternoon until 17:00, evening after. */
 function greetingForHour(hour: number): string {
@@ -40,14 +45,18 @@ function greetingForHour(hour: number): string {
 }
 
 export default function DashboardPage() {
-  const { role, user, subtitle, initialized } = useAuthStore()
+  const { role: authRole, user, subtitle, initialized, superUser } = useAuthStore()
+  // alpha_admin can open any staff role's dashboard; everyone else sees their own.
+  const [viewAs, setViewAs] = useState<UserRole>('admin')
+  const role = superUser ? viewAs : authRole
+  const { academicYear, term } = useViewingPeriod()
 
   // Show skeleton while auth initialises
   if (!initialized) {
     return (
       <div className="space-y-4 animate-pulse">
         <div className="skeleton h-9 w-72 rounded-lg" />
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="skeleton h-28 rounded-xl" />
           ))}
@@ -58,34 +67,41 @@ export default function DashboardPage() {
   }
 
   const displayName = user?.displayName ?? user?.email?.split('@')[0] ?? 'there'
+  const roleTitle = subtitle ?? (role ? ROLE_LABELS[role] : '')
+  const termLabel = term && academicYear ? `Term ${term} ${academicYear}` : ''
+  const today = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
+  const detail = [roleTitle, termLabel, today].filter(Boolean).join(' · ')
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-bold text-brand-navy flex items-center gap-2">
-          {greetingForHour(new Date().getHours())}, {displayName}
-          <Hand className="w-5 h-5 text-brand-amber" aria-hidden />
-        </h1>
-        <p className="text-muted text-sm mt-0.5">
-          {/* [PRODUCTION FIX 2026-07-28] subtitle (a real per-staff job
-              title, e.g. "Head Teacher") is null for many roles — the old
-              `{subtitle} · {role}` concatenation then rendered as a bare
-              "· exam officer" with nothing before the bullet, looking like
-              a leftover hardcoded fragment. Only show the bullet+role when
-              there's an actual subtitle to pair it with. */}
-          {subtitle ? <>{subtitle} · {role?.replace('_', ' ')}</> : role?.replace('_', ' ')}
-        </p>
-      </div>
+    <div className="space-y-4 md:space-y-5">
+      {/* [PRODUCTION FIX 2026-07-28] subtitle (a real per-staff job
+          title, e.g. "Head Teacher") is null for many roles, so the old
+          `{subtitle} · {role}` concatenation rendered as a bare
+          "· exam officer" with nothing before the bullet. Only show the
+          bullet+role when there is an actual subtitle to pair it with. */}
+      <WelcomeHeader
+        greeting={greetingForHour(new Date().getHours())}
+        name={displayName}
+        detail={detail}
+      />
 
-      {role === 'admin' && <AdminDashboard />}
-      {role === 'high_rank' && <HighRankDashboard />}
-      {role === 'finance' && <FinanceDashboard />}
-      {role === 'library' && <LibraryDashboard />}
-      {role === 'lower_rank' && <LowerRankDashboard />}
-      {role === 'academic' && <AcademicDashboard />}
-      {role === 'hr' && <HRDashboard />}
-      {role === 'exam_officer' && <ExamOfficerDashboard />}
-      {role === 'student' && <StudentDashboard />}
+      <ModuleSurface>
+        {superUser && (
+          <div className="flex justify-end">
+            <SuperUserRoleSwitcher value={viewAs} onChange={setViewAs} />
+          </div>
+        )}
+
+        {role === 'admin' && <AdminDashboard />}
+        {role === 'high_rank' && <HighRankDashboard />}
+        {role === 'finance' && <FinanceDashboard />}
+        {role === 'library' && <LibraryDashboard />}
+        {role === 'lower_rank' && <LowerRankDashboard />}
+        {role === 'academic' && <AcademicDashboard />}
+        {role === 'hr' && <HRDashboard />}
+        {role === 'exam_officer' && <ExamOfficerDashboard />}
+        {role === 'student' && <StudentDashboard />}
+      </ModuleSurface>
     </div>
   )
 }

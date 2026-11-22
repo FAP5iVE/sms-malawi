@@ -59,6 +59,15 @@ export interface ApiMonitoringFeedback {
   submittedByRole?: string
   dateCreated: string
   associatedIssueId?: string
+  /** [NEW] Who sent it — required on every "Report a problem" submission. */
+  reporterName?: string
+  /** [NEW] Employee number (staff) or student number (students), as typed. */
+  reporterIdNumber?: string
+  reporterIdType?: 'EMPLOYEE_NUMBER' | 'STUDENT_NUMBER'
+  /** [NEW] true = typed number matches the signed-in account's record,
+   *  false = it does not, null = no record on file to compare against. */
+  idMatchesAccount?: boolean | null
+  pageUrl?: string | null
 }
 
 export interface ApiMonitoringReplay {

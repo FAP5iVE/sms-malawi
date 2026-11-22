@@ -64,6 +64,7 @@
  */
 
 import { useState, useMemo, useRef, useEffect }  from 'react'
+import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   ChevronDown,
@@ -78,6 +79,8 @@ import {
   X,
 } from 'lucide-react'
 import { useMotionEnabled } from '@/store/motionStore'
+import { useFlatSurface } from '@/components/shared/FlatSurface'
+import { chipClass } from '@/lib/hills/chip'
 import {
   LIST_CONTAINER_VARIANTS,
   LIST_ITEM_VARIANTS,
@@ -178,6 +181,16 @@ export interface DataTableProps<T> {
    * behaviour is unchanged.
    */
   onRowClick?: (row: T) => void
+  /**
+   * [NEW] Whether the table view renders its own bordered `bg-surface`
+   * card. Defaults to `true` (unchanged from before) — needed for any
+   * DataTable that isn't already sitting inside another card (e.g. a
+   * detail page's own panel). Pass `false` when the DataTable is already
+   * inside a ModuleSurface panel or other bg-surface/border container, so
+   * the table doesn't render a second, redundant card nested inside the
+   * first — which also eats into the outer panel's side padding twice.
+   */
+  bordered?: boolean
 }
 
 type SortDir = 'asc' | 'desc' | null
@@ -238,7 +251,7 @@ function FilterChipsBar({
       {filters.map((f) => (
         <span
           key={f.key}
-          className="inline-flex items-center gap-1.5 bg-brand-navy/8 text-brand-navy text-xs font-medium px-2.5 py-1 rounded-full border border-brand-navy/20"
+          className="inline-flex items-center gap-1.5 text-brand-navy text-xs font-medium"
         >
           <span className="text-muted">{f.label}:</span>
           {f.value}
@@ -359,7 +372,12 @@ function MobileActionsSheet<T>({
 
   if (!row) return null
 
-  return (
+  // Portaled to <body>: rendered inline this sheet lived inside the page's
+  // z-10 stacking context (ModuleSurface), so the fixed mobile bottom nav
+  // painted over its lower actions. See components/shared/Modal.tsx.
+  if (typeof document === 'undefined') return null
+
+  return createPortal(
     <AnimatePresence>
       {row && (
         <>
@@ -424,7 +442,8 @@ function MobileActionsSheet<T>({
           </motion.div>
         </>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   )
 }
 
@@ -455,6 +474,8 @@ function MobileCardList<T extends object>({
   onRowClick,
 }: MobileCardListProps<T>) {
   const [activeRow, setActiveRow] = useState<T | null>(null)
+  // On a ModuleSurface a row that does nothing on tap is a tint tile; a tappable one keeps its border.
+  const flat = useFlatSurface()
 
   const criticalCol  = columns.find((c) => c.priority === 'critical') ?? columns[0]
   const restCols     = columns.filter((c) => c !== criticalCol)
@@ -526,9 +547,9 @@ function MobileCardList<T extends object>({
               }
               role={onRowClick ? 'button' : 'listitem'}
               tabIndex={onRowClick ? 0 : undefined}
-              aria-label={onRowClick ? `View details for ${id}` : undefined}
+              aria-label={onRowClick ? `View details for ${typeof titleValue === 'string' ? titleValue : id}` : undefined}
               className={[
-                'bg-surface border border-base rounded-xl px-4 py-3',
+                flat && !onRowClick ? 'app-tint rounded-xl px-4 py-3' : 'bg-surface border border-base rounded-xl px-4 py-3',
                 'flex items-start justify-between gap-3',
                 'hover:shadow-sm transition-shadow',
                 onRowClick
@@ -562,6 +583,12 @@ function MobileCardList<T extends object>({
                   ))}
                 </div>
               </div>
+
+              {/* Right: a chevron says the whole card opens something. Cards with a
+                  ⋯ actions button keep that button instead. */}
+              {onRowClick && !(mobileActions && mobileActions.length > 0) && (
+                <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-muted" aria-hidden />
+              )}
 
               {/* Right: ⋯ button — only when mobileActions is provided */}
               {mobileActions && mobileActions.length > 0 && (
@@ -645,8 +672,12 @@ export function DataTable<T extends object>({
   onColumnVisibilityChange,
   onSort,
   onRowClick,
+  bordered: borderedProp,
 }: DataTableProps<T>) {
   const motionEnabled = useMotionEnabled()
+  // Not told otherwise, the table draws its own card only when it is NOT on a ModuleSurface.
+  const flatSurface = useFlatSurface()
+  const bordered = borderedProp ?? !flatSurface
 
   const [sortKey,    setSortKey]    = useState<string | null>(null)
   const [sortDir,    setSortDir]    = useState<SortDir>(null)
@@ -739,12 +770,7 @@ export function DataTable<T extends object>({
                 key={f.value}
                 type="button"
                 onClick={() => onQuickFilter?.(f.value)}
-                className={[
-                  'px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors',
-                  activeQuickFilter === f.value
-                    ? 'bg-brand-navy text-white border-brand-navy'
-                    : 'bg-surface border-base text-muted hover:border-brand-navy/40 hover:text-body',
-                ].join(' ')}
+                className={chipClass(activeQuickFilter === f.value)}
               >
                 {f.label}
               </button>
@@ -759,7 +785,7 @@ export function DataTable<T extends object>({
             <button
               type="button"
               onClick={() => { onBulkArchive(selected); setSelected([]) }}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-coral/15 text-brand-coral border border-brand-coral/20 hover:bg-brand-coral/25 transition-colors"
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-status-danger/60 text-status-danger hover:bg-status-danger/10 transition-colors"
             >
               Archive {selected.length}
             </button>
@@ -796,7 +822,7 @@ export function DataTable<T extends object>({
               onClick={() => setView('table')}
               aria-label="Table view"
               aria-pressed={view === 'table'}
-              className={`p-1.5 transition-colors ${view === 'table' ? 'bg-brand-navy text-white' : 'hover:bg-page text-muted'}`}
+              className={`p-1.5 transition-colors ${view === 'table' ? 'bg-brand-deep text-white' : 'hover:bg-page text-muted'}`}
             >
               <List className="w-3.5 h-3.5" />
             </button>
@@ -805,7 +831,7 @@ export function DataTable<T extends object>({
               onClick={() => setView('card')}
               aria-label="Card view"
               aria-pressed={view === 'card'}
-              className={`p-1.5 transition-colors ${view === 'card' ? 'bg-brand-navy text-white' : 'hover:bg-page text-muted'}`}
+              className={`p-1.5 transition-colors ${view === 'card' ? 'bg-brand-deep text-white' : 'hover:bg-page text-muted'}`}
             >
               <LayoutGrid className="w-3.5 h-3.5" />
             </button>
@@ -870,11 +896,11 @@ export function DataTable<T extends object>({
 
       {/* ── TABLE VIEW (md+, default) ─────────────────────────────────────── */}
       {view === 'table' && (
-        <div className="hidden md:block border border-base rounded-xl overflow-hidden bg-surface">
+        <div className={bordered ? 'hidden md:block border border-base rounded-xl overflow-hidden bg-surface' : 'hidden md:block overflow-hidden'}>
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
               <thead>
-                <tr className="border-b border-base bg-page">
+                <tr className={`border-b border-base ${flatSurface ? 'app-tint' : 'bg-page'}`}>
                   <th scope="col" className="px-4 py-3 w-10">
                     <input
                       type="checkbox"

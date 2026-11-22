@@ -30,16 +30,26 @@
  *      default is replaced with settingsService.get(SETTING_KEYS.
  *      CURRENT_ACADEMIC_YEAR) — R14 will centralize this lookup pattern
  *      further; this phase wires the call.
+ * [MAINT 2026-09-16 — Class Subject Presets]: Added GET/PUT
+ *   /:id/subjects — the class's preset subject list (classService.
+ *   getClassSubjectsMeta/setClassSubjectPresets). GET is gated by the
+ *   existing class.view (broad read access — timetable/exam creation flows
+ *   need to know a class's offered subjects regardless of who's creating);
+ *   PUT is gated by the new class.manageSubjectPresets permission
+ *   (admin/high_rank/lower_rank only — deliberately excludes exam_officer,
+ *   which holds class.assignSubject for subject-teacher pairing but was
+ *   never one of the roles meant to set a class's subject list).
  * [DEPENDS ON]: apps/web/src/server/services/classService.ts,
  *   apps/web/src/server/services/settingsService.ts,
  *   apps/web/src/server/services/pendingActionService.ts,
- *   @shared/schemas/student (UpdateClassSchema)
+ *   @shared/schemas/student (UpdateClassSchema, SetClassSubjectPresetsSchema)
  */
 import { Router } from 'express'
 import { verifyAuth, requireRole } from '@/lib/verifyAuth'
 import { requirePermission } from '@/server/middleware/verifyPermission'
-import { CreateClassSchema, UpdateClassSchema, CreateTimetableSlotSchema, CreateSubjectAssignmentSchema } from '@shared/schemas/student'
+import { CreateClassSchema, UpdateClassSchema, CreateTimetableSlotSchema, CreateSubjectAssignmentSchema, SetClassSubjectPresetsSchema } from '@shared/schemas/student'
 import * as classService         from '@/server/services/classService'
+import * as riskService          from '@/server/services/riskService'
 import * as pendingActionService from '@/server/services/pendingActionService'
 import * as settingsService      from '@/server/services/settingsService'
 import { resolveStudentFromUid } from '@/server/services/studentService'
@@ -71,7 +81,12 @@ classesRouter.get(
   requirePermission('class.view'),
   async (req, res) => {
     const id = String(req.params.id)
-    const cls = await classService.getClass(id)
+    const year = typeof req.query.academicYear === 'string' && /^\d{4}\/\d{4}$/.test(req.query.academicYear) ? req.query.academicYear : undefined
+    const t = Number(req.query.term)
+    const cls = await classService.getClass(id, {
+      period: { academicYear: year, term: t === 1 || t === 2 || t === 3 ? t : undefined },
+      viewer: riskService.riskViewerFor(req.user?.role, req.user?.superUser === true),
+    })
     res.json(cls)
   }
 )
@@ -112,7 +127,7 @@ classesRouter.post('/', requirePermission('class.create'), async (req, res) => {
     })
   }
 
-  const cls = await classService.createClass(parsed.data, user.uid, user.role)
+  const cls = await classService.createClass(parsed.data, user.uid, user.role, user.superUser === true)
   return res.status(201).json(cls)
 })
 
@@ -124,7 +139,30 @@ classesRouter.patch('/:id', requirePermission('class.edit'), async (req, res) =>
   const { user } = req
   if (!user) return res.status(401).json({ error: 'Not authenticated.' })
 
-  const cls = await classService.updateClass(id, parsed.data, user.uid, user.role)
+  // [Approvals Hub] lower_rank holds class.edit "with approval required" (see
+  // the permission matrix), exactly like class.create above — but this route
+  // applied their edit directly, so it never reached a reviewer. Now queued.
+  if (user.role === 'lower_rank') {
+    const alreadyPending = await pendingActionService.hasPendingAction('Class', id, 'class.edit')
+    if (alreadyPending) {
+      return res.status(409).json({ error: 'A pending edit request already exists for this class.' })
+    }
+    const pendingAction = await pendingActionService.create({
+      entityType:      'Class',
+      entityId:        id,
+      action:          'class.edit',
+      description:     `Edit class ${id}`,
+      requestedByUid:  user.uid,
+      requestedByRole: user.role,
+      targetState:     parsed.data,
+    })
+    return res.status(202).json({
+      message: 'Class edit submitted for approval.',
+      pendingActionId: pendingAction.id,
+    })
+  }
+
+  const cls = await classService.updateClass(id, parsed.data, user.uid, user.role, user.superUser === true)
   return res.json(cls)
 })
 
@@ -134,8 +172,57 @@ classesRouter.delete('/:id', requirePermission('class.softDelete'), async (req, 
   const { user } = req
   if (!user) return res.status(401).json({ error: 'Not authenticated.' })
 
+  // [Approvals Hub] Same gap as PATCH above — lower_rank holds class.softDelete
+  // with approval required, but archived the class outright.
+  if (user.role === 'lower_rank') {
+    const alreadyPending = await pendingActionService.hasPendingAction('Class', id, 'class.softDelete')
+    if (alreadyPending) {
+      return res.status(409).json({ error: 'A pending archive request already exists for this class.' })
+    }
+    const pendingAction = await pendingActionService.create({
+      entityType:      'Class',
+      entityId:        id,
+      action:          'class.softDelete',
+      description:     `Archive class ${id}`,
+      requestedByUid:  user.uid,
+      requestedByRole: user.role,
+      targetState:     { action: 'archive' },
+    })
+    return res.status(202).json({
+      message: 'Class archival submitted for approval.',
+      pendingActionId: pendingAction.id,
+    })
+  }
+
   const cls = await classService.archiveClass(id, user.uid, user.role)
   return res.json(cls)
+})
+
+// ─── CLASS SUBJECT PRESETS ────────────────────────────────
+// The set of subjects a class offers — distinct from subject-teacher
+// assignments below. GET is class.view (broad read access); PUT is
+// class.manageSubjectPresets (admin/high_rank/lower_rank only).
+
+// GET /classes/:id/subjects — preset subjects + derived 5-day lock state.
+classesRouter.get('/:id/subjects', requirePermission('class.view'), async (req, res) => {
+  const id = String(req.params.id)
+  return res.json(await classService.getClassSubjectsMeta(id))
+})
+
+// PUT /classes/:id/subjects — set/change the class's preset subject list.
+// Rejected once the 5-day edit window (from the first time it was set)
+// has closed — classService.setClassSubjectPresets throws a 403 naming
+// the lock date. Also rejects removing a subject already in use by a
+// timetable slot, exam, or subject-teacher assignment for this class.
+classesRouter.put('/:id/subjects', requirePermission('class.manageSubjectPresets'), async (req, res) => {
+  const id = String(req.params.id)
+  const parsed = SetClassSubjectPresetsSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
+  const { user } = req
+  if (!user) return res.status(401).json({ error: 'Not authenticated.' })
+
+  const meta = await classService.setClassSubjectPresets(id, parsed.data.subjects, user.uid, user.role)
+  return res.json(meta)
 })
 
 
@@ -184,6 +271,17 @@ classesRouter.post('/subject-assignments/backfill', requirePermission('class.ass
     : await settingsService.get(SETTING_KEYS.CURRENT_ACADEMIC_YEAR)
   const result = await classService.backfillSubjectAssignmentsFromTimetable(academicYear, user.uid, user.role)
   return res.json(result)
+})
+
+// PATCH /classes/subject-assignments/:assignmentId — give a subject to a
+// different teacher. Body: { teacherUid }.
+classesRouter.patch('/subject-assignments/:assignmentId', requirePermission('class.assignSubject'), async (req, res) => {
+  const { user } = req
+  if (!user) return res.status(401).json({ error: 'Not authenticated.' })
+  const teacherUid = typeof req.body?.teacherUid === 'string' ? req.body.teacherUid.trim() : ''
+  if (!teacherUid) return res.status(400).json({ error: 'teacherUid is required.' })
+  const updated = await classService.updateSubjectAssignmentTeacher(String(req.params.assignmentId), teacherUid, user.uid, user.role)
+  return res.json(updated)
 })
 
 // DELETE /classes/subject-assignments/:assignmentId — remove an assignment.
@@ -256,12 +354,10 @@ classesRouter.get(
   requirePermission('timetable.view'),
   async (req, res) => {
     const id = String(req.params.id)
-    const { term = '1' } = req.query
-    let { academicYear } = req.query
-    if (!academicYear) {
-      academicYear = await settingsService.get(SETTING_KEYS.CURRENT_ACADEMIC_YEAR)
-    }
-    const slots = await classService.getTimetableForClass(id, Number(term), academicYear as string)
+    // Year AND term default to the school's current period (SystemSettings).
+    // The term used to default to a literal '1' regardless of the real term.
+    const { academicYear, term } = await settingsService.resolvePeriod(req.query)
+    const slots = await classService.getTimetableForClass(id, term, academicYear)
     res.json(slots)
   }
 )

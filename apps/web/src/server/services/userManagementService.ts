@@ -48,13 +48,39 @@ import { prisma } from '@/lib/prisma'
 import { clearTokensForUser } from '@/lib/push'
 import { generateTempPassword } from '@/lib/tempPassword'
 import { sendEmail } from '@/lib/email'
+import { sendResetEmail } from '@/server/services/passwordResetService'
+import * as algolia from '@/server/services/algoliaService'
 import type { CreateUserInput, NotificationPrefInput } from '@shared/schemas/admin'
 import type { UserRole } from '@shared/types/roles'
+import { isSuperUserClaim } from '@shared/constants/superUser'
+import { assertRoleChangeAllowed } from '@/lib/roleChangePolicy'
 
 function getAuth() { return admin.auth() }
 
+/**
+ * The alpha_admin super user is protected from everyone except itself: no
+ * other account — not even another admin — may change its role, disable it,
+ * or trigger a password reset for it. Without this, "absolute, non-negotiable
+ * access" could be revoked by any admin with one click in User Management.
+ * Claims are Admin-SDK-only, so nobody can use this path to *grant*
+ * super-user status either (updateUserRole preserves existing claims as-is).
+ */
+async function assertAccountNotProtected(targetUid: string, actorIsSuperUser: boolean): Promise<void> {
+  if (actorIsSuperUser) return
+  const target = await getAuth().getUser(targetUid)
+  if (isSuperUserClaim(target.customClaims?.['superUser'])) {
+    throw Object.assign(
+      new Error('This account is protected and can only be managed by itself.'),
+      { status: 403 },
+    )
+  }
+}
+
 // ─── CREATE USER ─────────────────────────────────────────
 export async function createUser(data: CreateUserInput, actorUid: string) {
+  // [Guardian portal] the admin schema already excludes 'parent'; refuse it at
+  // runtime as well so a type-level change can never open the door.
+  assertRoleChangeAllowed(null, data.role)
   const tempPassword = generateTempPassword()
   // 1. Create Firebase Auth account
   const userRecord = await getAuth().createUser({
@@ -129,6 +155,41 @@ export async function createUser(data: CreateUserInput, actorUid: string) {
     )
   }
   logger.info({ event: 'user.created', uid: userRecord.uid, role: data.role, subtitle, actorUid })
+
+  // [ALGOLIA ROLLOUT — Tier 1 item 2] employeeNo/registrationNo aren't known
+  // at this point without an extra lookup (data only carries staffId/
+  // studentId, not the display identifiers listUsers() later joins in) —
+  // fire-and-forget resolve + index rather than blocking account creation
+  // on it; a failure here just means this one account is briefly missing
+  // from search until the next seed run, same fallback story every other
+  // void algolia.* call in this codebase already relies on.
+  void (async () => {
+    let employeeNo: string | null = null
+    let registrationNo: string | null = null
+    if (data.staffId) {
+      const sp = await prisma.staffProfile.findUnique({ where: { id: data.staffId }, select: { employeeNo: true } })
+      employeeNo = sp?.employeeNo ?? null
+    }
+    if (data.studentId) {
+      const st = await prisma.student.findUnique({ where: { id: data.studentId }, select: { registrationNo: true } })
+      registrationNo = st?.registrationNo ?? null
+    }
+    await algolia.indexUserAccount({
+      objectID:               userRecord.uid,
+      displayName:            data.displayName,
+      email:                  data.email,
+      role:                   data.role,
+      disabled:               false,
+      requiresPasswordChange: true,
+      createdAt:              userRecord.metadata.creationTime,
+      lastSignIn:             userRecord.metadata.lastSignInTime ?? null,
+      employeeNo,
+      registrationNo,
+      staffProfileId:         data.staffId ?? null,
+      studentId:              data.studentId ?? null,
+    })
+  })()
+
   return { uid: userRecord.uid, email: data.email, role: data.role, subtitle }
 }
 
@@ -159,6 +220,7 @@ export async function listUsers(pageToken?: string) {
       email:       u.email,
       displayName: u.displayName,
       role:        u.customClaims?.['role'] as UserRole | undefined,
+      superUser:   isSuperUserClaim(u.customClaims?.['superUser']),
       requiresPasswordChange: u.customClaims?.['requiresPasswordChange'] === true,
       disabled:    u.disabled,
       createdAt:   u.metadata.creationTime,
@@ -172,16 +234,57 @@ export async function listUsers(pageToken?: string) {
   }
 }
 
+// ─── ALGOLIA BULK SEED ───────────────────────────────────
+// [ALGOLIA ROLLOUT — Tier 1 item 2] Deliberately loops every Firebase
+// listUsers() page via pageToken until exhausted, rather than the single
+// call the Accounts tab's own useUsers() makes — this is the seed path,
+// so it must not reproduce the exact "only the first 100" bug this whole
+// item exists to fix. Called from the admin seed route (algoliaAdmin.ts),
+// same pattern as seed-students/seed-staff/seed-books.
+export async function seedAllUserAccountsToAlgolia(): Promise<algolia.BulkIndexResult> {
+  let pageToken: string | undefined
+  let totalIndexed = 0
+  do {
+    const page = await listUsers(pageToken)
+    const records = page.users.map((u) => ({
+      objectID:               u.uid,
+      displayName:            u.displayName ?? null,
+      email:                  u.email ?? null,
+      role:                   u.role ?? null,
+      disabled:               u.disabled,
+      requiresPasswordChange: u.requiresPasswordChange,
+      createdAt:              u.createdAt ?? null,
+      lastSignIn:             u.lastSignIn ?? null,
+      employeeNo:             u.employeeNo,
+      registrationNo:         u.registrationNo,
+      staffProfileId:         u.staffProfileId,
+      studentId:              u.studentId,
+    }))
+    const result = await algolia.bulkIndexUserAccounts(records)
+    if (!result.configured) return result   // Algolia not configured — bail out on the first page, nothing to gain from looping.
+    if (result.error) return result
+    totalIndexed += result.indexed
+    pageToken = page.pageToken
+  } while (pageToken)
+  return { indexed: totalIndexed, configured: true }
+}
+
 // ─── UPDATE ROLE ─────────────────────────────────────────
-export async function updateUserRole(uid: string, role: UserRole, actorUid: string) {
+export async function updateUserRole(uid: string, role: UserRole, actorUid: string, actorIsSuperUser = false) {
+  await assertAccountNotProtected(uid, actorIsSuperUser)
   const existing = await getAuth().getUser(uid)
+  // [Guardian portal] parent accounts are minted only by the claim flow and are
+  // never converted, in either direction. Applies to super-users too.
+  assertRoleChangeAllowed(existing.customClaims?.['role'], role)
   await getAuth().setCustomUserClaims(uid, { ...existing.customClaims, role })
   logger.info({ event: 'user.role_updated', uid, role, actorUid })
+  void algolia.updateUserAccount({ objectID: uid, role })
   return { uid, role }
 }
 
 // ─── DISABLE / ENABLE USER ───────────────────────────────
-export async function toggleUserDisabled(uid: string, disabled: boolean, actorUid: string) {
+export async function toggleUserDisabled(uid: string, disabled: boolean, actorUid: string, actorIsSuperUser = false) {
+  await assertAccountNotProtected(uid, actorIsSuperUser)
   await getAuth().updateUser(uid, { disabled })
   if (disabled) {
     // Stop push notifications immediately for a disabled account rather
@@ -190,6 +293,7 @@ export async function toggleUserDisabled(uid: string, disabled: boolean, actorUi
     await clearTokensForUser(uid)
   }
   logger.info({ event: disabled ? 'user.disabled' : 'user.enabled', uid, actorUid })
+  void algolia.updateUserAccount({ objectID: uid, disabled })
 }
 
 // ─── CLEAR PASSWORD-CHANGE-REQUIRED FLAG ─────────────────
@@ -211,28 +315,38 @@ export async function clearPasswordChangeRequirement(uid: string): Promise<void>
     requiresPasswordChange: false,
   })
   logger.info({ event: 'user.passwordChangeCleared', uid })
+  void algolia.updateUserAccount({ objectID: uid, requiresPasswordChange: false })
 }
 
 // ─── RESET PASSWORD ──────────────────────────────────────
-export async function sendPasswordReset(uid: string) {
+export async function sendPasswordReset(uid: string, actorIsSuperUser = false) {
+  await assertAccountNotProtected(uid, actorIsSuperUser)
   const user = await getAuth().getUser(uid)
   if (!user.email) throw new Error('User has no email address.')
-  const link = await getAuth().generatePasswordResetLink(user.email)
-  // `from` deliberately omitted — see createUser() above; the email.ts
-  // singleton supplies it from EMAIL_FROM_ADDRESS/EMAIL_FROM_NAME.
-  const emailResult = await sendEmail({
-    to:      user.email,
-    subject: 'Password Reset — SMS Malawi',
-    html:    `<p>Click <a href="${link}">here</a> to reset your password. This link expires in 1 hour.</p>`,
-    tags: [{ name: 'type', value: 'password-reset' }],
-  })
-  if (!emailResult.ok) {
-    logger.warn(
-      { uid, email: user.email, reason: emailResult.error },
-      '[userManagementService.sendPasswordReset] reset email failed to send',
-    )
-    throw new Error('Failed to send password reset email.')
+  // The link opens the app's own /reset-password page (passwordResetService.ts), not
+  // Firebase's plain hosted page. `from` is supplied by the email.ts singleton.
+  let sent = false
+  try {
+    sent = await sendResetEmail(user.email, user.displayName)
+  } catch (err) {
+    logger.warn({ uid, email: user.email, err }, '[userManagementService.sendPasswordReset] could not build the reset link')
   }
+  if (!sent) throw new Error('Failed to send password reset email.')
+}
+
+// ─── OWN PROFILE PICTURE ─────────────────────────────────
+/**
+ * The signed-in user's recorded sex, for choosing the dashboard profile
+ * picture. Students are matched on Student.firebaseUid and staff on
+ * StaffProfile.uid. Returns null when no record is linked to the account
+ * (for example a bootstrap admin with no staff profile) or when staff HR has
+ * not recorded it yet; the client then shows an initials badge.
+ */
+export async function getMySex(uid: string): Promise<'MALE' | 'FEMALE' | null> {
+  const student = await prisma.student.findUnique({ where: { firebaseUid: uid }, select: { sex: true } })
+  if (student) return student.sex
+  const staff = await prisma.staffProfile.findUnique({ where: { uid }, select: { sex: true } })
+  return staff?.sex ?? null
 }
 
 // ─── NOTIFICATION PREFERENCES ────────────────────────────

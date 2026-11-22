@@ -13,17 +13,17 @@
 import 'server-only'
 
 import { format } from 'date-fns'
-import { buildEmailHtml, buildEmailText, divider, TOKEN, type EmailMessage, type SchoolBranding } from './base'
+import { banner, buildEmailHtml, buildEmailText, details, divider, fitSubject, note, TOKEN, TONES, type EmailMessage, type SchoolBranding, type Tone } from './base'
 import type { AnnouncementAudience } from '@shared/schemas/announcement'
 
 const AUDIENCE_LABELS: Record<AnnouncementAudience, string> = {
-  ALL:      'All School Members',
-  STAFF:    'All Staff',
-  STUDENTS: 'All Students',
-  ACADEMIC: 'Academic Staff',
-  FINANCE:  'Finance Department',
-  LIBRARY:  'Library Staff',
-  HR:       'HR Department',
+  ALL:      'All school members',
+  STAFF:    'All staff',
+  STUDENTS: 'All students',
+  ACADEMIC: 'Academic staff',
+  FINANCE:  'Finance department',
+  LIBRARY:  'Library staff',
+  HR:       'HR department',
 }
 
 export interface AnnouncementEmailData {
@@ -40,14 +40,14 @@ export interface AnnouncementEmailData {
   category?:    string
 }
 
-const CATEGORY_COLORS: Record<string, string> = {
-  'Event':       TOKEN.ACCENT_BLUE,
-  'Holiday':     TOKEN.ACCENT_GREEN,
-  'Exam':        TOKEN.ACCENT_ORANGE,
-  'Finance':     TOKEN.ACCENT_AMBER,
-  'Academic':    TOKEN.PRIMARY,
-  'General':     TOKEN.TEXT_MUTED,
-  'Urgent':      TOKEN.ACCENT_RED,
+const CATEGORY_TONES: Record<string, Tone> = {
+  'Event':       'blue',
+  'Holiday':     'green',
+  'Exam':        'amber',
+  'Finance':     'amber',
+  'Academic':    'neutral',
+  'General':     'neutral',
+  'Urgent':      'red',
 }
 
 export function renderAnnouncement(
@@ -56,13 +56,13 @@ export function renderAnnouncement(
 ): EmailMessage {
   const audienceLabel  = AUDIENCE_LABELS[data.audience] ?? data.audience
   const publishedLabel = format(data.publishedAt, 'EEEE, d MMMM yyyy')
-  const categoryColor  = data.category ? (CATEGORY_COLORS[data.category] ?? TOKEN.ACCENT_BLUE) : TOKEN.ACCENT_BLUE
+  const isUrgent       = data.category === 'Urgent'
+  const categoryTone   = data.category ? (CATEGORY_TONES[data.category] ?? 'blue') : 'blue'
+  const categoryColors = TONES[categoryTone]
 
-  const subject = data.category === 'Urgent'
-    ? `🚨 URGENT: ${data.title} — ${school.schoolName}`
-    : `📢 ${data.title} — ${school.schoolName}`
+  const subject = fitSubject(isUrgent ? `Urgent: ${data.title}` : data.title)
 
-  // Sanitise body for HTML insertion — preserve line breaks as <br>
+  // Sanitise body for HTML insertion, preserve line breaks as <br>
   const safeBody = data.body
     .replace(/&/g,  '&amp;')
     .replace(/</g,  '&lt;')
@@ -71,19 +71,13 @@ export function renderAnnouncement(
     .replace(/\n/g, '<br />')
 
   const bodyHtml = `
+    ${isUrgent ? banner({ tone: 'red', title: 'Urgent announcement' }) : ''}
     <!-- Announcement header -->
     <tr>
-      <td style="padding:32px 32px 0;">
-        ${data.category ? `
-        <table role="presentation" cellpadding="0" cellspacing="0" style="margin-bottom:12px;">
-          <tr>
-            <td style="background-color:${categoryColor};border-radius:4px;padding:4px 12px;">
-              <p style="margin:0;font-family:${TOKEN.FONT_STACK};font-size:11px;font-weight:bold;color:#ffffff;text-transform:uppercase;letter-spacing:0.08em;">${data.category}</p>
-            </td>
-          </tr>
-        </table>` : ''}
-        <h1 style="margin:0 0 4px;font-family:${TOKEN.FONT_HEADING};font-size:22px;font-weight:bold;color:${TOKEN.TEXT_DARK};line-height:1.3;">${data.title}</h1>
-        <p style="margin:0;font-family:${TOKEN.FONT_STACK};font-size:13px;color:${TOKEN.TEXT_MUTED};">
+      <td class="em-pad" style="padding:${isUrgent ? '20' : '32'}px 32px 0;">
+        ${data.category && !isUrgent ? `<p class="${categoryColors.cls}" style="margin:0 0 4px;font-family:${TOKEN.FONT_STACK};font-size:14px;font-weight:bold;color:${categoryColors.text};line-height:1.5;">${data.category}</p>` : ''}
+        <h1 class="em-t" style="margin:0 0 4px;font-family:${TOKEN.FONT_HEADING};font-size:22px;font-weight:bold;color:${TOKEN.TEXT_DARK};line-height:1.3;">${data.title}</h1>
+        <p class="em-m" style="margin:0;font-family:${TOKEN.FONT_STACK};font-size:14px;color:${TOKEN.TEXT_MUTED};line-height:1.5;">
           ${publishedLabel}
           ${data.authorName ? ` &bull; ${data.authorName}${data.authorTitle ? ', ' + data.authorTitle : ''}` : ''}
           &bull; To: ${audienceLabel}
@@ -91,71 +85,47 @@ export function renderAnnouncement(
       </td>
     </tr>
 
-    <!-- Divider -->
+    <tr><td style="padding:16px 0 0;"></td></tr>
     ${divider()}
 
     <!-- Body -->
     <tr>
-      <td style="padding:20px 32px 0;font-family:${TOKEN.FONT_STACK};font-size:15px;color:${TOKEN.TEXT_BODY};line-height:1.8;">
+      <td class="em-pad em-t" style="padding:20px 32px 0;font-family:${TOKEN.FONT_STACK};font-size:16px;color:${TOKEN.TEXT_BODY};line-height:1.5;">
         ${safeBody}
       </td>
     </tr>
 
-    ${data.eventDate ? `
-    <!-- Event date highlight -->
-    <tr>
-      <td style="padding:20px 32px 0;">
-        <table role="presentation" cellpadding="0" cellspacing="0" style="background-color:#eff6ff;border-left:4px solid ${TOKEN.ACCENT_BLUE};border-radius:4px;width:100%;">
-          <tr>
-            <td style="padding:14px 18px;">
-              <p style="margin:0;font-family:${TOKEN.FONT_STACK};font-size:12px;font-weight:bold;color:${TOKEN.ACCENT_BLUE};text-transform:uppercase;letter-spacing:0.06em;">Event Date</p>
-              <p style="margin:4px 0 0;font-family:${TOKEN.FONT_STACK};font-size:15px;font-weight:bold;color:${TOKEN.TEXT_DARK};">${format(data.eventDate, 'EEEE, d MMMM yyyy')}</p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>` : ''}
+    ${data.eventDate ? details({ rows: [{ label: 'Event date', value: format(data.eventDate, 'EEEE, d MMMM yyyy'), tone: 'blue' }] }) : ''}
 
-    <!-- Author footer -->
     ${data.authorName ? `
     <tr><td style="padding:24px 0 0;"></td></tr>
     ${divider()}
-    <tr>
-      <td style="padding:16px 32px 0;">
-        <p style="margin:0;font-family:${TOKEN.FONT_STACK};font-size:13px;color:${TOKEN.TEXT_MUTED};">
-          This announcement was posted by <strong>${data.authorName}</strong>${data.authorTitle ? ', ' + data.authorTitle : ''} on behalf of ${school.schoolName}.
-        </p>
-      </td>
-    </tr>` : ''}
-
-    <tr><td style="padding:24px 0 0;"></td></tr>
+    ${note(`This announcement was posted by <strong>${data.authorName}</strong>${data.authorTitle ? ', ' + data.authorTitle : ''} on behalf of ${school.schoolName}.`)}` : ''}
   `
 
   const html = buildEmailHtml({
     previewText:  data.body.replace(/<[^>]+>/g, '').slice(0, 140),
-    headerLabel:  `Announcement — ${audienceLabel}`,
-    headerColor:  data.category === 'Urgent' ? TOKEN.ACCENT_RED : TOKEN.PRIMARY,
+    headerLabel:  `Announcement: ${audienceLabel}`,
     body:         bodyHtml,
     cta: {
-      label: 'View on Portal',
+      label: 'View on portal',
       url:   `${school.loginUrl}/announcements`,
-      color: TOKEN.PRIMARY,
     },
     school,
   })
 
   const text = buildEmailText(
     [
-      `ANNOUNCEMENT: ${data.title}`,
+      `${isUrgent ? 'Urgent announcement' : 'Announcement'}: ${data.title}`,
       `Date: ${publishedLabel}`,
       `To: ${audienceLabel}`,
       `From: ${data.authorName}${data.authorTitle ? ', ' + data.authorTitle : ''}`,
       '',
-      '─'.repeat(40),
+      '-'.repeat(40),
       '',
       data.body,
       '',
-      ...(data.eventDate ? [`Event Date: ${format(data.eventDate, 'EEEE, d MMMM yyyy')}`, ''] : []),
+      ...(data.eventDate ? [`Event date: ${format(data.eventDate, 'EEEE, d MMMM yyyy')}`, ''] : []),
       `View on portal: ${school.loginUrl}/announcements`,
     ].join('\n'),
     school

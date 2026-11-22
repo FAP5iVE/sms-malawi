@@ -47,14 +47,32 @@
  *   submit + finalize run.
  * [DEPENDS ON]: W/components/shared/ConfirmDialog.tsx (same phase)
  */
+/*
+ * [CHANGE TYPE]: TARGETED EDIT
+ * [PURPOSE]: "I saved a draft, opened it again, pressed Finalize and nothing
+ *   happened." Two causes, both fixed:
+ *   1. Saved marks come back from GET /exams/:id/marks as STRINGS ("45") -
+ *      Prisma Decimals JSON-serialize that way - and the sheet sent them
+ *      straight back. The numeric Zod schema rejected the request (400) and
+ *      nothing here showed errors, so the click looked dead. The route now
+ *      serializes Decimals AND the sheet coerces on load, so neither side
+ *      relies on the other.
+ *   2. Finalize was two chained requests with no failure handling. It is now
+ *      ONE atomic request carrying the sheet, with loading state on the
+ *      button and dialog, a success toast, and any failure shown as a toast
+ *      AND a banner inside the sheet (e.g. "Missing marks for 2 student(s)").
+ *   Also: marks outside 0..max are caught before sending, and the sheet
+ *   cannot be closed mid-save.
+ */
 'use client'
 import { useState, useMemo } from 'react'
 import { useStudents } from '@/hooks/useStudents'
 import { useEnterMarks, useFinalizeMarks, useExamMarks, useCorrectMarks } from '@/hooks/useExams'
-import { motion, AnimatePresence } from 'framer-motion'
-import { X, Loader2, Lock, Save, AlertTriangle } from 'lucide-react'
+import { getErrorMessage } from '@/lib/feedback'
+import { Loader2, Lock, Save, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import type { ApiStudent } from '@shared/types/api'
+import { Modal, MODAL_BTN_PRIMARY, MODAL_BTN_SECONDARY } from '@/components/shared/Modal'
 
 interface Props {
   examId: string
@@ -96,6 +114,12 @@ export function MarksEntrySheet({ examId, classId, maxMark, onClose, readOnly = 
   const [errors, setErrors] = useState<Record<string, string>>({})
   // R15 — finalize-confirmation dialog visibility
   const [confirmFinalizeOpen, setConfirmFinalizeOpen] = useState(false)
+  // Why the last save/finalize/correct was refused - shown inside the sheet so
+  // it is still there after the toast fades.
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null)
+
+  const busy = enterMarks.isPending || finalizeMarks.isPending || correctMarks.isPending
 
   // Seed `marks` once students and any previously-saved draft marks have
   // loaded. A student ID already present in local state (typed in this
@@ -124,178 +148,226 @@ export function MarksEntrySheet({ examId, classId, maxMark, onClose, readOnly = 
         continue
       }
       const saved = savedMarks?.find((m) => m.studentId === s.id)
-      next[s.id] = saved ? { mark: saved.mark, absent: saved.absent } : { mark: null, absent: false }
+      // Number(): a saved mark may arrive as a string ("45") from an API that
+      // serializes Decimals as text. Left as a string it fails validation on
+      // the way back out - the "Finalize does nothing" bug.
+      const savedMark = saved?.mark == null || Number.isNaN(Number(saved.mark)) ? null : Number(saved.mark)
+      next[s.id] = saved ? { mark: savedMark, absent: saved.absent } : { mark: null, absent: false }
     }
     setMarks(next)
     setHydrated(true)
   }
 
   function setMark(studentId: string, val: string) {
-    const n = val === '' ? null : Number(val)
+    const parsed = val === '' ? null : Number(val)
+    const n = parsed !== null && Number.isFinite(parsed) ? parsed : null
     setMarks((p) => ({ ...p, [studentId]: { ...p[studentId]!, mark: n, absent: false } }))
     setErrors((p) => Object.fromEntries(Object.entries(p).filter(([id]) => id !== studentId)))
+    setActionError(null)
   }
 
   function toggleAbsent(studentId: string) {
     setMarks((p) => ({ ...p, [studentId]: { mark: null, absent: !(p[studentId]?.absent) } }))
+    setErrors((p) => Object.fromEntries(Object.entries(p).filter(([id]) => id !== studentId)))
+    setActionError(null)
   }
 
-  function saveDraft() {
-    const entries = students.map((s) => ({
+  function buildEntries() {
+    return students.map((s) => ({
       examId, studentId: s.id,
       mark:   marks[s.id]?.mark ?? undefined,
       absent: marks[s.id]?.absent ?? false,
     }))
-    enterMarks.mutate({ entries, isDraft: true })
+  }
+
+  // Marks outside 0..max are caught here, next to the box that holds them,
+  // instead of coming back from the server as one unattributed error.
+  function findOutOfRange(): Record<string, string> {
+    const errs: Record<string, string> = {}
+    for (const s of students) {
+      const m = marks[s.id]?.mark
+      if (m === null || m === undefined) continue
+      if (m < 0 || m > maxMark) errs[s.id] = `Must be between 0 and ${maxMark}`
+    }
+    return errs
+  }
+
+  function saveDraft() {
+    setActionError(null)
+    const outOfRange = findOutOfRange()
+    if (Object.keys(outOfRange).length > 0) {
+      setErrors(outOfRange)
+      setActionError(`${Object.keys(outOfRange).length} mark(s) are outside 0–${maxMark}. Fix them before saving.`)
+      return
+    }
+    enterMarks.mutate({ entries: buildEntries(), isDraft: true }, {
+      onSuccess: () => setDraftSavedAt(new Date()),
+      onError:   (err) => setActionError(getErrorMessage(err, 'The draft could not be saved.')),
+    })
   }
 
   // R15 — split: the button validates and opens the shared ConfirmDialog;
   // the actual submit + finalize runs only from the dialog's onConfirm.
   function requestFinalize() {
-    const missing = students.filter((s) => marks[s.id]?.mark === null && !marks[s.id]?.absent)
-    if (missing.length > 0) {
-      const errs: Record<string, string> = {}
-      missing.forEach((s) => { errs[s.id] = 'Mark required or mark as absent' })
+    setActionError(null)
+    const errs: Record<string, string> = findOutOfRange()
+    students
+      .filter((s) => marks[s.id]?.mark === null && !marks[s.id]?.absent)
+      .forEach((s) => { errs[s.id] = 'Mark required or mark as absent' })
+    if (Object.keys(errs).length > 0) {
       setErrors(errs)
+      setActionError(`${Object.keys(errs).length} student(s) need a valid mark (or to be marked absent) before the marks can be finalized.`)
       return
     }
     setConfirmFinalizeOpen(true)
   }
 
+  // ONE request: the sheet goes up with the confirm, the server saves and
+  // locks it atomically. The dialog stays open (spinner on its button) until
+  // the answer is back, then closes either way.
   function doFinalize() {
-    setConfirmFinalizeOpen(false)
-    const entries = students.map((s) => ({
-      examId, studentId: s.id,
-      mark:   marks[s.id]?.mark ?? undefined,
-      absent: marks[s.id]?.absent ?? false,
-    }))
-    enterMarks.mutate({ entries, isDraft: false }, {
-      onSuccess: () => finalizeMarks.mutate(examId, { onSuccess: onClose }),
+    setActionError(null)
+    finalizeMarks.mutate({ examId, entries: buildEntries() }, {
+      onSuccess: () => { setConfirmFinalizeOpen(false); onClose() },
+      onError:   (err) => {
+        setConfirmFinalizeOpen(false)
+        setActionError(getErrorMessage(err, 'The marks could not be finalized.'))
+      },
     })
   }
 
   // RW-1: save reviewer corrections to individual marks (marks stay final).
   function saveCorrections() {
-    const entries = students.map((s) => ({
-      examId, studentId: s.id,
-      mark:   marks[s.id]?.mark ?? undefined,
-      absent: marks[s.id]?.absent ?? false,
-    }))
-    correctMarks.mutate({ entries, isDraft: false }, { onSuccess: onClose })
+    setActionError(null)
+    const outOfRange = findOutOfRange()
+    if (Object.keys(outOfRange).length > 0) {
+      setErrors(outOfRange)
+      setActionError(`${Object.keys(outOfRange).length} mark(s) are outside 0–${maxMark}. Fix them before saving.`)
+      return
+    }
+    correctMarks.mutate({ entries: buildEntries(), isDraft: false }, {
+      onSuccess: onClose,
+      onError:   (err) => setActionError(getErrorMessage(err, 'The corrections could not be saved.')),
+    })
   }
 
   const loading = studentsLoading || marksLoading
 
   return (
-    <AnimatePresence>
-      <motion.div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40"
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-        <div className="absolute inset-0" onClick={onClose} />
-        <motion.div className="relative z-10 w-full max-w-2xl bg-surface rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]"
-          initial={{ scale: 0.96, y: 12 }} animate={{ scale: 1, y: 0 }} transition={{ type: 'spring', stiffness: 400, damping: 30 }}>
-          <div className="flex items-center justify-between px-6 py-4 border-b border-base shrink-0">
-            <div>
-              <h2 className="font-heading font-bold text-brand-navy">{correctionMode ? 'Correct Marks (Review)' : 'Enter Marks'}</h2>
-              <p className="text-xs text-muted mt-0.5">
-                {loading ? 'Loading…' : `${students.length} students · out of ${maxMark}`}
-              </p>
-            </div>
-            <button onClick={onClose} aria-label="Close" className="p-2 hover:bg-page rounded-xl">
-              <X className="w-4 h-4 text-muted" />
-            </button>
-          </div>
-          <div className="overflow-y-auto flex-1">
-            {loading ? (
-              <div className="px-6 py-12 text-center text-sm text-muted animate-pulse">
-                Loading students and saved marks…
-              </div>
-            ) : (
-              <table className="w-full text-sm border-collapse">
-                <thead>
-                  <tr className="border-b border-base bg-page">
-                    <th className="px-5 py-3 text-left font-heading text-xs uppercase tracking-wide text-muted">Student</th>
-                    <th className="px-5 py-3 text-left font-heading text-xs uppercase tracking-wide text-muted w-36">Mark (/{maxMark})</th>
-                    <th className="px-5 py-3 text-center font-heading text-xs uppercase tracking-wide text-muted w-24">Absent</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-base">
-                  {students.map((student) => (
-                    <tr key={student.id} className={marks[student.id]?.absent ? 'bg-amber-50' : ''}>
-                      <td className="px-5 py-3">
-                        <p className="font-medium text-body">{student.firstName} {student.lastName}</p>
-                        <p className="text-xs text-muted">{student.registrationNo}</p>
-                      </td>
-                      <td className="px-5 py-2">
-                        <input
-                          type="number" min={0} max={maxMark}
-                          value={marks[student.id]?.mark ?? ''}
-                          disabled={marks[student.id]?.absent || !editable}
-                          onChange={(e) => setMark(student.id, e.target.value)}
-                          aria-label={`Mark for ${student.firstName} ${student.lastName}`}
-                          className={`w-full border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal/25 ${
-                            errors[student.id] ? 'border-brand-coral bg-brand-coral/5' : 'border-base bg-page'
-                          } disabled:opacity-40`}
-                        />
-                        {errors[student.id] && (
-                          <p className="text-xs text-brand-coral mt-1 flex items-center gap-1">
-                            <AlertTriangle className="w-3 h-3" /> {errors[student.id]}
-                          </p>
-                        )}
-                      </td>
-                      <td className="px-5 py-2 text-center">
-                        <input
-                          type="checkbox"
-                          className="accent-brand-amber w-4 h-4"
-                          checked={marks[student.id]?.absent ?? false}
-                          onChange={() => toggleAbsent(student.id)}
-                          disabled={!editable}
-                          aria-label={`Mark ${student.firstName} ${student.lastName} as absent`}
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-          <div className="px-6 py-4 border-t border-base flex items-center justify-between gap-3 shrink-0">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm border border-base rounded-xl hover:bg-page">
+    <>
+      <Modal
+        title={correctionMode ? 'Correct marks (review)' : 'Enter marks'}
+        description={loading ? 'Loading…' : `${students.length} students · out of ${maxMark}`}
+        onClose={onClose}
+        busy={busy}
+        size="screen"
+        flush
+        footer={
+          <>
+            <button type="button" onClick={onClose} disabled={busy} className={`${MODAL_BTN_SECONDARY} sm:mr-auto`}>
               {readOnly && !correctionMode ? 'Close' : 'Cancel'}
             </button>
             {correctionMode ? (
-              <button type="button" onClick={saveCorrections} disabled={correctMarks.isPending || !hydrated}
-                className="flex items-center gap-2 px-5 py-2 text-sm bg-brand-teal text-white rounded-xl font-semibold disabled:opacity-60 hover:bg-brand-teal/90">
+              <button type="button" onClick={saveCorrections} disabled={busy || !hydrated} aria-busy={correctMarks.isPending} className={MODAL_BTN_PRIMARY}>
                 {correctMarks.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                Save Corrections
+                {correctMarks.isPending ? 'Saving…' : 'Save Corrections'}
               </button>
             ) : !readOnly ? (
-            <div className="flex gap-3">
-              <button onClick={saveDraft} disabled={enterMarks.isPending || !hydrated}
-                className="flex items-center gap-2 px-4 py-2 text-sm border border-base rounded-xl hover:bg-page disabled:opacity-60">
-                {enterMarks.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                Save Draft
-              </button>
-              <button type="button" onClick={requestFinalize} disabled={finalizeMarks.isPending || !hydrated}
-                className="flex items-center gap-2 px-5 py-2 text-sm bg-brand-navy text-white rounded-xl font-semibold disabled:opacity-60 hover:bg-brand-navy-mid">
-                {finalizeMarks.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Lock className="w-3.5 h-3.5" />}
-                Finalize Marks
-              </button>
-            </div>
+              <>
+                <button type="button" onClick={saveDraft} disabled={busy || !hydrated} aria-busy={enterMarks.isPending} className={MODAL_BTN_SECONDARY}>
+                  {enterMarks.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                  {enterMarks.isPending ? 'Saving draft…' : 'Save Draft'}
+                </button>
+                <button type="button" onClick={requestFinalize} disabled={busy || !hydrated} aria-busy={finalizeMarks.isPending} className={MODAL_BTN_PRIMARY}>
+                  {finalizeMarks.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Lock className="w-3.5 h-3.5" />}
+                  {finalizeMarks.isPending ? 'Finalizing…' : 'Finalize Marks'}
+                </button>
+              </>
             ) : null}
-          </div>
+          </>
+        }
+      >
+          {/* Result of the last action - persists after the toast fades. */}
+          {actionError && (
+            <p role="alert" className="mx-5 mt-4 flex items-start gap-2 text-xs text-tone-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden />
+              {actionError}
+            </p>
+          )}
+          {!actionError && draftSavedAt && !busy && !readOnly && !correctionMode && (
+            <p role="status" className="mx-5 mt-4 flex items-center gap-2 text-xs text-tone-teal">
+              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" aria-hidden />
+              Draft saved at {draftSavedAt.toLocaleTimeString('en-MW', { hour: '2-digit', minute: '2-digit' })}. You can close this and come back to finish later.
+            </p>
+          )}
+          {loading ? (
+            <div className="px-6 py-12 text-center text-sm text-muted animate-pulse">
+              Loading students and saved marks…
+            </div>
+          ) : (
+            <div className="table-scroll">
+            <table className="w-full text-sm border-collapse min-w-75">
+              <thead>
+                <tr className="border-b border-base bg-page">
+                  <th className="px-5 py-3 text-left font-heading text-xs text-muted">Student</th>
+                  <th className="px-5 py-3 text-left font-heading text-xs text-muted w-36">Mark (/{maxMark})</th>
+                  <th className="px-5 py-3 text-center font-heading text-xs text-muted w-24">Absent</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-base">
+                {students.map((student) => (
+                  <tr key={student.id} className={marks[student.id]?.absent ? 'text-muted italic' : ''}>
+                    <td className="px-5 py-3">
+                      <p className="font-medium text-body">{student.firstName} {student.lastName}</p>
+                      <p className="text-xs text-muted">{student.registrationNo}</p>
+                    </td>
+                    <td className="px-5 py-2">
+                      <input
+                        type="number" min={0} max={maxMark}
+                        value={marks[student.id]?.mark ?? ''}
+                        disabled={marks[student.id]?.absent || !editable}
+                        onChange={(e) => setMark(student.id, e.target.value)}
+                        aria-label={`Mark for ${student.firstName} ${student.lastName}`}
+                        className={`w-full border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal/25 ${
+                          errors[student.id] ? 'border-brand-coral bg-brand-coral/5' : 'border-base bg-page'
+                        } disabled:opacity-40`}
+                      />
+                      {errors[student.id] && (
+                        <p className="text-xs text-tone-coral mt-1 flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3" /> {errors[student.id]}
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-5 py-2 text-center">
+                      <input
+                        type="checkbox"
+                        className="accent-brand-amber w-4 h-4"
+                        checked={marks[student.id]?.absent ?? false}
+                        onChange={() => toggleAbsent(student.id)}
+                        disabled={!editable}
+                        aria-label={`Mark ${student.firstName} ${student.lastName} as absent`}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            </div>
+          )}
+      </Modal>
 
-          {/* R15 — confirmation before the irreversible finalize */}
-          <ConfirmDialog
-            open={confirmFinalizeOpen}
-            title="Finalize these marks?"
-            description={`Marks for all ${students.length} students will be submitted and the sheet locked against further entry. Corrections after this point require an administrator.`}
-            confirmLabel="Finalize Marks"
-            destructive
-            onConfirm={doFinalize}
-            onCancel={() => setConfirmFinalizeOpen(false)}
-          />
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+      {/* R15 — confirmation before the irreversible finalize */}
+        <ConfirmDialog
+          open={confirmFinalizeOpen}
+          title="Finalize these marks?"
+          description={`Marks for all ${students.length} students will be submitted and the sheet locked against further entry. Once confirmed, this exam can no longer be edited or deleted, and corrections need an exam officer.`}
+          confirmLabel="Finalize Marks"
+          confirming={finalizeMarks.isPending}
+          confirmingLabel="Finalizing…"
+          destructive
+          onConfirm={doFinalize}
+          onCancel={() => setConfirmFinalizeOpen(false)}
+        />
+    </>
   )
 }

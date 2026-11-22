@@ -28,6 +28,19 @@ const SENSITIVE_KEYS = new Set([
   'dateofbirth', 'dob', 'address', 'village', 'nationalid',
   'healthnote', 'medicalnote', 'welfarenote', 'registrationno',
   'password', 'token', 'authorization', 'cookie',
+  // Demographic fields (gap-analysis plan). Identity numbers and welfare data
+  // about children must never reach Sentry, including in request bodies.
+  'nrbnumber', 'tpin', 'traditionalauthority', 'guardianemail', 'guardianaddress',
+  'nextofkinname', 'nextofkinphone', 'nextofkinrelation',
+  'orphanstatus', 'vulnerabilitytags', 'supportneeds', 'supportneedtypes',
+  'supportnotes', 'specialneeds', 'disabilitytype', 'welfaredata',
+  'exitreason', 'exitnotes', 'exitnote',
+  'licencenumber', 'tcmlicencenumber', 'qualifications', 'qualificationlevel',
+  // Guardian portal: claim codes are single-use credentials, contact values are
+  // PII, and the parent API handles id tokens and passwords during claim.
+  'invitationcode', 'claimcode', 'secret', 'secrethash', 'otp',
+  'normalizedvalue', 'contactvalue', 'normalizedname', 'altphone',
+  'idtoken', 'newpassword', 'currentpassword',
 ])
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {

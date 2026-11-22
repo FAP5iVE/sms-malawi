@@ -1,124 +1,199 @@
 /**
  * apps/web/src/app/(auth)/reports/page.tsx
  *
- * [CHANGE TYPE]: MAJOR REWRITE (tab wiring + export affordance)
- * [R-PHASE]: R14 — Analytics & Reports Domain
- * [PURPOSE]: The page's chart panels are sound and are left alone. Four
- *   things were not:
+ * Reports for every role. The page owns the role → tab map and the viewing
+ * period; the tabs themselves live in two places:
  *
- *   1. Seven report hooks (useSchoolReport, useFinanceReport,
- *      useLibraryReport, useHRReport, useAcademicReport, useExamOfficerReport,
- *      useStudentReport) were fully built, backed by real routes, and had NO
- *      consumer anywhere in the app — only useAdminReport and useAuditLog were
- *      ever called. Each is now wired into a real Summary tab for the role
- *      whose route it serves, so every role's report actually reaches a screen.
+ *   - components/reports/panels/*  — the role reports backed by the
+ *     /reporting/<domain> endpoints (KPI strip, findings, attention queue,
+ *     charts and tables). Their numbers come from the same server services the
+ *     dashboards use, so a dashboard KPI and the report it links to agree.
+ *   - the panels below — the long-standing chart panels, kept where they still
+ *     show something the newer tabs do not.
  *
- *   2. `report.export` is the one permission granted to all nine roles, and it
- *      had no implementation at any layer — the page imported a `Download`
- *      icon and never rendered it. Every panel with tabular data now registers
- *      that data with an export context, and the header renders a real,
- *      permission-gated Download button that produces a genuine CSV via
- *      W/lib/csv.ts. Whether the button appears is decided by
- *      GET /analytics/capabilities — i.e. by ROLE_PERMISSIONS itself — not by
- *      a client-side role list that can drift from it.
- *
- *   3. analyticsService.getAcademicMarksDistribution() and
- *      getManebCandidateList() were likewise fully built, role-gated, and
- *      unreachable. Both are now wired into the academic and exam_officer tabs.
- *
- *   4. `const CURRENT_YEAR = '2025/2026'` was a hardcoded literal. It is now
- *      read from SystemSettings (current_academic_year / current_term, both
- *      isPublic) — the same source R14's routes default from, so the page and
- *      the API agree on what "now" is and the school does not silently keep
- *      reporting 2025/2026 forever after it rolls over.
- *
- *   Also corrects the budget-vs-actual chart's `dataKey="department"` to
- *   `"category"`: ApiBudgetVsActualRow's key field is the ExpenseCategory join
- *   key, not the free-text department that never matched an expense (R14,
- *   analyticsService.ts + schema.prisma).
- * [DEPENDS ON]: W/hooks/useAnalytics.ts, W/hooks/useReports.ts, W/lib/csv.ts,
- *   W/hooks/useSettings.ts
+ * The active tab is the `?tab=` URL parameter, which is what dashboard KPIs
+ * link to (see reportLink). Export (CSV / Excel / PDF report pack) is
+ * registered per panel through useExportable and offered by ExportToolbar,
+ * which is shown only to roles holding `report.export`. Year and term come from
+ * the app-wide viewing period (SystemSettings), never from literals.
  */
 'use client'
-import {
-  useState, useEffect, useRef, useMemo, useCallback, useContext, createContext,
-} from 'react'
-import { RoleGuard }         from '@/components/shared/RoleGuard'
+import { Suspense, useState, useCallback, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
+import { RoleGuard } from '@/components/shared/RoleGuard'
+import type { UserRole } from '@shared/types/roles'
+import { SPONSOR_TYPE_LABELS } from '@shared/constants/malawi'
+import { SuperUserRoleSwitcher } from '@/components/shared/SuperUserRoleSwitcher'
+import { ModuleSurface } from '@/components/shared/ModuleSurface'
+import { FlatSurface, useFlatSurface } from '@/components/shared/FlatSurface'
 import { PlacementAnalyticsPanel } from '@/components/placements/PlacementAnalyticsPanel'
-import { chartColorAt } from '@/lib/chartPalette'
-import { useAuthStore }      from '@/store/authStore'
-import { usePublicSettings } from '@/hooks/useSettings'
-import { SETTING_KEYS }      from '@shared/types/settings'
-import { downloadCsv, csvFilename } from '@/lib/csv'
-import type { CsvColumn }    from '@/lib/csv'
+import { AdminSessionsPanel } from '@/components/reports/AdminSessionsPanel'
+import { ExecutiveOverviewTab, RetentionPanel } from '@/components/reports/panels/ExecutivePanels'
 import {
-  useAdminLoginTrend, useAdminActivityHeatmap, useAdminEntityActivity,
-  useAdminActionBreakdown, useAdminAuditVolumeTrend,
+  FinanceOverviewTab,
+  FinanceAgingTab,
+  FinancePaymentsTab,
+} from '@/components/reports/panels/FinancePanels'
+import { AssetsTab, InventoryTab, ProcurementTab, StocktakeTab } from '@/components/reports/panels/OperationsPanels'
+import {
+  HrOverviewTab,
+  HrWorkforceTab,
+  HrLeaveTab,
+  HrContractsTab,
+  HrTeachingTab,
+  HrLoansTab,
+  HrReviewsTab,
+} from '@/components/reports/panels/HrPanels'
+import { ExamWorkflowTab, ManebStatusCard, MarkCompletionTab } from '@/components/reports/panels/ExamPanels'
+import { AnalyticsPanel } from '@/components/exams/AnalyticsPanel'
+import {
+  LibraryOverviewSection,
+  LibraryCirculationTab,
+  LibraryFinesTab,
+  LibraryDigitalTab,
+  LibraryStockTab,
+} from '@/components/reports/panels/LibraryPanels'
+import { AttendanceReportTab } from '@/components/reports/panels/AttendancePanels'
+import { AdmissionsTab, EnrollmentTab } from '@/components/reports/panels/AdmissionsPanels'
+import {
+  AcademicTeachingTab,
+  AcademicAssignmentsTab,
+  AcademicStudentsTab,
+  AcademicReadinessTab,
+} from '@/components/reports/panels/AcademicPanels'
+import {
+  AdminOverviewSection,
+  AdminSecurityTab,
+  AdminSessionsReportTab,
+  AdminGovernanceTab,
+  AdminAdoptionTab,
+  AdminOperationsTab,
+} from '@/components/reports/panels/AdminPanels'
+import {
+  StudentOverviewTab,
+  StudentProgressTab,
+  StudentAssignmentsTab,
+  StudentLibraryTab,
+  StudentAttendanceTab,
+  StudentFeesTab,
+  StudentPlacementTab,
+} from '@/components/reports/panels/StudentPanels'
+import { useResizableColumns } from '@/hooks/useResizableColumns'
+import { CopyableId } from '@/components/shared/CopyableId'
+import { chartColorAt } from '@/lib/chartPalette'
+import { useAuthStore } from '@/store/authStore'
+import { useViewingPeriod } from '@/hooks/useViewingPeriod'
+import { ReportExportProvider, ExportToolbar, useExportable } from '@/components/reports/ui/ReportExport'
+import { useReportParam } from '@/components/reports/ui/useReportParams'
+import {
+  useAdminActivityHeatmap,
+  useAdminEntityActivity,
+  useAdminActionBreakdown,
+  useAdminAuditVolumeTrend,
 } from '@/hooks/useAnalytics'
 import {
-  useSchoolPerformanceTrend, useClassComparison, useSubjectComparison,
-  useTeacherEffectiveness, useEnrollmentTrend, useHighRankFinancialSummary,
+  useSchoolPerformanceTrend,
+  useClassComparison,
+  useSubjectComparison,
+  useTeacherEffectiveness,
+  useEnrollmentTrend,
+  useHighRankFinancialSummary,
   useAttendanceSummary,
 } from '@/hooks/useAnalytics'
 import {
-  useFinanceCollectionByDay, useFinanceCollectionByMonth,
-  useFinanceOutstandingByClass, useFinanceExpenseBreakdown,
-  useFinanceBudgetVsActual, useFinanceCashFlow, useFinancePayrollTrend,
+  useFinanceCollectionByDay,
+  useFinanceCollectionByMonth,
+  useFinanceOutstandingByClass,
+  useFinanceExpenseBreakdown,
+  useFinanceBudgetVsActual,
+  useFinanceCashFlow,
+  useFinancePayrollTrend,
   useScholarshipSummary,
 } from '@/hooks/useAnalytics'
 import {
-  useLibraryBorrowingTrend, useLibraryInventoryHealth,
-  useLibraryTopBorrowed, useLibraryDigitalStats,
+  useLibraryBorrowingTrend,
+  useLibraryInventoryHealth,
+  useLibraryTopBorrowed,
 } from '@/hooks/useAnalytics'
+import { useApplicationsFunnel } from '@/hooks/useAnalytics'
+import { useAcademicSubjectPerformance, useAcademicMarksDistribution } from '@/hooks/useAnalytics'
+import { useManebSchoolStats, useManebCandidates } from '@/hooks/useAnalytics'
+import { useHRStaffByDepartment } from '@/hooks/useAnalytics'
 import {
-  useApplicationsFunnel, useApplicationTrend, useEnrollmentByForm,
-} from '@/hooks/useAnalytics'
-import {
-  useAcademicSubjectPerformance, useAcademicAssignmentCompletion,
-  useAcademicMarksDistribution,
-} from '@/hooks/useAnalytics'
-import {
-  useStudentPerformanceTrend, useStudentSubjectBreakdown, useStudentFeeStatement,
-  useOwnAttendance,
-} from '@/hooks/useAnalytics'
-import {
-  useManebSchoolStats, useManebCandidates,
-} from '@/hooks/useAnalytics'
-import {
-  useHRStaffByDepartment, useHRLeaveByType, useHRLeaveTrend,
-} from '@/hooks/useAnalytics'
-import { useReportCapabilities } from '@/hooks/useAnalytics'
-import {
-  useAdminReport, useAuditLog,
-  useSchoolReport, useFinanceReport, useLibraryReport, useHRReport,
-  useAcademicReport, useExamOfficerReport, useStudentReport,
+  useAdminReport,
+  useAuditLog,
+  useSchoolReport,
+  useFinanceReport,
+  useAcademicReport,
+  useStudentReport,
 } from '@/hooks/useReports'
 import {
-  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
-  LineChart, Line, AreaChart, Area, PieChart, Pie, Cell, Legend,
-  ComposedChart, ReferenceLine,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  LineChart,
+  Line,
+  AreaChart,
+  Area,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+  ComposedChart,
+  LabelList,
 } from 'recharts'
 import type { PieLabelRenderProps } from 'recharts'
 import {
-  TrendingUp, BookOpen, Users, DollarSign, ShieldCheck,
-  BarChart2, FileText, GraduationCap, Activity, AlertTriangle,
-  ArrowUpRight, ArrowDownRight, Download,
+  BAR_LABEL_PROPS,
+  HBAR_LABEL_PROPS,
+  chartKey,
+  fixedKey,
+  truncateLabel,
+  valueFormatter,
+} from '@/components/shared/chart/chartLabels'
+import {
+  TrendingUp,
+  BookOpen,
+  Users,
+  DollarSign,
+  ShieldCheck,
+  BarChart2,
+  FileText,
+  GraduationCap,
+  Activity,
+  AlertTriangle,
+  ArrowUpRight,
+  ArrowDownRight,
+  ChevronLeft,
+  ChevronRight,
+  Wifi,
+  Trophy,
 } from 'lucide-react'
 import type {
-  ApiLoginTrendPoint, ApiCategoryBreakdown, ApiClassPerformanceStat,
-  ApiTeacherEffectivenessRow, ApiEnrollmentTrendPoint,
-  ApiApplicationFunnelStage, ApiTopBorrowedBook,
-  ApiStudentPerformancePoint, ApiStudentSubjectScore, ApiStudentFeeStatement,
-  ApiManebSchoolStat, ApiCashFlowRow, ApiBudgetVsActualRow,
-  ApiAssignmentCompletionRow, ApiTimeSeriesPoint,
-  ApiAttendanceSummaryRow, ApiScholarshipSummaryRow, ApiMarksDistributionBucket,
+  ApiCategoryBreakdown,
+  ApiClassPerformanceStat,
+  ApiTeacherEffectivenessRow,
+  ApiEnrollmentTrendPoint,
+  ApiTopBorrowedBook,
+  ApiManebSchoolStat,
+  ApiCashFlowRow,
+  ApiBudgetVsActualRow,
+  ApiTimeSeriesPoint,
+  ApiScholarshipSummaryRow,
+  ApiMarksDistributionBucket,
   ApiAcademicSubjectPerformanceRow,
-  ApiSchoolPerformanceTrendPoint, ApiOutstandingByClassRow,
-  ApiManebResultSummary, ApiAcademicClassSummary, ApiAuditLogEntry,
+  ApiSchoolPerformanceTrendPoint,
+  ApiOutstandingByClassRow,
+  ApiManebResultSummary,
+  ApiAcademicClassSummary,
+  ApiAuditLogEntry,
 } from '@shared/types/api'
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
-
 
 /**
  * [R14] Recharts hands a Tooltip formatter / Pie label its value as its own
@@ -157,192 +232,175 @@ function recentAcademicYears(currentYear: string, yearsBack: number): string[] {
   return years
 }
 
-// ─── EXPORT CONTEXT (R14 — report.export) ────────────────────────────────────
+const I = {
+  trend: <TrendingUp className="w-4 h-4" />,
+  chart: <BarChart2 className="w-4 h-4" />,
+  users: <Users className="w-4 h-4" />,
+  grad: <GraduationCap className="w-4 h-4" />,
+  activity: <Activity className="w-4 h-4" />,
+  money: <DollarSign className="w-4 h-4" />,
+  doc: <FileText className="w-4 h-4" />,
+  alert: <AlertTriangle className="w-4 h-4" />,
+  book: <BookOpen className="w-4 h-4" />,
+  shield: <ShieldCheck className="w-4 h-4" />,
+  wifi: <Wifi className="w-4 h-4" />,
+}
 
 /**
- * What the currently-visible panel offers for export.
- *
- * The Download button lives in the page header, but only the active panel
- * knows what rows it is actually showing — so panels register their table here
- * and the header renders a button that exports precisely what the user is
- * looking at, rather than some fixed guess at what the tab "probably" holds.
- *
- * `download` is a closure rather than raw rows + columns so each panel keeps
- * its own row type: type erasure happens at the boundary, not inside the panel.
+ * Tab ids double as deep-link targets: dashboards link to `/reports?tab=<id>`
+ * (see reportLink), so renaming an id here means updating the dashboards.
  */
-interface ExportRegistration {
-  label: string
-  hasRows: boolean
-  download: () => boolean
-}
-
-interface ExportContextValue {
-  registration: ExportRegistration | null
-  register: (registration: ExportRegistration) => void
-  clear: () => void
-}
-
-const ExportContext = createContext<ExportContextValue>({
-  registration: null,
-  register: () => undefined,
-  clear: () => undefined,
-})
-
-/**
- * Registers the calling panel's table as the page's current export target.
- *
- * `columns` are held in a ref rather than an effect dependency on purpose:
- * panels declare them inline, so a fresh array identity arrives on every
- * render and depending on it would re-register (and therefore setState) every
- * render — an infinite loop. `rows` comes from TanStack Query and IS reference
- * -stable between renders, so it is a real dependency.
- */
-function useExportable<T>(
-  label: string,
-  rows: readonly T[] | undefined,
-  columns: readonly CsvColumn<T>[],
-): void {
-  const { register, clear } = useContext(ExportContext)
-
-  const columnsRef = useRef(columns)
-  const rowsRef = useRef(rows)
-
-  // Refs are mirrors of the latest `columns`/`rows`, kept fresh for the
-  // `download` closure below without making either a dependency of the
-  // registration effect (see the two comments above for why: unstable
-  // `columns` identity and — deliberately, for symmetry — `rows` too).
-  // Mutating a ref must happen outside render, so this assignment lives in
-  // its own effect (no dependency array — it intentionally runs after every
-  // render) rather than directly in the function body.
-  useEffect(() => {
-    columnsRef.current = columns
-    rowsRef.current = rows
-  })
-
-  const hasRows = (rows?.length ?? 0) > 0
-
-  useEffect(() => {
-    register({
-      label,
-      hasRows,
-      download: () => downloadCsv(csvFilename(label), rowsRef.current ?? [], columnsRef.current),
-    })
-    return clear
-  }, [register, clear, label, hasRows])
-}
-
-/** The header's Download button — rendered only when the caller actually holds
- *  report.export, as reported by the permission matrix itself. */
-function ExportButton() {
-  const { registration } = useContext(ExportContext)
-  const { data: capabilities } = useReportCapabilities()
-  const [message, setMessage] = useState<string | null>(null)
-
-  if (!capabilities?.canExport) return null
-
-  const disabled = !registration?.hasRows
-
-  return (
-    <div className="flex flex-col items-end gap-1">
-      <button
-        type="button"
-        onClick={() => {
-          if (!registration) return
-          setMessage(registration.download() ? null : 'Nothing to export on this tab.')
-        }}
-        disabled={disabled}
-        title={disabled ? 'This tab has no exportable data yet' : `Export ${registration?.label} as CSV`}
-        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium border border-base bg-surface text-brand-navy transition-colors hover:bg-base disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
-      >
-        <Download className="w-4 h-4" />
-        Export CSV
-      </button>
-      {message && <p role="alert" className="text-xs text-brand-coral">{message}</p>}
-    </div>
-  )
-}
-
 const ROLE_TABS: Record<string, { id: string; label: string; icon: React.ReactNode }[]> = {
   admin: [
-    { id: 'overview',  label: 'Overview',    icon: <Activity className="w-4 h-4" /> },
-    { id: 'security',  label: 'Security',    icon: <ShieldCheck className="w-4 h-4" /> },
-    { id: 'audit',     label: 'Audit Log',   icon: <FileText className="w-4 h-4" /> },
+    { id: 'overview', label: 'Overview', icon: I.activity },
+    { id: 'security', label: 'Security', icon: I.shield },
+    { id: 'sessions', label: 'Sessions', icon: I.wifi },
+    { id: 'governance', label: 'Governance', icon: I.doc },
+    { id: 'adoption', label: 'Adoption', icon: I.users },
+    { id: 'operations', label: 'Operations', icon: I.alert },
+    { id: 'assets', label: 'Assets', icon: I.chart },
+    { id: 'inventory', label: 'Inventory', icon: I.chart },
+    { id: 'audit', label: 'Audit Log', icon: I.doc },
   ],
   high_rank: [
-    { id: 'performance', label: 'Performance',   icon: <TrendingUp className="w-4 h-4" /> },
-    { id: 'classes',     label: 'Classes',       icon: <BarChart2 className="w-4 h-4" /> },
-    { id: 'teachers',    label: 'Teachers',      icon: <Users className="w-4 h-4" /> },
-    { id: 'enrollment',  label: 'Enrollment',    icon: <GraduationCap className="w-4 h-4" /> },
-    { id: 'attendance',  label: 'Attendance',    icon: <Activity className="w-4 h-4" /> },
-    { id: 'finance',     label: 'Finance',       icon: <DollarSign className="w-4 h-4" /> },
-    { id: 'placements',  label: 'Placements',    icon: <GraduationCap className="w-4 h-4" /> },
-    { id: 'summary',     label: 'Summary',       icon: <FileText className="w-4 h-4" /> },
+    { id: 'overview', label: 'Overview', icon: I.activity },
+    { id: 'performance', label: 'Performance', icon: I.trend },
+    { id: 'classes', label: 'Classes', icon: I.chart },
+    { id: 'teachers', label: 'Teachers', icon: I.users },
+    { id: 'enrollment', label: 'Enrollment', icon: I.grad },
+    { id: 'admissions', label: 'Admissions', icon: I.doc },
+    { id: 'attendance', label: 'Attendance', icon: I.activity },
+    { id: 'completion', label: 'Exams', icon: I.doc },
+    { id: 'finance', label: 'Finance', icon: I.money },
+    { id: 'aging', label: 'Receivables', icon: I.alert },
+    { id: 'procurement', label: 'Procurement', icon: I.doc },
+    { id: 'stocktake', label: 'Stocktakes', icon: I.chart },
+    { id: 'assets', label: 'Assets', icon: I.chart },
+    { id: 'inventory', label: 'Inventory', icon: I.chart },
+    { id: 'workforce', label: 'HR', icon: I.users },
+    { id: 'leave', label: 'Leave', icon: I.activity },
+    { id: 'contracts', label: 'Contracts', icon: I.alert },
+    { id: 'teaching', label: 'Teaching', icon: I.users },
+    { id: 'circulation', label: 'Library', icon: I.book },
+    { id: 'placements', label: 'Placements', icon: I.grad },
+    { id: 'governance', label: 'Governance', icon: I.shield },
+    { id: 'summary', label: 'Summary', icon: I.doc },
   ],
   finance: [
-    { id: 'collection', label: 'Fee Collection', icon: <TrendingUp className="w-4 h-4" /> },
-    { id: 'outstanding', label: 'Outstanding',   icon: <AlertTriangle className="w-4 h-4" /> },
-    { id: 'expenses',   label: 'Expenses',       icon: <BarChart2 className="w-4 h-4" /> },
-    { id: 'cashflow',   label: 'Cash Flow',      icon: <Activity className="w-4 h-4" /> },
-    { id: 'payroll',    label: 'Payroll',        icon: <DollarSign className="w-4 h-4" /> },
-    { id: 'scholarships', label: 'Scholarships', icon: <GraduationCap className="w-4 h-4" /> },
-    { id: 'summary',    label: 'Summary',        icon: <FileText className="w-4 h-4" /> },
+    { id: 'overview', label: 'Overview', icon: I.activity },
+    { id: 'collection', label: 'Fee Collection', icon: I.trend },
+    { id: 'outstanding', label: 'Outstanding', icon: I.alert },
+    { id: 'aging', label: 'Aging', icon: I.alert },
+    { id: 'payments', label: 'Payments', icon: I.money },
+    { id: 'expenses', label: 'Expenses', icon: I.chart },
+    { id: 'cashflow', label: 'Cash flow', icon: I.activity },
+    { id: 'payroll', label: 'Payroll', icon: I.money },
+    { id: 'scholarships', label: 'Scholarships', icon: I.grad },
+    { id: 'procurement', label: 'Procurement', icon: I.doc },
+    { id: 'stocktake', label: 'Stocktakes', icon: I.chart },
+    { id: 'assets', label: 'Assets', icon: I.chart },
+    { id: 'inventory', label: 'Inventory', icon: I.chart },
+    { id: 'summary', label: 'Summary', icon: I.doc },
   ],
   library: [
-    { id: 'overview',  label: 'Overview',     icon: <BookOpen className="w-4 h-4" /> },
-    { id: 'borrowing', label: 'Borrowing',    icon: <TrendingUp className="w-4 h-4" /> },
-    { id: 'digital',   label: 'Digital',      icon: <FileText className="w-4 h-4" /> },
-    { id: 'summary',   label: 'Summary',      icon: <Activity className="w-4 h-4" /> },
+    { id: 'overview', label: 'Overview', icon: I.book },
+    { id: 'circulation', label: 'Circulation', icon: I.activity },
+    { id: 'borrowing', label: 'Borrowing', icon: I.trend },
+    { id: 'fines', label: 'Fines', icon: I.money },
+    { id: 'digital', label: 'Digital', icon: I.doc },
+    { id: 'stock', label: 'Physical stock', icon: I.book },
   ],
   lower_rank: [
-    { id: 'applications', label: 'Applications', icon: <FileText className="w-4 h-4" /> },
-    { id: 'enrollment',   label: 'Enrollment',   icon: <Users className="w-4 h-4" /> },
-    { id: 'attendance',   label: 'Attendance',   icon: <Activity className="w-4 h-4" /> },
+    { id: 'admissions', label: 'Admissions', icon: I.doc },
+    { id: 'enrollment', label: 'Enrollment', icon: I.users },
+    { id: 'attendance', label: 'Attendance', icon: I.activity },
   ],
   academic: [
-    { id: 'subjects',     label: 'Subjects',     icon: <BarChart2 className="w-4 h-4" /> },
-    { id: 'assignments',  label: 'Assignments',  icon: <FileText className="w-4 h-4" /> },
-    { id: 'marks',        label: 'Marks',        icon: <Activity className="w-4 h-4" /> },
-    { id: 'attendance',   label: 'Attendance',   icon: <Users className="w-4 h-4" /> },
-    { id: 'summary',      label: 'My Classes',   icon: <GraduationCap className="w-4 h-4" /> },
+    { id: 'teaching', label: 'Teaching', icon: I.chart },
+    { id: 'assignments', label: 'Assignments', icon: I.doc },
+    { id: 'marks', label: 'Marks', icon: I.activity },
+    { id: 'students', label: 'Students', icon: I.alert },
+    { id: 'readiness', label: 'Exam readiness', icon: I.grad },
+    { id: 'attendance', label: 'Attendance', icon: I.users },
+    { id: 'summary', label: 'My Classes', icon: I.grad },
   ],
   exam_officer: [
-    { id: 'maneb',        label: 'MANEB',        icon: <GraduationCap className="w-4 h-4" /> },
-    { id: 'candidates',   label: 'Candidates',   icon: <Users className="w-4 h-4" /> },
-    { id: 'subjects',     label: 'Subjects',     icon: <BarChart2 className="w-4 h-4" /> },
-    { id: 'marks',        label: 'Marks',        icon: <Activity className="w-4 h-4" /> },
-    { id: 'placements',   label: 'Placements',   icon: <GraduationCap className="w-4 h-4" /> },
-    { id: 'summary',      label: 'Summary',      icon: <FileText className="w-4 h-4" /> },
+    { id: 'completion', label: 'Mark completion', icon: I.activity },
+    { id: 'pipeline', label: 'Workflow', icon: I.trend },
+    { id: 'maneb', label: 'MANEB', icon: I.grad },
+    { id: 'candidates', label: 'Candidates', icon: I.users },
+    { id: 'subjects', label: 'Subjects', icon: I.chart },
+    { id: 'marks', label: 'Marks', icon: I.activity },
+    { id: 'placements', label: 'Placements', icon: I.grad },
   ],
   hr: [
-    { id: 'staffing',  label: 'Staffing',     icon: <Users className="w-4 h-4" /> },
-    { id: 'leave',     label: 'Leave',        icon: <Activity className="w-4 h-4" /> },
-    { id: 'summary',   label: 'Summary',      icon: <FileText className="w-4 h-4" /> },
+    { id: 'overview', label: 'Overview', icon: I.activity },
+    { id: 'workforce', label: 'Workforce', icon: I.users },
+    { id: 'leave', label: 'Leave', icon: I.activity },
+    { id: 'contracts', label: 'Contracts', icon: I.alert },
+    { id: 'teaching', label: 'Teaching', icon: I.users },
+    { id: 'loans', label: 'Staff loans', icon: I.money },
+    { id: 'reviews', label: 'Reviews', icon: I.doc },
   ],
   student: [
-    { id: 'performance', label: 'Performance', icon: <TrendingUp className="w-4 h-4" /> },
-    { id: 'subjects',    label: 'Subjects',    icon: <BarChart2 className="w-4 h-4" /> },
-    { id: 'attendance',  label: 'Attendance',  icon: <Activity className="w-4 h-4" /> },
-    { id: 'fees',        label: 'Fees',        icon: <DollarSign className="w-4 h-4" /> },
-    { id: 'summary',     label: 'Results',     icon: <FileText className="w-4 h-4" /> },
+    { id: 'overview', label: 'Overview', icon: I.activity },
+    { id: 'progress', label: 'Progress', icon: I.trend },
+    { id: 'assignments', label: 'Assignments', icon: I.doc },
+    { id: 'attendance', label: 'Attendance', icon: I.activity },
+    { id: 'library', label: 'Library', icon: I.book },
+    { id: 'fees', label: 'Fees', icon: I.money },
+    { id: 'summary', label: 'Results', icon: I.doc },
+    { id: 'placement', label: 'Placement', icon: I.grad },
   ],
+}
+
+/**
+ * Deep links written for a role's own report (e.g. the finance reports' `outstanding`
+ * or the HR reports' `loans`) that leadership sees inside a wider tab.
+ */
+const TAB_ALIASES: Record<string, Record<string, string>> = {
+  high_rank: {
+    collection: 'finance',
+    outstanding: 'aging',
+    expenses: 'finance',
+    payments: 'finance',
+    loans: 'workforce',
+    reviews: 'workforce',
+    fines: 'circulation',
+    library: 'circulation',
+    stock: 'circulation',
+    digital: 'circulation',
+    pipeline: 'completion',
+  },
 }
 
 // ─── SHARED UI COMPONENTS ────────────────────────────────────────────────────
 
 function KpiCard({
-  label, value, sub, trend, warn = false,
+  label,
+  value,
+  sub,
+  trend,
+  warn = false,
 }: {
-  label: string; value: string | number; sub?: string
-  trend?: 'up' | 'down' | null; warn?: boolean
+  label: string
+  value: string | number
+  sub?: string
+  trend?: 'up' | 'down' | null
+  warn?: boolean
 }) {
   return (
-    <div className={`bg-surface border rounded-2xl p-5 flex flex-col gap-1 ${warn ? 'border-brand-coral/40' : 'border-base'}`}>
-      <p className="text-xs font-medium text-muted uppercase tracking-wide">{label}</p>
-      <p className={`text-2xl font-bold font-heading ${warn ? 'text-brand-coral' : 'text-brand-navy'}`}>{value}</p>
+    <div className="app-tint rounded-xl p-5 flex flex-col gap-1">
+      <p className="text-xs font-medium text-muted">{label}</p>
+      <p
+        className={`text-2xl font-bold font-heading ${warn ? 'text-tone-coral' : 'text-brand-navy'}`}
+      >
+        {value}
+      </p>
       {(sub || trend) && (
         <div className="flex items-center gap-1 mt-0.5">
-          {trend === 'up'   && <ArrowUpRight   className="w-3.5 h-3.5 text-brand-teal" />}
-          {trend === 'down' && <ArrowDownRight className="w-3.5 h-3.5 text-brand-coral" />}
+          {trend === 'up' && <ArrowUpRight className="w-3.5 h-3.5 text-tone-teal" />}
+          {trend === 'down' && <ArrowDownRight className="w-3.5 h-3.5 text-tone-coral" />}
           {sub && <span className="text-xs text-muted">{sub}</span>}
         </div>
       )}
@@ -350,9 +408,19 @@ function KpiCard({
   )
 }
 
-function ChartCard({ title, children, className = '' }: { title: string; children: React.ReactNode; className?: string }) {
+function ChartCard({
+  title,
+  children,
+  className = '',
+}: {
+  title: string
+  children: React.ReactNode
+  className?: string
+}) {
+  // Reports sit on the ModuleSurface panel (see <FlatSurface> below): section heading + content, no second card.
+  const flat = useFlatSurface()
   return (
-    <div className={`bg-surface border border-base rounded-2xl p-5 ${className}`}>
+    <div className={`${flat ? '' : 'bg-surface border border-base rounded-2xl p-5'} ${className}`}>
       <h3 className="font-heading font-semibold text-brand-navy text-sm mb-4">{title}</h3>
       {children}
     </div>
@@ -362,15 +430,16 @@ function ChartCard({ title, children, className = '' }: { title: string; childre
 function SectionHeader({ title, icon }: { title: string; icon: React.ReactNode }) {
   return (
     <div className="flex items-center gap-2 mb-1">
-      <span className="text-brand-teal">{icon}</span>
+      <span className="text-tone-teal">{icon}</span>
       <h2 className="font-heading font-bold text-brand-navy text-base">{title}</h2>
     </div>
   )
 }
 
 function SkeletonChart() {
+  const flat = useFlatSurface()
   return (
-    <div className="bg-surface border border-base rounded-2xl p-5 animate-pulse">
+    <div className={`${flat ? '' : 'bg-surface border border-base rounded-2xl p-5'} animate-pulse`}>
       <div className="h-4 w-40 bg-base rounded mb-4" />
       <div className="h-40 bg-base rounded" />
     </div>
@@ -387,13 +456,21 @@ function EmptyState({ message = 'No data available' }: { message?: string }) {
 }
 
 function RoleTabs({
-  role, active, onChange,
+  role,
+  active,
+  onChange,
 }: {
-  role: string; active: string; onChange: (id: string) => void
+  role: string
+  active: string
+  onChange: (id: string) => void
 }) {
   const tabs = ROLE_TABS[role] ?? []
   return (
-    <div role="tablist" aria-label="Report sections" className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide">
+    <div
+      role="tablist"
+      aria-label="Report sections"
+      className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide"
+    >
       {tabs.map((t) => (
         <button
           key={t.id}
@@ -403,7 +480,7 @@ function RoleTabs({
           onClick={() => onChange(t.id)}
           className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-colors ${
             active === t.id
-              ? 'bg-brand-navy text-white'
+              ? 'bg-brand-deep text-white'
               : 'text-muted hover:bg-base hover:text-brand-navy'
           }`}
         >
@@ -420,51 +497,89 @@ function RoleTabs({
 function AdminOverviewPanel() {
   const { data: volumeRaw, isLoading: vLoading } = useAdminAuditVolumeTrend(30)
   const { data: entityRaw, isLoading: eLoading } = useAdminEntityActivity(30)
-  const { data: adminBase }                       = useAdminReport()
-  const volume  = volumeRaw  as ApiTimeSeriesPoint[]        | undefined
-  const entity  = entityRaw  as ApiCategoryBreakdown[]      | undefined
-  const base    = adminBase  as { totalStudents: number; activeStudents: number; totalStaff: number; totalInvoices: number; paidInvoices: number; totalExams: number } | undefined
+  const { data: adminBase } = useAdminReport()
+  const volume = volumeRaw as ApiTimeSeriesPoint[] | undefined
+  const entity = entityRaw as ApiCategoryBreakdown[] | undefined
+  const base = adminBase as
+    | {
+        totalStudents: number
+        activeStudents: number
+        totalStaff: number
+        totalInvoices: number
+        paidInvoices: number
+        totalExams: number
+      }
+    | undefined
 
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <KpiCard label="Total Students"  value={base?.totalStudents  ?? '—'} />
-        <KpiCard label="Active Students" value={base?.activeStudents ?? '—'} trend="up" />
-        <KpiCard label="Active Staff"    value={base?.totalStaff     ?? '—'} />
-        <KpiCard label="Total Invoices"  value={base?.totalInvoices  ?? '—'} />
-        <KpiCard label="Paid Invoices"   value={base?.paidInvoices   ?? '—'} trend="up" />
-        <KpiCard label="Total Exams"     value={base?.totalExams     ?? '—'} />
+        <KpiCard label="Total students" value={base?.totalStudents ?? '-'} />
+        <KpiCard label="Active students" value={base?.activeStudents ?? '-'} trend="up" />
+        <KpiCard label="Active staff" value={base?.totalStaff ?? '-'} />
+        <KpiCard label="Total invoices" value={base?.totalInvoices ?? '-'} />
+        <KpiCard label="Paid invoices" value={base?.paidInvoices ?? '-'} trend="up" />
+        <KpiCard label="Total exams" value={base?.totalExams ?? '-'} />
       </div>
 
-      {vLoading ? <SkeletonChart /> : (
-        <ChartCard title="System Write Activity — Last 30 Days">
+      {vLoading ? (
+        <SkeletonChart />
+      ) : (
+        <ChartCard title="System write activity: Last 30 days">
           <ResponsiveContainer width="100%" height={180}>
             <AreaChart data={volume ?? []}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-              <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-              <YAxis tick={{ fontSize: 10 }} />
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
+              />
+              <YAxis tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
               <Tooltip contentStyle={{ fontSize: 12 }} />
-              <Area type="monotone" dataKey="value" stroke={chartColorAt(0)} fill={chartColorAt(0)} fillOpacity={0.08} strokeWidth={2} name="Actions" />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Area
+                type="monotone"
+                dataKey="value"
+                stroke={chartColorAt(0)}
+                fill={chartColorAt(0)}
+                fillOpacity={0.08}
+                strokeWidth={2}
+                name="Actions"
+              />
             </AreaChart>
           </ResponsiveContainer>
         </ChartCard>
       )}
 
-      {eLoading ? <SkeletonChart /> : (
+      {eLoading ? (
+        <SkeletonChart />
+      ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <ChartCard title="Activity by Entity Type">
+          <ChartCard title="Activity by entity type">
             {entity && entity.length > 0 ? (
               <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={entity} layout="vertical">
-                  <XAxis type="number" tick={{ fontSize: 10 }} />
-                  <YAxis type="category" dataKey="category" tick={{ fontSize: 10 }} width={100} />
+                <BarChart data={entity} layout="vertical" margin={{ top: 4, right: 48, left: 0, bottom: 0 }}>
+                  <XAxis
+                    type="number"
+                    tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
+                  />
+                  <YAxis
+                    type="category" interval={0}
+                    dataKey="category"
+                    tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
+                    width={100}
+                  />
                   <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [num(v), 'Actions']} />
-                  <Bar dataKey="value" fill={chartColorAt(1)} radius={[0, 4, 4, 0]} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar dataKey="value" fill={chartColorAt(1)} radius={[0, 4, 4, 0]} name="Actions">
+                    <LabelList dataKey="value" {...HBAR_LABEL_PROPS} formatter={valueFormatter('number')} />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
-            ) : <EmptyState />}
+            ) : (
+              <EmptyState />
+            )}
           </ChartCard>
-          <ChartCard title="Top Action Types">
+          <ChartCard title="Top action types">
             <AdminActionBreakdownChart />
           </ChartCard>
         </div>
@@ -480,71 +595,42 @@ function AdminActionBreakdownChart() {
   if (!data?.length) return <EmptyState />
   return (
     <ResponsiveContainer width="100%" height={200}>
-      <BarChart data={data.slice(0, 8)} layout="vertical">
-        <XAxis type="number" tick={{ fontSize: 10 }} />
-        <YAxis type="category" dataKey="category" tick={{ fontSize: 10 }} width={130} />
+      <BarChart data={data.slice(0, 8)} layout="vertical" margin={{ top: 4, right: 48, left: 0, bottom: 0 }}>
+        <XAxis type="number" tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
+        <YAxis
+          type="category" interval={0}
+          dataKey="category"
+          tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
+          width={130}
+        />
         <Tooltip contentStyle={{ fontSize: 12 }} />
-        <Bar dataKey="value" fill={chartColorAt(2)} radius={[0, 4, 4, 0]} />
+        <Legend wrapperStyle={{ fontSize: 11 }} />
+        <Bar dataKey="value" fill={chartColorAt(2)} radius={[0, 4, 4, 0]} name="Actions">
+          <LabelList dataKey="value" {...HBAR_LABEL_PROPS} formatter={valueFormatter('number')} />
+        </Bar>
       </BarChart>
     </ResponsiveContainer>
   )
 }
-
-function AdminSecurityPanel() {
-  const { data: raw, isLoading } = useAdminLoginTrend(30)
-  const data = raw as ApiLoginTrendPoint[] | undefined
-  const successful = data?.reduce((s, d) => s + d.successful, 0) ?? 0
-  const failed     = data?.reduce((s, d) => s + d.failed,     0) ?? 0
-  const failRate   = successful + failed > 0 ? Math.round((failed / (successful + failed)) * 100) : 0
-
-  return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <KpiCard label="Successful Logins"  value={successful} trend="up" />
-        <KpiCard label="Failed Logins"      value={failed}     warn={failed > 10} />
-        <KpiCard label="Failure Rate"       value={`${failRate}%`} warn={failRate > 5} />
-        <KpiCard label="Period"             value="30 days" />
-      </div>
-      {isLoading ? <SkeletonChart /> : (
-        <ChartCard title="Login Success vs Failure — Last 30 Days">
-          {data && data.length > 0 ? (
-            <ResponsiveContainer width="100%" height={220}>
-              <ComposedChart data={data}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip contentStyle={{ fontSize: 12 }} />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey="successful" fill={chartColorAt(1)} radius={[4, 4, 0, 0]} name="Successful" stackId="a" />
-                <Bar dataKey="failed"     fill={chartColorAt(3)} radius={[4, 4, 0, 0]} name="Failed"     stackId="a" />
-                <ReferenceLine y={0} stroke="var(--color-border)" />
-              </ComposedChart>
-            </ResponsiveContainer>
-          ) : <EmptyState message="No login activity in this period" />}
-        </ChartCard>
-      )}
-      <AdminHeatmapPanel />
-    </div>
-  )
-}
-
 function AdminHeatmapPanel() {
   const { data: raw } = useAdminActivityHeatmap()
   const cells = raw as { hour: number; dayOfWeek: number; count: number }[] | undefined
   if (!cells) return null
 
-  const DAYS  = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
   const maxVal = Math.max(...cells.map((c) => c.count), 1)
 
   return (
-    <ChartCard title="Activity Heatmap — Hour × Day of Week">
+    <ChartCard title="Activity heatmap: hour × day of week">
       <div className="overflow-x-auto">
         <table className="min-w-full text-xs text-center">
           <thead>
             <tr>
               <th className="w-10" />
               {Array.from({ length: 24 }, (_, h) => (
-                <th key={h} className="font-normal text-muted w-6 pb-1">{h}</th>
+                <th key={h} className="font-normal text-muted w-6 pb-1">
+                  {h}
+                </th>
               ))}
             </tr>
           </thead>
@@ -559,8 +645,11 @@ function AdminHeatmapPanel() {
                     <td key={h} className="p-px">
                       <div
                         className="w-5 h-5 rounded-sm"
-                        style={{ backgroundColor: `rgba(14,138,106,${intensity / 100})`, minHeight: '20px' }}
-                        title={`${day} ${h}:00 — ${cell?.count ?? 0} actions`}
+                        style={{
+                          backgroundColor: `rgba(14,138,106,${intensity / 100})`,
+                          minHeight: '20px',
+                        }}
+                        title={`${day} ${h}:00: ${cell?.count ?? 0} actions`}
                       />
                     </td>
                   )
@@ -574,48 +663,239 @@ function AdminHeatmapPanel() {
   )
 }
 
+// Static column specs for AdminAuditPanel's table — hoisted out of the
+// component so useResizableColumns doesn't see a new array identity on
+// every render (harmless either way given its ref-based design, but no
+// reason to recreate static data each render).
+const AUDIT_COLUMNS: { key: string; defaultWidth: number; minWidth: number }[] = [
+  { key: 'action', defaultWidth: 140, minWidth: 90 },
+  { key: 'entity', defaultWidth: 110, minWidth: 70 },
+  { key: 'entityId', defaultWidth: 150, minWidth: 90 },
+  { key: 'actor', defaultWidth: 170, minWidth: 100 },
+  { key: 'idNo', defaultWidth: 130, minWidth: 80 },
+  { key: 'role', defaultWidth: 100, minWidth: 70 },
+  { key: 'time', defaultWidth: 150, minWidth: 110 },
+]
+const AUDIT_HEADERS: { key: string; label: string }[] = [
+  { key: 'action', label: 'Action' },
+  { key: 'entity', label: 'Entity' },
+  { key: 'entityId', label: 'Entity ID' },
+  { key: 'actor', label: 'Actor' },
+  { key: 'idNo', label: 'ID No.' },
+  { key: 'role', label: 'Role' },
+  { key: 'time', label: 'Time' },
+]
+
+const AUDIT_PAGE_SIZE = 50
+
+/** Compact page list: 1 … 4 5 [6] 7 8 … 20 (null = ellipsis). */
+function auditPageWindow(current: number, total: number): (number | null)[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
+  const pages = new Set<number>([1, total, current, current - 1, current + 1])
+  if (current <= 3) {
+    pages.add(2)
+    pages.add(3)
+    pages.add(4)
+  }
+  if (current >= total - 2) {
+    pages.add(total - 1)
+    pages.add(total - 2)
+    pages.add(total - 3)
+  }
+  const sorted = [...pages].filter((p) => p >= 1 && p <= total).sort((a, b) => a - b)
+  const out: (number | null)[] = []
+  sorted.forEach((p, i) => {
+    if (i > 0 && p - (sorted[i - 1] as number) > 1) out.push(null)
+    out.push(p)
+  })
+  return out
+}
+
 function AdminAuditPanel() {
-  const { data: audit } = useAuditLog({ page: 1 })
+  const [page, setPage] = useState(1)
+  const { data: audit, isFetching } = useAuditLog({ page, limit: AUDIT_PAGE_SIZE })
+  const totalPages = Math.max(1, audit?.pages ?? 1)
+  const safePage = Math.min(page, totalPages)
+  const totalEntries = audit?.total ?? 0
+  const firstShown = totalEntries === 0 ? 0 : (safePage - 1) * AUDIT_PAGE_SIZE + 1
+  const lastShown = Math.min(safePage * AUDIT_PAGE_SIZE, totalEntries)
+  // The audit log is paged on the server, so an export holds the page on screen, not the whole log.
+  // Say so in the menu, the workbook and the PDF rather than letting it pass as complete.
+  const auditExportNote =
+    totalPages > 1
+      ? `Page ${safePage} of ${totalPages} only (${totalEntries} entries in total); use the page controls to export other pages`
+      : undefined
 
   useExportable<ApiAuditLogEntry>('Audit Log', audit?.logs, [
-    { label: 'Action',    value: (l) => l.action },
-    { label: 'Entity',    value: (l) => l.entityType },
+    { label: 'Action', value: (l) => l.action },
+    { label: 'Entity', value: (l) => l.entityType },
     { label: 'Entity ID', value: (l) => l.entityId },
-    { label: 'Actor',     value: (l) => l.actorUid },
-    { label: 'Role',      value: (l) => l.actorRole },
-    { label: 'Time',      value: (l) => l.createdAt },
-  ])
+    { label: 'Actor name', value: (l) => l.actorName ?? '' },
+    { label: 'Employee no.', value: (l) => l.actorEmployeeNo ?? '' },
+    { label: 'Reg. no.', value: (l) => l.actorRegistrationNo ?? '' },
+    { label: 'Actor', value: (l) => l.actorUid },
+    { label: 'Role', value: (l) => l.actorRole },
+    { label: 'Time', value: (l) => l.createdAt },
+  ], auditExportNote)
+
+  // [PRODUCTION FIX] Column widths are now admin-adjustable (drag the
+  // handle at each header's right edge) rather than a fixed best-guess
+  // split — long Entity/Actor ID values were getting clipped no matter
+  // what fixed percentages this table shipped with, because "long enough
+  // to matter" depends on what's actually in the data on a given day, not
+  // something a static width can predict. Widths persist per-admin via
+  // localStorage (reports.auditLog.columnWidths), the same "adjust once,
+  // stays adjusted" convention as Notion/Linear/Airtable's own resizable
+  // columns.
+  //
+  // The standalone Actor UID column from the previous version is gone —
+  // it's now the copy icon on the Actor cell below. Showing the raw UID
+  // as its own column stopped pulling weight the moment the Name/ID No.
+  // columns existed right next to it: everyone identifies an actor by
+  // name, and the one time the raw UID itself is actually needed (cross-
+  // referencing against a database record, a support ticket) is exactly
+  // what a copy button is for — one click of the real ID, not a
+  // permanent extra column of one for the other 99% of the time.
+  const { widths, startResize } = useResizableColumns(
+    AUDIT_COLUMNS,
+    'reports.auditLog.columnWidths'
+  )
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted">{audit?.total ?? 0} total entries</p>
+        <p className="text-sm text-muted">
+          {totalEntries} total entries
+          {totalEntries > 0 && (
+            <>
+              {' '}
+              · showing {firstShown}–{lastShown}
+            </>
+          )}
+        </p>
       </div>
-      <div className="border border-base rounded-2xl overflow-hidden">
+      <div className="overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm border-collapse">
+          <table className="w-full text-sm border-collapse table-fixed">
+            <colgroup>
+              {AUDIT_HEADERS.map((h) => (
+                <col key={h.key} style={{ width: widths[h.key] }} />
+              ))}
+            </colgroup>
             <thead>
               <tr className="bg-page border-b border-base">
-                {['Action', 'Entity', 'Entity ID', 'Actor', 'Role', 'Time'].map((h) => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase whitespace-nowrap">{h}</th>
+                {AUDIT_HEADERS.map((h) => (
+                  <th
+                    key={h.key}
+                    className="relative px-4 py-3 text-left text-xs font-heading font-semibold text-muted whitespace-nowrap select-none"
+                  >
+                    {h.label}
+                    {/* Drag handle — grab the right edge of any header to
+                       resize that column. Widens the hit target well past
+                       the visible 1.5px line since a pixel-perfect border
+                       is nearly impossible to grab with a mouse. */}
+                    <span
+                      onMouseDown={startResize(h.key)}
+                      className="absolute top-0 right-0 h-full w-2 -mr-1 cursor-col-resize hover:bg-brand-teal/40 active:bg-brand-teal/60 z-10"
+                    />
+                  </th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-base">
               {audit?.logs.map((log) => (
                 <tr key={log.id} className="hover:bg-page transition-colors">
-                  <td className="px-4 py-3 font-mono text-xs text-brand-teal whitespace-nowrap">{log.action}</td>
-                  <td className="px-4 py-3 text-xs">{log.entityType}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-muted">{log.entityId.slice(0, 10)}…</td>
-                  <td className="px-4 py-3 font-mono text-xs">{log.actorUid.slice(0, 8)}…</td>
-                  <td className="px-4 py-3"><span className="text-xs bg-base rounded-lg px-2 py-0.5">{log.actorRole}</span></td>
-                  <td className="px-4 py-3 text-xs text-muted whitespace-nowrap">{new Date(log.createdAt).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' })}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-tone-teal truncate">
+                    {log.action}
+                  </td>
+                  <td className="px-4 py-3 text-xs truncate">{log.entityType}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-muted overflow-hidden">
+                    <CopyableId value={log.entityId} display={`${log.entityId.slice(0, 10)}…`} />
+                  </td>
+                  {/* [NEW] Name/ID resolved server-side against StaffProfile
+                     (by uid) / Student (by firebaseUid) — see
+                     reportService.getAuditLogs(). Neither match (a deleted
+                     account, or a system/cron actor) renders an em dash
+                     rather than blank, so it reads as "checked, nothing
+                     found" rather than a missing value. The copy icon
+                     copies the actual actorUid — still one click away for
+                     the rare case it's genuinely needed, just not taking
+                     up a whole column of its own any more. */}
+                  <td className="px-4 py-3 text-xs overflow-hidden">
+                    <CopyableId
+                      value={log.actorUid}
+                      display={log.actorName ?? <span className="text-muted">-</span>}
+                    />
+                  </td>
+                  <td className="px-4 py-3 font-mono text-xs text-muted truncate">
+                    {log.actorEmployeeNo ?? log.actorRegistrationNo ?? <span>-</span>}
+                  </td>
+                  <td className="px-4 py-3 truncate">
+                    <span className="text-xs">{log.actorRole}</span>
+                  </td>
+                  <td className="px-4 py-3 text-xs text-muted truncate">
+                    {new Date(log.createdAt).toLocaleString('en-GB', {
+                      dateStyle: 'short',
+                      timeStyle: 'short',
+                    })}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </div>
+
+      {totalEntries > 0 && (
+        <nav
+          aria-label="Audit log pagination"
+          className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-base"
+        >
+          <p className="text-xs text-muted" aria-live="polite">
+            Page {safePage} of {totalPages}
+            {isFetching ? ' · loading…' : ''}
+          </p>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(1, Math.min(totalPages, p - 1)))}
+              disabled={safePage <= 1}
+              className="inline-flex items-center gap-1 px-3 py-1.5 min-h-[36px] rounded-lg border border-base text-sm hover:bg-page disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft className="w-4 h-4" aria-hidden /> Prev
+            </button>
+            {auditPageWindow(safePage, totalPages).map((p, i) =>
+              p === null ? (
+                <span key={`gap-${i}`} className="px-1 text-muted text-sm select-none">
+                  …
+                </span>
+              ) : (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setPage(Math.max(1, Math.min(totalPages, p)))}
+                  aria-current={p === safePage ? 'page' : undefined}
+                  className={`min-w-[36px] min-h-[36px] px-2 rounded-lg text-sm border ${
+                    p === safePage
+                      ? 'bg-btn-brand text-btn-brand-fg border-brand-teal font-semibold'
+                      : 'border-base hover:bg-page'
+                  }`}
+                >
+                  {p}
+                </button>
+              )
+            )}
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(1, Math.min(totalPages, p + 1)))}
+              disabled={safePage >= totalPages}
+              className="inline-flex items-center gap-1 px-3 py-1.5 min-h-[36px] rounded-lg border border-base text-sm hover:bg-page disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Next <ChevronRight className="w-4 h-4" aria-hidden />
+            </button>
+          </div>
+        </nav>
+      )}
     </div>
   )
 }
@@ -626,97 +906,221 @@ function HighRankPerformancePanel({ academicYear, term }: { academicYear: string
   // [R14] The trend window is derived from the school's configured current
   // year, not a hardcoded ['2023/2024', '2024/2025', '2025/2026'] literal that
   // stops meaning "the last three years" the moment the school rolls over.
-  const years = useMemo(
-    () => recentAcademicYears(academicYear, TREND_YEARS_BACK),
-    [academicYear],
-  )
+  const years = useMemo(() => recentAcademicYears(academicYear, TREND_YEARS_BACK), [academicYear])
   const { data: trend, isLoading: tl } = useSchoolPerformanceTrend(years)
 
   useExportable<ApiSchoolPerformanceTrendPoint>('School Performance Trend', trend, [
     { label: 'Academic Year', value: (t) => t.academicYear },
-    { label: 'Term',          value: (t) => t.term },
+    { label: 'Term', value: (t) => t.term },
     { label: 'Pass Rate (%)', value: (t) => t.passRate },
-    { label: 'Average',       value: (t) => t.average },
-    { label: 'Results',       value: (t) => t.total },
+    { label: 'Average', value: (t) => t.average },
+    { label: 'Results', value: (t) => t.total },
   ])
 
   const current = trend?.filter((t) => t.academicYear === academicYear && t.term === term)
   const passRate = current?.[0]?.passRate ?? null
-  const avgScore = current?.[0]?.average  ?? null
+  const avgScore = current?.[0]?.average ?? null
 
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <KpiCard label="Pass Rate (Term)"   value={passRate !== null ? `${passRate}%` : '—'} trend="up" />
-        <KpiCard label="School Avg (Term)"  value={avgScore !== null ? `${avgScore}%` : '—'} />
-        <KpiCard label="Students Assessed"  value={current?.[0]?.total ?? '—'} />
-        <KpiCard label="Academic Year"      value={academicYear} />
+        <KpiCard
+          label="Pass rate (term)"
+          value={passRate !== null ? `${passRate}%` : '-'}
+          trend="up"
+        />
+        <KpiCard label="School avg (term)" value={avgScore !== null ? `${avgScore}%` : '-'} />
+        <KpiCard label="Students assessed" value={current?.[0]?.total ?? '-'} />
+        <KpiCard label="Academic year" value={academicYear} />
       </div>
-      {tl ? <SkeletonChart /> : (
-        <ChartCard title="School Pass Rate Trend — All Terms">
+      {tl ? (
+        <SkeletonChart />
+      ) : (
+        <ChartCard title="School pass rate trend: all terms">
           {trend && trend.length > 0 ? (
             <ResponsiveContainer width="100%" height={220}>
-              <LineChart data={trend.map((t) => ({ ...t, label: `${t.academicYear} T${t.term}` }))}>
+              <LineChart data={trend.map((t) => ({ ...t, label: `${t.academicYear} T${t.term}` }))} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                <XAxis dataKey="label" tick={{ fontSize: 9 }} />
-                <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
+                <XAxis
+                  dataKey="label"
+                  tick={{ fontSize: 9, fill: 'var(--color-muted-foreground)' }}
+                />
+                <YAxis
+                  domain={[0, 100]}
+                  tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
+                />
                 <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [`${num(v)}%`, '']} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Line type="monotone" dataKey="passRate" stroke={chartColorAt(1)} strokeWidth={2} dot name="Pass Rate %" />
-                <Line type="monotone" dataKey="average"  stroke={chartColorAt(0)} strokeWidth={2} dot name="Average %" />
+                <Line
+                  type="monotone"
+                  dataKey="passRate"
+                  stroke={chartColorAt(1)}
+                  strokeWidth={2}
+                  dot
+                  name="Pass Rate %">
+                  <LabelList dataKey="passRate" {...BAR_LABEL_PROPS} formatter={valueFormatter('percent')} />
+                </Line>
+                <Line
+                  type="monotone"
+                  dataKey="average"
+                  stroke={chartColorAt(0)}
+                  strokeWidth={2}
+                  dot
+                  name="Average %">
+                  <LabelList dataKey="average" {...BAR_LABEL_PROPS} formatter={valueFormatter('percent')} />
+                </Line>
               </LineChart>
             </ResponsiveContainer>
-          ) : <EmptyState />}
+          ) : (
+            <EmptyState />
+          )}
         </ChartCard>
       )}
+      {/*
+       * [PRODUCTION FIX] high_rank holds report.viewSchoolPerformance — the
+       * same permission GET /maneb/school-stats is gated on — but national
+       * exam results (JCE/MSCE) had no home on this tab at all, only on
+       * exam_officer's separate 'maneb' tab. A school's national exam
+       * standing is core leadership-level performance data, not just an
+       * exam office operational concern. Reuses the exact same panel
+       * exam_officer sees.
+       */}
+      <div className="space-y-5">
+        <SectionHeader
+          title="MANEB National Exam Results"
+          icon={<GraduationCap className="w-4 h-4" />}
+        />
+        <ManebStatusCard academicYear={academicYear} />
+        <ManebAnalyticsPanel academicYear={academicYear} />
+      </div>
     </div>
   )
 }
 
 function HighRankClassPanel({ academicYear, term }: { academicYear: string; term: number }) {
-  const { data: classes,  isLoading: cl } = useClassComparison(academicYear, term)
+  const { data: classes, isLoading: cl } = useClassComparison(academicYear, term)
   const { data: subjects, isLoading: sl } = useSubjectComparison(academicYear, term)
 
   useExportable<ApiClassPerformanceStat>(`Class Comparison ${academicYear} Term ${term}`, classes, [
-    { label: 'Class',         value: (c) => c.className },
-    { label: 'Students',      value: (c) => c.studentCount },
-    { label: 'Average',       value: (c) => c.average },
+    { label: 'Class', value: (c) => c.className },
+    { label: 'Students', value: (c) => c.studentCount },
+    { label: 'Assessed', value: (c) => c.assessed },
+    // Blank, never 0, when the class has no computed results.
+    { label: 'Average', value: (c) => c.average },
     { label: 'Pass Rate (%)', value: (c) => c.passRate },
   ])
+  const notComputed = (classes ?? []).filter((c) => c.studentCount > 0 && c.assessed === 0)
 
   return (
     <div className="space-y-5">
-      {cl ? <SkeletonChart /> : (
-        <ChartCard title="Class Comparison — Average Score">
+      {cl ? (
+        <SkeletonChart />
+      ) : (
+        <ChartCard title="Class comparison: average score">
           {classes && classes.length > 0 ? (
             <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={classes}>
+              <BarChart data={classes} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                <XAxis dataKey="className" tick={{ fontSize: 11 }} />
-                <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
+                <XAxis
+                  dataKey="className"
+                  tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
+                  interval={0}
+                  tickFormatter={(v: unknown) => truncateLabel(v, 14)}
+                  angle={-30} textAnchor="end" height={56}
+                />
+                <YAxis
+                  domain={[0, 100]}
+                  tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
+                />
                 <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [`${num(v)}%`, '']} />
-                <Bar dataKey="average"  fill={chartColorAt(0)} radius={[4, 4, 0, 0]} name="Average %" />
-                <Bar dataKey="passRate" fill={chartColorAt(1)} radius={[4, 4, 0, 0]} name="Pass Rate %" />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Bar
+                  dataKey="average"
+                  fill={chartColorAt(0)}
+                  radius={[4, 4, 0, 0]}
+                  name="Average %">
+                  <LabelList dataKey="average" {...BAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('percent')} />
+                </Bar>
+                <Bar
+                  dataKey="passRate"
+                  fill={chartColorAt(1)}
+                  radius={[4, 4, 0, 0]}
+                  name="Pass Rate %">
+                  <LabelList dataKey="passRate" {...BAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('percent')} />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
-          ) : <EmptyState />}
+          ) : (
+            <EmptyState />
+          )}
+          {notComputed.length > 0 && (
+            <p role="note" className="mt-3 text-xs text-muted">
+              No computed results yet for {notComputed.map((c) => c.className).join(', ')} shown
+              without a bar, not as 0%.
+            </p>
+          )}
         </ChartCard>
       )}
-      {sl ? <SkeletonChart /> : (
-        <ChartCard title="Subject Average Comparison">
+      {sl ? (
+        <SkeletonChart />
+      ) : (
+        <ChartCard title="Subject average comparison">
           {subjects && subjects.length > 0 ? (
             <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={subjects.slice(0, 12)}>
+              <BarChart data={subjects.slice(0, 12)} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                <XAxis dataKey="subject" tick={{ fontSize: 9 }} />
-                <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
+                <XAxis
+                  dataKey="subject"
+                  tick={{ fontSize: 9, fill: 'var(--color-muted-foreground)' }}
+                  interval={0}
+                  tickFormatter={(v: unknown) => truncateLabel(v, 14)}
+                  angle={-30} textAnchor="end" height={56}
+                />
+                <YAxis
+                  domain={[0, 100]}
+                  tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
+                />
                 <Tooltip contentStyle={{ fontSize: 12 }} />
-                <Bar dataKey="average" fill={chartColorAt(2)} radius={[4, 4, 0, 0]} name="Average %" />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Bar
+                  dataKey="average"
+                  fill={chartColorAt(2)}
+                  radius={[4, 4, 0, 0]}
+                  name="Average %">
+                  <LabelList dataKey="average" {...BAR_LABEL_PROPS} formatter={valueFormatter('percent')} />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
-          ) : <EmptyState />}
+          ) : (
+            <EmptyState />
+          )}
         </ChartCard>
       )}
+      {/*
+       * [PRODUCTION FIX] GET /academic/marks-distribution is gated on the
+       * same report.viewClassPerformance permission as the two charts above
+       * — high_rank already holds it — but this tab never surfaced it.
+       * Reuses the exact panel academic/exam_officer already use.
+       */}
+      <div className="space-y-5">
+        <SectionHeader
+          title="Marks distribution by exam"
+          icon={<BarChart2 className="w-4 h-4" />}
+        />
+        <MarksDistributionPanel />
+      </div>
+      {/*
+       * Streams of one form (Form 1A / 1B) side by side, a consolidated
+       * Top 10 / Bottom 10 across both, and the single-class rankings. The
+       * same panel Exams > Analytics uses, so the two can never disagree.
+       */}
+      <div className="space-y-5">
+        <SectionHeader
+          title="Class & Stream Rankings"
+          icon={<Trophy className="w-4 h-4" />}
+        />
+        <AnalyticsPanel academicYear={academicYear} selectedClassId="" term={term} />
+      </div>
     </div>
   )
 }
@@ -724,38 +1128,96 @@ function HighRankClassPanel({ academicYear, term }: { academicYear: string; term
 function HighRankTeachersPanel({ academicYear, term }: { academicYear: string; term: number }) {
   const { data: teachers, isLoading } = useTeacherEffectiveness(academicYear, term)
 
-  useExportable<ApiTeacherEffectivenessRow>(`Teacher Effectiveness ${academicYear} Term ${term}`, teachers, [
-    { label: 'Teacher',        value: (t) => t.teacherName },
-    { label: 'Department',     value: (t) => t.department },
-    { label: 'Subjects',       value: (t) => t.subjectCount },
-    { label: 'Classes',        value: (t) => t.classesCount },
-    { label: 'Avg Score',      value: (t) => t.avgStudentScore },
-    { label: 'Avg Pass Rate',  value: (t) => t.avgPassRate },
-  ])
+  useExportable<ApiTeacherEffectivenessRow>(
+    `Teacher Effectiveness ${academicYear} Term ${term}`,
+    teachers,
+    [
+      { label: 'Teacher', value: (t) => t.teacherName },
+      { label: 'Department', value: (t) => t.department },
+      { label: 'Subjects', value: (t) => t.subjectCount },
+      { label: 'Classes', value: (t) => t.classesCount },
+      { label: 'Avg Score', value: (t) => t.avgStudentScore },
+      { label: 'Avg pass rate', value: (t) => t.avgPassRate },
+    ]
+  )
+
+  // [PRODUCTION FIX] Highest/lowest performer — computed client-side from
+  // data this tab already fetches, no new endpoint needed. Sorted copies so
+  // the source array (and the export above) keep the backend's own order.
+  const bySc =
+    teachers && teachers.length > 0
+      ? [...teachers].sort((a, b) => b.avgStudentScore - a.avgStudentScore)
+      : undefined
+  const topTeacher = bySc?.[0]
+  const bottomTeacher = bySc && bySc.length > 1 ? bySc[bySc.length - 1] : undefined
 
   return (
     <div className="space-y-5">
-      {isLoading ? <SkeletonChart /> : (
+      {topTeacher && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <KpiCard
+            label="Highest avg score"
+            value={`${topTeacher.avgStudentScore}%`}
+            sub={topTeacher.teacherName}
+            trend="up"
+          />
+          {bottomTeacher && (
+            <KpiCard
+              label="Lowest avg score"
+              value={`${bottomTeacher.avgStudentScore}%`}
+              sub={bottomTeacher.teacherName}
+              trend={bottomTeacher.avgStudentScore < 50 ? 'down' : null}
+              warn={bottomTeacher.avgStudentScore < 50}
+            />
+          )}
+        </div>
+      )}
+      {isLoading ? (
+        <SkeletonChart />
+      ) : (
         <>
-          <ChartCard title="Teacher Effectiveness — Student Average Score">
+          <ChartCard title="Teacher effectiveness: student average score">
             {teachers && teachers.length > 0 ? (
               <ResponsiveContainer width="100%" height={Math.max(180, teachers.length * 36)}>
-                <BarChart data={teachers} layout="vertical">
-                  <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 10 }} />
-                  <YAxis type="category" dataKey="teacherName" tick={{ fontSize: 10 }} width={130} />
+                <BarChart data={teachers} layout="vertical" margin={{ top: 4, right: 48, left: 0, bottom: 0 }}>
+                  <XAxis
+                    type="number"
+                    domain={[0, 100]}
+                    tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
+                  />
+                  <YAxis
+                    type="category" interval={0}
+                    dataKey="teacherName"
+                    tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
+                    width={130}
+                  />
                   <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [`${num(v)}%`, '']} />
-                  <Bar dataKey="avgStudentScore" fill={chartColorAt(4)} radius={[0, 4, 4, 0]} name="Avg Student Score %" />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar
+                    dataKey="avgStudentScore"
+                    fill={chartColorAt(4)}
+                    radius={[0, 4, 4, 0]}
+                    name="Avg Student Score %">
+                    <LabelList dataKey="avgStudentScore" {...HBAR_LABEL_PROPS} formatter={valueFormatter('percent')} />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
-            ) : <EmptyState />}
+            ) : (
+              <EmptyState />
+            )}
           </ChartCard>
           {teachers && teachers.length > 0 && (
-            <div className="border border-base rounded-2xl overflow-hidden">
-              <table className="w-full text-sm">
+            <div className="table-scroll">
+              <table className="w-full text-sm min-w-130">
                 <thead>
                   <tr className="bg-page border-b border-base">
                     {['Teacher', 'Department', 'Classes', 'Avg Score', 'Pass Rate'].map((h) => (
-                      <th key={h} className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase">{h}</th>
+                      <th
+                        key={h}
+                        className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted"
+                      >
+                        {h}
+                      </th>
                     ))}
                   </tr>
                 </thead>
@@ -766,10 +1228,18 @@ function HighRankTeachersPanel({ academicYear, term }: { academicYear: string; t
                       <td className="px-4 py-3 text-muted text-xs">{t.department}</td>
                       <td className="px-4 py-3">{t.classesCount}</td>
                       <td className="px-4 py-3">
-                        <span className={`font-bold ${t.avgStudentScore >= 50 ? 'text-brand-teal' : 'text-brand-coral'}`}>{t.avgStudentScore}%</span>
+                        <span
+                          className={`font-bold ${t.avgStudentScore >= 50 ? 'text-tone-teal' : 'text-tone-coral'}`}
+                        >
+                          {t.avgStudentScore}%
+                        </span>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`font-semibold ${t.avgPassRate >= 50 ? 'text-brand-teal' : 'text-brand-coral'}`}>{t.avgPassRate}%</span>
+                        <span
+                          className={`font-semibold ${t.avgPassRate >= 50 ? 'text-tone-teal' : 'text-tone-coral'}`}
+                        >
+                          {t.avgPassRate}%
+                        </span>
                       </td>
                     </tr>
                   ))}
@@ -789,65 +1259,153 @@ function HighRankEnrollmentPanel() {
 
   return (
     <div className="space-y-5">
-      {tl ? <SkeletonChart /> : (
-        <ChartCard title="Student Enrollment Trend — Last 12 Months">
+      {tl ? (
+        <SkeletonChart />
+      ) : (
+        <ChartCard title="Student enrollment trend: Last 12 months">
           {trend && trend.length > 0 ? (
             <ResponsiveContainer width="100%" height={220}>
-              <ComposedChart data={trend}>
+              <ComposedChart data={trend} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                <XAxis dataKey="month" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} />
+                <XAxis
+                  dataKey="month"
+                  tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
+                />
+                <YAxis tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
                 <Tooltip contentStyle={{ fontSize: 12 }} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey="enrolled" fill={chartColorAt(1)} radius={[4, 4, 0, 0]} name="New Enrolled" />
-                <Bar dataKey="departed" fill={chartColorAt(3)} radius={[4, 4, 0, 0]} name="Departed" />
-                <Line type="monotone" dataKey="net" stroke={chartColorAt(2)} strokeWidth={2} dot={false} name="Net Change" />
+                <Bar
+                  dataKey="enrolled"
+                  fill={chartColorAt(1)}
+                  radius={[4, 4, 0, 0]}
+                  name="New Enrolled">
+                  <LabelList dataKey="enrolled" {...BAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('number')} />
+                </Bar>
+                <Bar
+                  dataKey="departed"
+                  fill={chartColorAt(3)}
+                  radius={[4, 4, 0, 0]}
+                  name="Departed">
+                  <LabelList dataKey="departed" {...BAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('number')} />
+                </Bar>
+                <Line
+                  type="monotone"
+                  dataKey="net"
+                  stroke={chartColorAt(2)}
+                  strokeWidth={2}
+                  dot={false}
+                  name="Net Change">
+                  <LabelList dataKey="net" {...BAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('number')} />
+                </Line>
               </ComposedChart>
             </ResponsiveContainer>
-          ) : <EmptyState />}
+          ) : (
+            <EmptyState />
+          )}
         </ChartCard>
       )}
     </div>
   )
 }
 
-function HighRankFinancePanel({ academicYear }: { academicYear: string }) {
+function HighRankFinancePanel({ academicYear, term }: { academicYear: string; term: number }) {
   const { data: cfRaw, isLoading } = useHighRankFinancialSummary(academicYear)
   const cashFlow = cfRaw as ApiCashFlowRow[] | undefined
 
   return (
-    <div className="space-y-5">
-      {cashFlow && (
-        <div className="grid grid-cols-3 gap-3">
-          {cashFlow.map((row) => (
-            <KpiCard
-              key={row.term}
-              label={`Term ${row.term} Net`}
-              value={`MWK ${(row.net / 1_000_000).toFixed(1)}M`}
-              trend={row.net >= 0 ? 'up' : 'down'}
-              warn={row.net < 0}
-            />
-          ))}
-        </div>
-      )}
-      {isLoading ? <SkeletonChart /> : (
-        <ChartCard title="Revenue vs Expenses by Term">
-          {cashFlow && cashFlow.length > 0 ? (
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={cashFlow.map((r) => ({ ...r, label: `Term ${r.term}` }))}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => `${(v / 1_000_000).toFixed(1)}M`} />
-                <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [mwk(v), '']} />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey="revenue"  fill={chartColorAt(1)} radius={[4, 4, 0, 0]} name="Revenue" />
-                <Bar dataKey="expenses" fill={chartColorAt(3)} radius={[4, 4, 0, 0]} name="Expenses" />
-                <Bar dataKey="payroll"  fill={chartColorAt(2)} radius={[4, 4, 0, 0]} name="Payroll" />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : <EmptyState />}
-        </ChartCard>
-      )}
+    <div className="space-y-8">
+      <div className="space-y-5">
+        {cashFlow && (
+          <div className="grid grid-cols-3 gap-3">
+            {cashFlow.map((row) => (
+              <KpiCard
+                key={row.term}
+                label={`Term ${row.term} Net`}
+                value={`MWK ${(row.net / 1_000_000).toFixed(1)}M`}
+                trend={row.net >= 0 ? 'up' : 'down'}
+                warn={row.net < 0}
+              />
+            ))}
+          </div>
+        )}
+        {isLoading ? (
+          <SkeletonChart />
+        ) : (
+          <ChartCard title="Fees collected vs expenses and payroll by term">
+            {cashFlow && cashFlow.length > 0 ? (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={cashFlow.map((r) => ({ ...r, label: `Term ${r.term}` }))} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
+                    tickFormatter={(v: number) => `${(v / 1_000_000).toFixed(1)}M`}
+                  />
+                  <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [mwk(v), '']} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar
+                    dataKey="revenue"
+                    fill={chartColorAt(1)}
+                    radius={[4, 4, 0, 0]}
+                    name="Fees collected">
+                    <LabelList dataKey="revenue" {...BAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('mwk')} />
+                  </Bar>
+                  <Bar
+                    dataKey="expenses"
+                    fill={chartColorAt(3)}
+                    radius={[4, 4, 0, 0]}
+                    name="Expenses">
+                    <LabelList dataKey="expenses" {...BAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('mwk')} />
+                  </Bar>
+                  <Bar
+                    dataKey="payroll"
+                    fill={chartColorAt(2)}
+                    radius={[4, 4, 0, 0]}
+                    name="Payroll">
+                    <LabelList dataKey="payroll" {...BAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('mwk')} />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <EmptyState />
+            )}
+          </ChartCard>
+        )}
+      </div>
+
+      {/*
+       * [PRODUCTION FIX] high_rank holds report.viewFeeCollection,
+       * viewOutstandingBalances, viewExpenseBreakdown (covers budget-vs-
+       * actual too — same permission gates both routes), viewPayrollSummary,
+       * and viewScholarshipSummary (packages/shared/types/permissions.ts) —
+       * six analytics endpoints this tab never rendered, even though the
+       * dedicated 'finance' role's own tabs already use every one of them
+       * below. Reusing those exact panels rather than re-deriving new chart
+       * code: same data, same permission, already proven correct.
+       */}
+      <div className="space-y-5">
+        <SectionHeader title="Fee Collection" icon={<DollarSign className="w-4 h-4" />} />
+        <FinanceCollectionPanel />
+      </div>
+      <div className="space-y-5">
+        <SectionHeader title="Outstanding balances" icon={<AlertTriangle className="w-4 h-4" />} />
+        <FinanceOutstandingPanel academicYear={academicYear} term={term} />
+      </div>
+      <div className="space-y-5">
+        <SectionHeader title="Expenses and budget" icon={<FileText className="w-4 h-4" />} />
+        <FinanceExpensesPanel academicYear={academicYear} term={term} />
+      </div>
+      <div className="space-y-5">
+        <SectionHeader title="Payroll" icon={<Users className="w-4 h-4" />} />
+        <FinancePayrollPanel />
+      </div>
+      <div className="space-y-5">
+        <SectionHeader title="Scholarships" icon={<GraduationCap className="w-4 h-4" />} />
+        <FinanceScholarshipsPanel academicYear={academicYear} />
+      </div>
     </div>
   )
 }
@@ -855,47 +1413,95 @@ function HighRankFinancePanel({ academicYear }: { academicYear: string }) {
 // ─── FINANCE PANELS ──────────────────────────────────────────────────────────
 
 function FinanceCollectionPanel() {
-  const { data: dayRaw,   isLoading: dl } = useFinanceCollectionByDay(30)
+  const { data: dayRaw, isLoading: dl } = useFinanceCollectionByDay(30)
   const { data: monthRaw, isLoading: ml } = useFinanceCollectionByMonth(12)
-  const dayData   = dayRaw   as ApiTimeSeriesPoint[] | undefined
-  const monthData = monthRaw as { month: string; collected: number; cumulative: number }[] | undefined
+  const dayData = dayRaw as ApiTimeSeriesPoint[] | undefined
+  const monthData = monthRaw as
+    { month: string; collected: number; cumulative: number }[] | undefined
 
-  const totalDay   = dayData?.reduce((s, d) => s + d.value, 0)   ?? 0
+  const totalDay = dayData?.reduce((s, d) => s + d.value, 0) ?? 0
   const totalMonth = monthData?.reduce((s, d) => s + d.collected, 0) ?? 0
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <KpiCard label="Last 30 Days"   value={`MWK ${totalDay.toLocaleString()}`}   trend="up" />
-        <KpiCard label="Last 12 Months" value={`MWK ${totalMonth.toLocaleString()}`} />
-        <KpiCard label="Daily Average"  value={`MWK ${Math.round(totalDay / 30).toLocaleString()}`} />
-        <KpiCard label="Currency"       value="MWK" />
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <KpiCard label="Received, last 30 days" value={`MWK ${totalDay.toLocaleString()}`} />
+        <KpiCard label="Received, last 12 months" value={`MWK ${totalMonth.toLocaleString()}`} />
+        <KpiCard
+          label="Daily average (30 days)"
+          value={`MWK ${Math.round(totalDay / 30).toLocaleString()}`}
+        />
       </div>
-      {dl ? <SkeletonChart /> : (
-        <ChartCard title="Daily Fee Collection — Last 30 Days">
+      <p role="note" className="text-xs text-muted">
+        Cash received by the date each payment was recorded, across all terms. This is a flow and
+        will not match the term collection rate, which compares fees applied to a term&apos;s
+        invoices with fees billed for that term.
+      </p>
+      {dl ? (
+        <SkeletonChart />
+      ) : (
+        <ChartCard title="Daily fee collection: Last 30 days">
           <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={dayData ?? []}>
+            <BarChart data={dayData ?? []} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-              <XAxis dataKey="label" tick={{ fontSize: 9 }} />
-              <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}K`} />
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 9, fill: 'var(--color-muted-foreground)' }}
+              />
+              <YAxis
+                tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
+                tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}K`}
+              />
               <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [mwk(v), 'Collected']} />
-              <Bar dataKey="value" fill={chartColorAt(1)} radius={[4, 4, 0, 0]} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Bar dataKey="value" fill={chartColorAt(1)} radius={[4, 4, 0, 0]} name="Collected (MWK)">
+                <LabelList dataKey="value" {...BAR_LABEL_PROPS} formatter={valueFormatter('mwk')} />
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
       )}
-      {ml ? <SkeletonChart /> : (
-        <ChartCard title="Monthly Collection & Cumulative — Last 12 Months">
+      {ml ? (
+        <SkeletonChart />
+      ) : (
+        <ChartCard title="Monthly collection and cumulative: Last 12 months">
           <ResponsiveContainer width="100%" height={200}>
-            <ComposedChart data={monthData ?? []}>
+            <ComposedChart data={monthData ?? []} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-              <XAxis dataKey="month" tick={{ fontSize: 10 }} />
-              <YAxis yAxisId="left"  tick={{ fontSize: 10 }} tickFormatter={(v: number) => `${(v / 1_000_000).toFixed(1)}M`} />
-              <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} tickFormatter={(v: number) => `${(v / 1_000_000).toFixed(1)}M`} />
+              <XAxis
+                dataKey="month"
+                tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
+              />
+              <YAxis
+                yAxisId="left"
+                tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
+                tickFormatter={(v: number) => `${(v / 1_000_000).toFixed(1)}M`}
+              />
+              <YAxis
+                yAxisId="right"
+                orientation="right"
+                tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
+                tickFormatter={(v: number) => `${(v / 1_000_000).toFixed(1)}M`}
+              />
               <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [mwk(v), '']} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Bar      yAxisId="left"  dataKey="collected"  fill={chartColorAt(1)} radius={[4, 4, 0, 0]} name="Monthly" />
-              <Line     yAxisId="right" dataKey="cumulative" stroke={chartColorAt(2)} strokeWidth={2} dot={false} name="Cumulative" />
+              <Bar
+                yAxisId="left"
+                dataKey="collected"
+                fill={chartColorAt(1)}
+                radius={[4, 4, 0, 0]}
+                name="Monthly">
+                <LabelList dataKey="collected" {...BAR_LABEL_PROPS} formatter={valueFormatter('mwk')} />
+              </Bar>
+              <Line
+                yAxisId="right"
+                dataKey="cumulative"
+                stroke={chartColorAt(2)}
+                strokeWidth={2}
+                dot={false}
+                name="Cumulative">
+                <LabelList dataKey="cumulative" {...BAR_LABEL_PROPS} formatter={valueFormatter('mwk')} />
+              </Line>
             </ComposedChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -909,49 +1515,84 @@ function FinanceOutstandingPanel({ academicYear, term }: { academicYear: string;
   const total = rows?.reduce((s, r) => s + r.outstanding, 0) ?? 0
 
   useExportable<ApiOutstandingByClassRow>(`Outstanding Balances ${academicYear}`, rows, [
-    { label: 'Class',             value: (r) => r.className },
-    { label: 'Students Owing',    value: (r) => r.studentCount },
+    { label: 'Class', value: (r) => r.className },
+    { label: 'Students owing', value: (r) => r.studentCount },
     { label: 'Outstanding (MWK)', value: (r) => r.outstanding },
   ])
 
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-3">
-        <KpiCard label="Total Outstanding" value={`MWK ${total.toLocaleString()}`} warn={total > 0} />
-        <KpiCard label="Classes Affected"  value={rows?.filter((r) => r.outstanding > 0).length ?? 0} />
+        <KpiCard
+          label="Total outstanding"
+          value={`MWK ${total.toLocaleString()}`}
+          warn={total > 0}
+        />
+        <KpiCard
+          label="Classes affected"
+          value={rows?.filter((r) => r.outstanding > 0).length ?? 0}
+        />
       </div>
-      {isLoading ? <SkeletonChart /> : (
-        <ChartCard title="Outstanding Balance by Class">
+      {isLoading ? (
+        <SkeletonChart />
+      ) : (
+        <ChartCard title="Outstanding balance by class">
           {rows && rows.length > 0 ? (
             <>
               <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={rows} layout="vertical">
-                  <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}K`} />
-                  <YAxis type="category" dataKey="className" tick={{ fontSize: 11 }} width={80} />
-                  <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [mwk(v), 'Outstanding']} />
-                  <Bar dataKey="outstanding" fill={chartColorAt(3)} radius={[0, 4, 4, 0]} />
+                <BarChart data={rows} layout="vertical" margin={{ top: 4, right: 48, left: 0, bottom: 0 }}>
+                  <XAxis
+                    type="number"
+                    tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
+                    tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}K`}
+                  />
+                  <YAxis
+                    type="category" interval={0}
+                    dataKey="className"
+                    tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
+                    width={80}
+                  />
+                  <Tooltip
+                    contentStyle={{ fontSize: 12 }}
+                    formatter={(v) => [mwk(v), 'Outstanding']}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar dataKey="outstanding" fill={chartColorAt(3)} radius={[0, 4, 4, 0]} name="Outstanding (MWK)">
+                    <LabelList dataKey="outstanding" {...HBAR_LABEL_PROPS} formatter={valueFormatter('mwk')} />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
-              <div className="mt-4 border border-base rounded-xl overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead><tr className="bg-page border-b border-base">
-                    {['Class', 'Students', 'Outstanding'].map((h) => (
-                      <th key={h} className="px-4 py-2 text-left text-xs font-semibold text-muted uppercase">{h}</th>
-                    ))}
-                  </tr></thead>
+              <div className="mt-4 table-scroll">
+                <table className="w-full text-sm min-w-130">
+                  <thead>
+                    <tr className="bg-page border-b border-base">
+                      {['Class', 'Students', 'Outstanding'].map((h) => (
+                        <th
+                          key={h}
+                          className="px-4 py-2 text-left text-xs font-semibold text-muted"
+                        >
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
                   <tbody className="divide-y divide-base">
                     {rows.map((r) => (
                       <tr key={r.classId} className="hover:bg-page">
                         <td className="px-4 py-2 font-medium">{r.className}</td>
                         <td className="px-4 py-2 text-muted">{r.studentCount}</td>
-                        <td className="px-4 py-2 font-bold text-brand-coral">MWK {r.outstanding.toLocaleString()}</td>
+                        <td className="px-4 py-2 font-bold text-tone-coral">
+                          MWK {r.outstanding.toLocaleString()}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             </>
-          ) : <EmptyState message="No outstanding balances" />}
+          ) : (
+            <EmptyState message="No outstanding balances" />
+          )}
         </ChartCard>
       )}
     </div>
@@ -960,49 +1601,106 @@ function FinanceOutstandingPanel({ academicYear, term }: { academicYear: string;
 
 function FinanceExpensesPanel({ academicYear, term }: { academicYear: string; term?: number }) {
   const { data: expenses, isLoading: el } = useFinanceExpenseBreakdown(academicYear, term)
-  const { data: budgets,  isLoading: bl } = useFinanceBudgetVsActual(academicYear, term)
+  const { data: budgets, isLoading: bl } = useFinanceBudgetVsActual(academicYear, term)
 
   useExportable<ApiBudgetVsActualRow>(`Budget vs Actual ${academicYear}`, budgets, [
-    { label: 'Category',        value: (r) => r.category },
+    { label: 'Category', value: (r) => r.category },
     { label: 'Allocated (MWK)', value: (r) => r.allocated },
-    { label: 'Spent (MWK)',     value: (r) => r.spent },
+    { label: 'Spent (MWK)', value: (r) => r.spent },
+    // Blank (not 0) when nothing is allocated to the category.
     { label: 'Utilisation (%)', value: (r) => r.utilisation },
+    { label: 'Unbudgeted', value: (r) => (r.unbudgeted ? 'Yes' : 'No') },
   ])
 
   return (
     <div className="space-y-5">
+      <p role="note" className="text-xs text-muted">
+        Spent is the live total of approved expenses (not the cached budget counter). For a term
+        this shows that term&apos;s budgets plus annual budgets, which count the year&apos;s spending to
+        date. Spend in a category with no budget is shown with nothing allocated.
+      </p>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {el ? <SkeletonChart /> : (
-          <ChartCard title="Expense Breakdown by Category">
+        {el ? (
+          <SkeletonChart />
+        ) : (
+          <ChartCard title="Expense breakdown by category">
             {expenses && expenses.length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
                 <PieChart>
-                  <Pie data={expenses} dataKey="value" nameKey="category" cx="50%" cy="50%" outerRadius={80} label={(p: PieLabelRenderProps) => `${p.name ?? ''} ${Math.round((p.percent ?? 0) * 100)}%`} labelLine fontSize={10}>
-                    {expenses.map((_, i) => <Cell key={i} fill={chartColorAt(i)} />)}
+                  <Pie
+                    data={expenses}
+                    dataKey="value"
+                    nameKey="category"
+                    cx="50%"
+                    cy="45%"
+                    outerRadius={62}
+                    label={(p: PieLabelRenderProps) =>
+                      `${p.name ?? ''} ${Math.round((p.percent ?? 0) * 100)}%`
+                    }
+                    labelLine
+                    fontSize={10}
+                  >
+                    {expenses.map((_, i) => (
+                      <Cell key={i} fill={chartColorAt(i)} />
+                    ))}
                   </Pie>
                   <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [mwk(v), '']} />
+                  {/* The key names every slice with its exact amount and share. */}
+                  <Legend
+                    verticalAlign="bottom"
+                    content={chartKey((name) => {
+                      const slice = expenses.find((e) => e.category === name)
+                      if (!slice) return undefined
+                      const total = expenses.reduce((sum, e) => sum + num(e.value), 0)
+                      const share = total > 0 ? Math.round((num(slice.value) / total) * 100) : 0
+                      return `${mwk(slice.value)} · ${share}%`
+                    })}
+                  />
                 </PieChart>
               </ResponsiveContainer>
-            ) : <EmptyState />}
+            ) : (
+              <EmptyState />
+            )}
           </ChartCard>
         )}
-        {bl ? <SkeletonChart /> : (
-          <ChartCard title="Budget vs Actual by Category">
+        {bl ? (
+          <SkeletonChart />
+        ) : (
+          <ChartCard title="Budget vs actual by category">
             {budgets && budgets.length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={budgets} layout="vertical">
-                  <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}K`} />
+                <BarChart data={budgets} layout="vertical" margin={{ top: 4, right: 48, left: 0, bottom: 0 }}>
+                  <XAxis
+                    type="number"
+                    tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
+                    tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}K`}
+                  />
                   {/* [R14] Was dataKey="department" — a field that exists on Budget
                       but not on Expense, and therefore never joined. The row's key
                       is now the ExpenseCategory it is actually budgeted against. */}
-                  <YAxis type="category" dataKey="category" tick={{ fontSize: 10 }} width={110} />
+                  <YAxis
+                    type="category" interval={0}
+                    dataKey="category"
+                    tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
+                    width={110}
+                  />
                   <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [mwk(v), '']} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Bar dataKey="allocated" fill={chartColorAt(0)} radius={[0, 4, 4, 0]} name="Allocated" />
-                  <Bar dataKey="spent"     fill={chartColorAt(2)} radius={[0, 4, 4, 0]} name="Spent" />
+                  <Bar
+                    dataKey="allocated"
+                    fill={chartColorAt(0)}
+                    radius={[0, 4, 4, 0]}
+                    name="Allocated">
+                    <LabelList dataKey="allocated" {...HBAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('mwk')} />
+                  </Bar>
+                  <Bar dataKey="spent" fill={chartColorAt(2)} radius={[0, 4, 4, 0]} name="Spent">
+                    <LabelList dataKey="spent" {...HBAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('mwk')} />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
-            ) : <EmptyState />}
+            ) : (
+              <EmptyState />
+            )}
           </ChartCard>
         )}
       </div>
@@ -1014,15 +1712,21 @@ function FinanceCashFlowPanel({ academicYear }: { academicYear: string }) {
   const { data: rows, isLoading } = useFinanceCashFlow(academicYear)
 
   useExportable<ApiCashFlowRow>(`Cash Flow ${academicYear}`, rows, [
-    { label: 'Term',           value: (r) => r.term },
-    { label: 'Revenue (MWK)',  value: (r) => r.revenue },
-    { label: 'Expenses (MWK)', value: (r) => r.expenses },
-    { label: 'Payroll (MWK)',  value: (r) => r.payroll },
-    { label: 'Net (MWK)',      value: (r) => r.net },
+    { label: 'Term', value: (r) => r.term },
+    { label: 'Fees collected on term invoices (MWK)', value: (r) => r.revenue },
+    { label: 'Approved expenses (MWK)', value: (r) => r.expenses },
+    { label: 'Payroll (MWK)', value: (r) => r.payroll },
+    { label: 'Net (MWK)', value: (r) => r.net },
   ])
 
   return (
     <div className="space-y-5">
+      <p role="note" className="text-xs text-muted">
+        Revenue is the fees applied to each term&apos;s invoices to date (not cash received in that
+        term). Expenses are approved expenses recorded for the term. Payroll is net pay for payroll
+        runs that are completed, awaiting approval, approved or locked, by the calendar month each
+        term spans; a payroll run for August falls outside every term and is not shown here.
+      </p>
       {rows && (
         <div className="grid grid-cols-3 gap-3">
           {rows.map((r) => (
@@ -1037,45 +1741,98 @@ function FinanceCashFlowPanel({ academicYear }: { academicYear: string }) {
           ))}
         </div>
       )}
-      {isLoading ? <SkeletonChart /> : (
-        <ChartCard title="Cash Flow Statement by Term">
+      {isLoading ? (
+        <SkeletonChart />
+      ) : (
+        <ChartCard title="Cash flow statement by term">
           {rows && rows.length > 0 ? (
             <>
               <ResponsiveContainer width="100%" height={220}>
-                <ComposedChart data={rows.map((r) => ({ ...r, label: `Term ${r.term}` }))}>
+                <ComposedChart data={rows.map((r) => ({ ...r, label: `Term ${r.term}` }))} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                  <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => `${(v / 1_000_000).toFixed(1)}M`} />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
+                    tickFormatter={(v: number) => `${(v / 1_000_000).toFixed(1)}M`}
+                  />
                   <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [mwk(v), '']} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Bar dataKey="revenue"  fill={chartColorAt(1)} radius={[4, 4, 0, 0]} name="Revenue" />
-                  <Bar dataKey="expenses" fill={chartColorAt(3)} radius={[4, 4, 0, 0]} name="Expenses" />
-                  <Bar dataKey="payroll"  fill={chartColorAt(2)} radius={[4, 4, 0, 0]} name="Payroll" />
-                  <Line type="monotone" dataKey="net" stroke={chartColorAt(0)} strokeWidth={2} dot name="Net" />
+                  <Bar
+                    dataKey="revenue"
+                    fill={chartColorAt(1)}
+                    radius={[4, 4, 0, 0]}
+                    name="Fees collected">
+                    <LabelList dataKey="revenue" {...BAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('mwk')} />
+                  </Bar>
+                  <Bar
+                    dataKey="expenses"
+                    fill={chartColorAt(3)}
+                    radius={[4, 4, 0, 0]}
+                    name="Expenses">
+                    <LabelList dataKey="expenses" {...BAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('mwk')} />
+                  </Bar>
+                  <Bar
+                    dataKey="payroll"
+                    fill={chartColorAt(2)}
+                    radius={[4, 4, 0, 0]}
+                    name="Payroll">
+                    <LabelList dataKey="payroll" {...BAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('mwk')} />
+                  </Bar>
+                  <Line
+                    type="monotone"
+                    dataKey="net"
+                    stroke={chartColorAt(0)}
+                    strokeWidth={2}
+                    dot
+                    name="Net">
+                    <LabelList dataKey="net" {...BAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('mwk')} />
+                  </Line>
                 </ComposedChart>
               </ResponsiveContainer>
-              <div className="mt-4 border border-base rounded-xl overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead><tr className="bg-page border-b border-base">
-                    {['Term', 'Revenue', 'Expenses', 'Payroll', 'Net'].map((h) => (
-                      <th key={h} className="px-4 py-2 text-left text-xs font-semibold text-muted uppercase">{h}</th>
-                    ))}
-                  </tr></thead>
+              <div className="mt-4 table-scroll">
+                <table className="w-full text-sm min-w-130">
+                  <thead>
+                    <tr className="bg-page border-b border-base">
+                      {['Term', 'Fees collected', 'Expenses', 'Payroll', 'Net'].map((h) => (
+                        <th
+                          key={h}
+                          className="px-4 py-2 text-left text-xs font-semibold text-muted"
+                        >
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
                   <tbody className="divide-y divide-base">
                     {rows.map((r) => (
                       <tr key={r.term}>
                         <td className="px-4 py-2 font-medium">Term {r.term}</td>
-                        <td className="px-4 py-2 text-brand-teal">MWK {r.revenue.toLocaleString()}</td>
-                        <td className="px-4 py-2 text-brand-coral">MWK {r.expenses.toLocaleString()}</td>
-                        <td className="px-4 py-2 text-brand-amber">MWK {r.payroll.toLocaleString()}</td>
-                        <td className={`px-4 py-2 font-bold ${r.net >= 0 ? 'text-brand-teal' : 'text-brand-coral'}`}>MWK {r.net.toLocaleString()}</td>
+                        <td className="px-4 py-2 text-tone-teal">
+                          MWK {r.revenue.toLocaleString()}
+                        </td>
+                        <td className="px-4 py-2 text-tone-coral">
+                          MWK {r.expenses.toLocaleString()}
+                        </td>
+                        <td className="px-4 py-2 text-tone-amber">
+                          MWK {r.payroll.toLocaleString()}
+                        </td>
+                        <td
+                          className={`px-4 py-2 font-bold ${r.net >= 0 ? 'text-tone-teal' : 'text-tone-coral'}`}
+                        >
+                          MWK {r.net.toLocaleString()}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             </>
-          ) : <EmptyState />}
+          ) : (
+            <EmptyState />
+          )}
         </ChartCard>
       )}
     </div>
@@ -1090,22 +1847,44 @@ function FinancePayrollPanel() {
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-3">
-        <KpiCard label="Total Payroll (12M)" value={`MWK ${total.toLocaleString()}`} />
-        <KpiCard label="Monthly Average"     value={`MWK ${data?.length ? Math.round(total / data.length).toLocaleString() : '—'}`} />
+        <KpiCard label="Total payroll (12M)" value={`MWK ${total.toLocaleString()}`} />
+        <KpiCard
+          label="Monthly average"
+          value={`MWK ${data?.length ? Math.round(total / data.length).toLocaleString() : '-'}`}
+        />
       </div>
-      {isLoading ? <SkeletonChart /> : (
-        <ChartCard title="Monthly Payroll Cost — Last 12 Months">
+      {isLoading ? (
+        <SkeletonChart />
+      ) : (
+        <ChartCard title="Monthly payroll cost: Last 12 months">
           {data && data.length > 0 ? (
             <ResponsiveContainer width="100%" height={200}>
               <AreaChart data={data}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => `${(v / 1_000_000).toFixed(1)}M`} />
+                <XAxis
+                  dataKey="label"
+                  tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
+                />
+                <YAxis
+                  tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
+                  tickFormatter={(v: number) => `${(v / 1_000_000).toFixed(1)}M`}
+                />
                 <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [mwk(v), 'Payroll']} />
-                <Area type="monotone" dataKey="value" stroke={chartColorAt(0)} fill={chartColorAt(0)} fillOpacity={0.08} strokeWidth={2} name="Payroll" />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Area
+                  type="monotone"
+                  dataKey="value"
+                  stroke={chartColorAt(0)}
+                  fill={chartColorAt(0)}
+                  fillOpacity={0.08}
+                  strokeWidth={2}
+                  name="Payroll"
+                />
               </AreaChart>
             </ResponsiveContainer>
-          ) : <EmptyState />}
+          ) : (
+            <EmptyState />
+          )}
         </ChartCard>
       )}
     </div>
@@ -1116,11 +1895,11 @@ function FinancePayrollPanel() {
 
 function LibraryOverviewPanel() {
   const { data: health, isLoading: hl } = useLibraryInventoryHealth()
-  const { data: top,    isLoading: tl } = useLibraryTopBorrowed(10)
+  const { data: top, isLoading: tl } = useLibraryTopBorrowed(10)
 
   useExportable<ApiTopBorrowedBook>('Top Borrowed Books', top, [
-    { label: 'Title',      value: (b) => b.title },
-    { label: 'Author',     value: (b) => b.author },
+    { label: 'Title', value: (b) => b.title },
+    { label: 'Author', value: (b) => b.author },
     { label: 'Borrowings', value: (b) => b.borrowCount },
   ])
 
@@ -1128,41 +1907,67 @@ function LibraryOverviewPanel() {
     <div className="space-y-5">
       {health && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <KpiCard label="Total Titles"     value={health.totalTitles} />
-          <KpiCard label="Available Copies" value={health.availableCopies} trend="up" />
-          <KpiCard label="Overdue"          value={health.overdueCount} warn={health.overdueCount > 0} />
-          <KpiCard label="Availability"     value={`${health.availabilityRate}%`} />
+          <KpiCard label="Total titles" value={health.totalTitles} />
+          <KpiCard label="Available copies" value={health.availableCopies} trend="up" />
+          <KpiCard label="Overdue" value={health.overdueCount} warn={health.overdueCount > 0} />
+          <KpiCard label="Availability" value={`${health.availabilityRate}%`} />
         </div>
       )}
       {hl && <SkeletonChart />}
-      {tl ? <SkeletonChart /> : (
-        <ChartCard title="Top 10 Most Borrowed Books">
+      {tl ? (
+        <SkeletonChart />
+      ) : (
+        <ChartCard title="Top 10 most borrowed books">
           {top && top.length > 0 ? (
             <>
               <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={top} layout="vertical">
-                  <XAxis type="number" tick={{ fontSize: 10 }} />
-                  <YAxis type="category" dataKey="title" tick={{ fontSize: 9 }} width={160} />
+                <BarChart data={top} layout="vertical" margin={{ top: 4, right: 48, left: 0, bottom: 0 }}>
+                  <XAxis
+                    type="number"
+                    tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
+                  />
+                  <YAxis
+                    type="category" interval={0}
+                    dataKey="title"
+                    tick={{ fontSize: 9, fill: 'var(--color-muted-foreground)' }}
+                    width={160}
+                  />
                   <Tooltip contentStyle={{ fontSize: 12 }} />
-                  <Bar dataKey="borrowCount" fill={chartColorAt(1)} radius={[0, 4, 4, 0]} name="Borrows" />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar
+                    dataKey="borrowCount"
+                    fill={chartColorAt(1)}
+                    radius={[0, 4, 4, 0]}
+                    name="Borrows">
+                    <LabelList dataKey="borrowCount" {...HBAR_LABEL_PROPS} formatter={valueFormatter('number')} />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
               <div className="mt-4 space-y-1">
                 {top.map((b, i) => (
-                  <div key={b.bookId} className="flex items-center justify-between py-2 border-b border-base last:border-0">
+                  <div
+                    key={b.bookId}
+                    className="flex items-center justify-between py-2 border-b border-base last:border-0"
+                  >
                     <div className="flex items-center gap-3">
-                      <span className="w-6 h-6 rounded-full bg-brand-navy text-white text-xs flex items-center justify-center font-bold">{i + 1}</span>
+                      <span className="w-6 h-6 rounded-full bg-brand-deep text-white text-xs flex items-center justify-center font-bold">
+                        {i + 1}
+                      </span>
                       <div>
                         <p className="text-sm font-medium text-brand-navy">{b.title}</p>
-                        <p className="text-xs text-muted">{b.author} · {b.category}</p>
+                        <p className="text-xs text-muted">
+                          {b.author} · {b.category}
+                        </p>
                       </div>
                     </div>
-                    <span className="text-sm font-bold text-brand-teal">{b.borrowCount}×</span>
+                    <span className="text-sm font-bold text-tone-teal">{b.borrowCount}×</span>
                   </div>
                 ))}
               </div>
             </>
-          ) : <EmptyState />}
+          ) : (
+            <EmptyState />
+          )}
         </ChartCard>
       )}
     </div>
@@ -1175,200 +1980,115 @@ function LibraryBorrowingPanel() {
 
   return (
     <div className="space-y-5">
-      {isLoading ? <SkeletonChart /> : (
-        <ChartCard title="Weekly Borrowing Trend — Last 12 Weeks">
+      {isLoading ? (
+        <SkeletonChart />
+      ) : (
+        <ChartCard title="Weekly borrowing trend: Last 12 weeks">
           {data && data.length > 0 ? (
             <ResponsiveContainer width="100%" height={200}>
               <AreaChart data={data}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} />
+                <XAxis
+                  dataKey="label"
+                  tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
+                />
+                <YAxis tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
                 <Tooltip contentStyle={{ fontSize: 12 }} />
-                <Area type="monotone" dataKey="value" stroke={chartColorAt(1)} fill={chartColorAt(1)} fillOpacity={0.13} strokeWidth={2} name="Books Issued" />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Area
+                  type="monotone"
+                  dataKey="value"
+                  stroke={chartColorAt(1)}
+                  fill={chartColorAt(1)}
+                  fillOpacity={0.13}
+                  strokeWidth={2}
+                  name="Books Issued"
+                />
               </AreaChart>
             </ResponsiveContainer>
-          ) : <EmptyState />}
+          ) : (
+            <EmptyState />
+          )}
         </ChartCard>
       )}
     </div>
   )
 }
-
-function LibraryDigitalPanel() {
-  const { data: raw, isLoading } = useLibraryDigitalStats()
-  const stats = raw as { byType: ApiCategoryBreakdown[]; bySubject: ApiCategoryBreakdown[]; total: number; approvedCount: number } | undefined
-
-  return (
-    <div className="space-y-5">
-      {stats && (
-        <div className="grid grid-cols-2 gap-3">
-          <KpiCard label="Total Resources" value={stats.total} />
-          <KpiCard label="Approved"        value={stats.approvedCount} trend="up" />
-        </div>
-      )}
-      {isLoading ? <SkeletonChart /> : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <ChartCard title="By Resource Type">
-            {stats?.byType?.length ? (
-              <ResponsiveContainer width="100%" height={180}>
-                <PieChart>
-                  <Pie data={stats.byType} dataKey="value" nameKey="category" cx="50%" cy="50%" outerRadius={70}>
-                    {stats.byType.map((_, i) => <Cell key={i} fill={chartColorAt(i)} />)}
-                  </Pie>
-                  <Tooltip contentStyle={{ fontSize: 12 }} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : <EmptyState />}
-          </ChartCard>
-          <ChartCard title="By Subject">
-            {stats?.bySubject?.length ? (
-              <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={stats.bySubject} layout="vertical">
-                  <XAxis type="number" tick={{ fontSize: 10 }} />
-                  <YAxis type="category" dataKey="category" tick={{ fontSize: 10 }} width={100} />
-                  <Tooltip contentStyle={{ fontSize: 12 }} />
-                  <Bar dataKey="value" fill={chartColorAt(4)} radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : <EmptyState />}
-          </ChartCard>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ─── LOWER RANK PANELS ───────────────────────────────────────────────────────
-
-function LowerRankApplicationsPanel() {
-  const { data: funnel, isLoading: fl } = useApplicationsFunnel()
-  const { data: trend,  isLoading: tl } = useApplicationTrend(12)
-
-  useExportable<ApiApplicationFunnelStage>('Applications Funnel', funnel, [
-    { label: 'Stage', value: (f) => f.stage },
-    { label: 'Count', value: (f) => f.count },
-  ])
-
-  return (
-    <div className="space-y-5">
-      {funnel && (
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-          {funnel.map((s) => (
-            <KpiCard
-              key={s.stage}
-              label={s.stage}
-              value={s.count}
-              sub={`${s.pct}%`}
-              warn={s.stage === 'Denied'}
-            />
-          ))}
-        </div>
-      )}
-      {fl ? <SkeletonChart /> : (
-        <ChartCard title="Application Funnel">
-          {funnel && funnel.length > 0 ? (
-            <ResponsiveContainer width="100%" height={180}>
-              <BarChart data={funnel.filter((s) => s.stage !== 'Denied')}>
-                <XAxis dataKey="stage" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip contentStyle={{ fontSize: 12 }} />
-                <Bar dataKey="count" fill={chartColorAt(0)} radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : <EmptyState />}
-        </ChartCard>
-      )}
-      {tl ? <SkeletonChart /> : (
-        <ChartCard title="Monthly Application Submissions — Last 12 Months">
-          {trend && trend.length > 0 ? (
-            <ResponsiveContainer width="100%" height={160}>
-              <AreaChart data={trend}>
-                <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip contentStyle={{ fontSize: 12 }} />
-                <Area type="monotone" dataKey="value" stroke={chartColorAt(1)} fill={chartColorAt(1)} fillOpacity={0.08} strokeWidth={2} name="Applications" />
-              </AreaChart>
-            </ResponsiveContainer>
-          ) : <EmptyState />}
-        </ChartCard>
-      )}
-    </div>
-  )
-}
-
-function LowerRankEnrollmentPanel({ academicYear }: { academicYear: string }) {
-  const { data: raw, isLoading } = useEnrollmentByForm(academicYear)
-  const rows = raw as { form: number; className: string; studentCount: number }[] | undefined
-
-  return (
-    <div className="space-y-5">
-      {isLoading ? <SkeletonChart /> : (
-        <ChartCard title={`Enrollment by Class — ${academicYear}`}>
-          {rows && rows.length > 0 ? (
-            <>
-              <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={rows}>
-                  <XAxis dataKey="className" tick={{ fontSize: 10 }} />
-                  <YAxis tick={{ fontSize: 10 }} />
-                  <Tooltip contentStyle={{ fontSize: 12 }} />
-                  <Bar dataKey="studentCount" fill={chartColorAt(1)} radius={[4, 4, 0, 0]} name="Students" />
-                </BarChart>
-              </ResponsiveContainer>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
-                {[1, 2, 3, 4].map((form) => {
-                  const total = rows.filter((r) => r.form === form).reduce((s, r) => s + r.studentCount, 0)
-                  return <KpiCard key={form} label={`Form ${form}`} value={total} />
-                })}
-              </div>
-            </>
-          ) : <EmptyState />}
-        </ChartCard>
-      )}
-    </div>
-  )
-}
-
-// ─── ACADEMIC STAFF PANELS ───────────────────────────────────────────────────
 
 function AcademicSubjectsPanel({ academicYear, term }: { academicYear: string; term: number }) {
   const { data: rows, isLoading } = useAcademicSubjectPerformance(academicYear, term)
 
-  useExportable<ApiAcademicSubjectPerformanceRow>(`Subject Performance ${academicYear} Term ${term}`, rows, [
-    { label: 'Subject',       value: (r) => r.subject },
-    { label: 'Class',         value: (r) => r.className },
-    { label: 'Students',      value: (r) => r.studentCount },
-    { label: 'Average',       value: (r) => r.average },
-    { label: 'Pass Rate (%)', value: (r) => r.passRate },
-  ])
+  useExportable<ApiAcademicSubjectPerformanceRow>(
+    `Subject Performance ${academicYear} Term ${term}`,
+    rows,
+    [
+      { label: 'Subject', value: (r) => r.subject },
+      { label: 'Class', value: (r) => r.className },
+      { label: 'Students', value: (r) => r.studentCount },
+      { label: 'Average', value: (r) => r.average },
+      { label: 'Pass Rate (%)', value: (r) => r.passRate },
+    ]
+  )
 
   return (
     <div className="space-y-5">
-      {isLoading ? <SkeletonChart /> : (
+      {isLoading ? (
+        <SkeletonChart />
+      ) : (
         <>
-          <ChartCard title="Subject Performance — My Classes">
+          <ChartCard title="Subject performance: my classes">
             {rows && rows.length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={rows.slice(0, 12)}>
+                <BarChart data={rows.slice(0, 12)} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                  <XAxis dataKey="subject" tick={{ fontSize: 9 }} />
-                  <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
+                  <XAxis
+                    dataKey="subject"
+                    tick={{ fontSize: 9, fill: 'var(--color-muted-foreground)' }}
+                    interval={0}
+                    tickFormatter={(v: unknown) => truncateLabel(v, 14)}
+                    angle={-30} textAnchor="end" height={56}
+                  />
+                  <YAxis
+                    domain={[0, 100]}
+                    tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
+                  />
                   <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [`${num(v)}%`, '']} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Bar dataKey="average"  fill={chartColorAt(0)} radius={[4, 4, 0, 0]} name="Average %" />
-                  <Bar dataKey="passRate" fill={chartColorAt(1)} radius={[4, 4, 0, 0]} name="Pass Rate %" />
+                  <Bar
+                    dataKey="average"
+                    fill={chartColorAt(0)}
+                    radius={[4, 4, 0, 0]}
+                    name="Average %">
+                    <LabelList dataKey="average" {...BAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('percent')} />
+                  </Bar>
+                  <Bar
+                    dataKey="passRate"
+                    fill={chartColorAt(1)}
+                    radius={[4, 4, 0, 0]}
+                    name="Pass Rate %">
+                    <LabelList dataKey="passRate" {...BAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('percent')} />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
-            ) : <EmptyState message="No finalised exam data for this term" />}
+            ) : (
+              <EmptyState message="No finalised exam data for this term" />
+            )}
           </ChartCard>
           {rows && rows.length > 0 && (
-            <div className="border border-base rounded-2xl overflow-hidden">
-              <table className="w-full text-sm">
-                <thead><tr className="bg-page border-b border-base">
-                  {['Subject', 'Class', 'Students', 'Avg Score', 'Pass Rate'].map((h) => (
-                    <th key={h} className="px-4 py-2 text-left text-xs font-semibold text-muted uppercase">{h}</th>
-                  ))}
-                </tr></thead>
+            <div className="table-scroll">
+              <table className="w-full text-sm min-w-130">
+                <thead>
+                  <tr className="bg-page border-b border-base">
+                    {['Subject', 'Class', 'Students', 'Avg Score', 'Pass Rate'].map((h) => (
+                      <th
+                        key={h}
+                        className="px-4 py-2 text-left text-xs font-semibold text-muted"
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
                 <tbody className="divide-y divide-base">
                   {rows.map((r, i) => (
                     <tr key={i} className="hover:bg-page">
@@ -1377,7 +2097,11 @@ function AcademicSubjectsPanel({ academicYear, term }: { academicYear: string; t
                       <td className="px-4 py-2">{r.studentCount}</td>
                       <td className="px-4 py-2 font-bold text-brand-navy">{r.average}%</td>
                       <td className="px-4 py-2">
-                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${r.passRate >= 50 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{r.passRate}%</span>
+                        <span
+                          className={`text-xs font-semibold ${r.passRate >= 50 ? 'text-tone-teal' : 'text-tone-coral'}`}
+                        >
+                          {r.passRate}%
+                        </span>
                       </td>
                     </tr>
                   ))}
@@ -1391,200 +2115,15 @@ function AcademicSubjectsPanel({ academicYear, term }: { academicYear: string; t
   )
 }
 
-function AcademicAssignmentsPanel({ academicYear }: { academicYear: string }) {
-  const { data: rows, isLoading } = useAcademicAssignmentCompletion(academicYear)
-
-  useExportable<ApiAssignmentCompletionRow>(`Assignment Completion ${academicYear}`, rows, [
-    { label: 'Assignment',      value: (a) => a.title },
-    { label: 'Subject',         value: (a) => a.subject },
-    { label: 'Due',             value: (a) => a.dueDate },
-    { label: 'Submitted',       value: (a) => a.submitted },
-    { label: 'Total',           value: (a) => a.total },
-    { label: 'Completion (%)',  value: (a) => a.completionRate },
-  ])
-
-  return (
-    <div className="space-y-5">
-      {isLoading ? <SkeletonChart /> : (
-        <ChartCard title="Assignment Completion Rates">
-          {rows && rows.length > 0 ? (
-            <div className="space-y-2">
-              {rows.map((r) => (
-                <div key={r.assignmentId} className="flex items-center gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-0.5">
-                      <p className="text-sm font-medium text-brand-navy truncate">{r.title}</p>
-                      <span className="text-xs text-muted ml-2 whitespace-nowrap">{r.submitted}/{r.total}</span>
-                    </div>
-                    <p className="text-xs text-muted mb-1">{r.subject} · Due {r.dueDate}</p>
-                    <div className="h-2 bg-base rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all ${r.completionRate >= 80 ? 'bg-brand-teal' : r.completionRate >= 50 ? 'bg-brand-amber' : 'bg-brand-coral'}`}
-                        style={{ width: `${r.completionRate}%` }}
-                      />
-                    </div>
-                  </div>
-                  <span className={`text-sm font-bold w-12 text-right ${r.completionRate >= 80 ? 'text-brand-teal' : r.completionRate >= 50 ? 'text-brand-amber' : 'text-brand-coral'}`}>{r.completionRate}%</span>
-                </div>
-              ))}
-            </div>
-          ) : <EmptyState message="No assignments found for this year" />}
-        </ChartCard>
-      )}
-    </div>
-  )
-}
-
-// ─── STUDENT PANELS ──────────────────────────────────────────────────────────
-
-function StudentPerformancePanel({ studentId, academicYear, term }: { studentId: string; academicYear: string; term: number }) {
-  const { data: trend,    isLoading: tl } = useStudentPerformanceTrend(studentId)
-  const { data: subjects, isLoading: sl } = useStudentSubjectBreakdown(studentId, academicYear, term)
-
-  useExportable<ApiStudentPerformancePoint>('Performance Trend', trend, [
-    { label: 'Academic Year',  value: (p) => p.academicYear },
-    { label: 'Term',           value: (p) => p.term },
-    { label: 'Average',        value: (p) => p.average },
-    { label: 'Grade',          value: (p) => p.grade },
-    { label: 'Position',       value: (p) => p.position },
-    { label: 'Class Total',    value: (p) => p.classTotal },
-    { label: 'Attendance (%)', value: (p) => p.attendancePct },
-  ])
-
-  const latest = trend?.[trend.length - 1]
-
-  return (
-    <div className="space-y-5">
-      {latest && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <KpiCard label="Latest Average" value={`${latest.average}%`} trend={latest.passStatus ? 'up' : 'down'} />
-          <KpiCard label="Grade"          value={latest.grade} />
-          <KpiCard label="Class Position" value={latest.position !== null ? `#${latest.position} of ${latest.classTotal}` : '—'} />
-          <KpiCard label="Attendance"     value={`${latest.attendancePct}%`} warn={latest.attendancePct < 80} />
-        </div>
-      )}
-      {tl ? <SkeletonChart /> : (
-        <ChartCard title="My Performance Trend">
-          {trend && trend.length > 0 ? (
-            <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={trend.map((t) => ({ ...t, label: `${t.academicYear} T${t.term}` }))}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                <XAxis dataKey="label" tick={{ fontSize: 9 }} />
-                <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
-                <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [`${num(v)}%`, '']} />
-                <Line type="monotone" dataKey="average" stroke={chartColorAt(1)} strokeWidth={2} dot name="Average %" />
-              </LineChart>
-            </ResponsiveContainer>
-          ) : <EmptyState />}
-        </ChartCard>
-      )}
-      {sl ? <SkeletonChart /> : (
-        <ChartCard title={`Subject Breakdown — ${academicYear} Term ${term}`}>
-          {subjects && subjects.length > 0 ? (
-            <>
-              <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={subjects}>
-                  <XAxis dataKey="subject" tick={{ fontSize: 9 }} />
-                  <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
-                  <Tooltip contentStyle={{ fontSize: 12 }} />
-                  <Bar dataKey="score" fill={chartColorAt(0)} radius={[4, 4, 0, 0]} name="Score">
-                    {subjects.map((s, i) => (
-                      <Cell key={i} fill={Number(s.score) / s.maxMark * 100 >= 50 ? chartColorAt(1) : chartColorAt(3)} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-3">
-                {subjects.map((s) => (
-                  <div key={s.subject} className="bg-page border border-base rounded-xl p-3">
-                    <p className="text-xs text-muted truncate">{s.subject}</p>
-                    <p className="font-bold text-brand-navy">{s.score}/{s.maxMark}</p>
-                    <p className={`text-xs font-semibold ${s.grade === 'F' ? 'text-brand-coral' : 'text-brand-teal'}`}>{s.grade}</p>
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : <EmptyState message="No results released for this term" />}
-        </ChartCard>
-      )}
-    </div>
-  )
-}
-
-function StudentFeesPanel({ studentId }: { studentId: string }) {
-  const { data: invoices, isLoading } = useStudentFeeStatement(studentId)
-
-  const totalOwed = invoices?.reduce((s, i) => s + i.balance, 0) ?? 0
-
-  useExportable<ApiStudentFeeStatement>('Fee Statement', invoices, [
-    { label: 'Academic Year', value: (i) => i.academicYear },
-    { label: 'Term',          value: (i) => i.term },
-    { label: 'Total (MWK)',   value: (i) => i.totalAmount },
-    { label: 'Paid (MWK)',    value: (i) => i.paidAmount },
-    { label: 'Balance (MWK)', value: (i) => i.balance },
-    { label: 'Status',        value: (i) => i.status },
-    { label: 'Due Date',      value: (i) => i.dueDate },
-  ])
-
-  return (
-    <div className="space-y-5">
-      {invoices && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <KpiCard label="Total Outstanding" value={`MWK ${totalOwed.toLocaleString()}`} warn={totalOwed > 0} />
-          <KpiCard label="Invoices"          value={invoices.length} />
-          <KpiCard label="Fully Paid"        value={invoices.filter((i) => i.status === 'PAID').length} trend="up" />
-          <KpiCard label="Overdue"           value={invoices.filter((i) => i.status === 'OVERDUE').length} warn />
-        </div>
-      )}
-      {isLoading ? <SkeletonChart /> : (
-        <div className="space-y-3">
-          {invoices?.map((inv) => (
-            <div key={inv.invoiceId} className="bg-surface border border-base rounded-2xl p-4">
-              <div className="flex items-center justify-between mb-2">
-                <div>
-                  <p className="font-semibold text-brand-navy">{inv.academicYear} — Term {inv.term}</p>
-                  <p className="text-xs text-muted">Due {inv.dueDate}</p>
-                </div>
-                <span className={`text-xs font-semibold px-3 py-1 rounded-full ${
-                  inv.status === 'PAID'    ? 'bg-green-50 text-green-700' :
-                  inv.status === 'OVERDUE' ? 'bg-red-50 text-red-700' :
-                  inv.status === 'PARTIAL' ? 'bg-amber-50 text-amber-700' :
-                  'bg-base text-muted'
-                }`}>{inv.status}</span>
-              </div>
-              <div className="grid grid-cols-3 gap-2 text-sm mb-3">
-                <div><p className="text-xs text-muted">Total</p><p className="font-bold">MWK {inv.totalAmount.toLocaleString()}</p></div>
-                <div><p className="text-xs text-muted">Paid</p><p className="font-bold text-brand-teal">MWK {inv.paidAmount.toLocaleString()}</p></div>
-                <div><p className="text-xs text-muted">Balance</p><p className={`font-bold ${inv.balance > 0 ? 'text-brand-coral' : 'text-brand-teal'}`}>MWK {inv.balance.toLocaleString()}</p></div>
-              </div>
-              {inv.payments.length > 0 && (
-                <div className="border-t border-base pt-2 space-y-1">
-                  {inv.payments.map((p, i) => (
-                    <div key={i} className="flex items-center justify-between text-xs text-muted">
-                      <span>{p.method} · {p.paidAt}</span>
-                      <span className="font-medium text-brand-navy">MWK {p.amount.toLocaleString()}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-          {(!invoices || invoices.length === 0) && <EmptyState message="No invoices found" />}
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ─── MANEB PANELS ────────────────────────────────────────────────────────────
 
 function ManebAnalyticsPanel({ academicYear }: { academicYear: string }) {
   const { data: stats, isLoading } = useManebSchoolStats(academicYear)
 
   useExportable<ApiManebSchoolStat>(`MANEB Results ${academicYear}`, stats, [
-    { label: 'Exam',          value: (m) => m.examType },
-    { label: 'Candidates',    value: (m) => m.total },
-    { label: 'Passed',        value: (m) => m.passCount },
+    { label: 'Exam', value: (m) => m.examType },
+    { label: 'Candidates', value: (m) => m.total },
+    { label: 'Passed', value: (m) => m.passCount },
     { label: 'Pass Rate (%)', value: (m) => m.passRate },
   ])
 
@@ -1594,25 +2133,56 @@ function ManebAnalyticsPanel({ academicYear }: { academicYear: string }) {
       {stats?.map((stat) => (
         <div key={stat.examType} className="space-y-4">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-brand-navy text-white">{stat.examType}</span>
+            <span className="text-xs font-bold text-status-info">
+              {stat.examType}
+            </span>
             <span className="text-sm text-muted">{stat.total} candidates</span>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <KpiCard label="Total Candidates" value={stat.total} />
-            <KpiCard label="Passed"           value={stat.passCount} trend="up" />
-            <KpiCard label="Pass Rate"        value={`${stat.passRate}%`} trend={stat.passRate >= 50 ? 'up' : 'down'} warn={stat.passRate < 50} />
+            <KpiCard label="Total candidates" value={stat.total} />
+            <KpiCard label="Passed" value={stat.passCount} trend="up" />
+            <KpiCard
+              label="Pass rate"
+              value={`${stat.passRate}%`}
+              trend={stat.passRate >= 50 ? 'up' : 'down'}
+              warn={stat.passRate < 50}
+            />
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <ChartCard title={`${stat.examType} Grade Distribution`}>
               <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={stat.gradeDistribution}>
-                  <XAxis dataKey="category" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 10 }} />
+                <BarChart data={stat.gradeDistribution} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
+                  <XAxis
+                    dataKey="category"
+                    tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
+                    interval={0}
+                    tickFormatter={(v: unknown) => truncateLabel(v, 14)}
+                  />
+                  <YAxis tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
                   <Tooltip contentStyle={{ fontSize: 12 }} />
+                  {/* Colour is set per grade (Cell), not per series, so the key spells out
+                      what each colour means instead of showing one unnamed swatch. */}
+                  <Legend
+                    content={fixedKey([
+                      { value: 'Grades A–B', color: chartColorAt(1) },
+                      { value: 'Other grades', color: chartColorAt(2) },
+                      { value: 'Grade U', color: chartColorAt(3) },
+                    ])}
+                  />
                   <Bar dataKey="value" radius={[4, 4, 0, 0]} name="Students">
                     {stat.gradeDistribution.map((g, i) => (
-                      <Cell key={i} fill={['A', 'B'].includes(g.category) ? chartColorAt(1) : g.category === 'U' ? chartColorAt(3) : chartColorAt(2)} />
+                      <Cell
+                        key={i}
+                        fill={
+                          ['A', 'B'].includes(g.category)
+                            ? chartColorAt(1)
+                            : g.category === 'U'
+                              ? chartColorAt(3)
+                              : chartColorAt(2)
+                        }
+                      />
                     ))}
+                    <LabelList dataKey="value" {...BAR_LABEL_PROPS} formatter={valueFormatter('number')} />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -1620,116 +2190,45 @@ function ManebAnalyticsPanel({ academicYear }: { academicYear: string }) {
             <ChartCard title={`${stat.examType} Subject Pass Rates`}>
               {stat.subjectAverages.length > 0 ? (
                 <ResponsiveContainer width="100%" height={180}>
-                  <BarChart data={stat.subjectAverages.slice(0, 8)} layout="vertical">
-                    <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 10 }} />
-                    <YAxis type="category" dataKey="subject" tick={{ fontSize: 9 }} width={100} />
-                    <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [`${num(v)}%`, 'Pass Rate']} />
+                  <BarChart data={stat.subjectAverages.slice(0, 8)} layout="vertical" margin={{ top: 4, right: 48, left: 0, bottom: 0 }}>
+                    <XAxis
+                      type="number"
+                      domain={[0, 100]}
+                      tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
+                    />
+                    <YAxis
+                      type="category" interval={0}
+                      dataKey="subject"
+                      tick={{ fontSize: 9, fill: 'var(--color-muted-foreground)' }}
+                      width={100}
+                    />
+                    <Tooltip
+                      contentStyle={{ fontSize: 12 }}
+                      formatter={(v) => [`${num(v)}%`, 'Pass Rate']}
+                    />
+                    <Legend
+                      content={fixedKey([
+                        { value: 'Pass rate 50% or above', color: chartColorAt(1) },
+                        { value: 'Pass rate below 50%', color: chartColorAt(3) },
+                      ])}
+                    />
                     <Bar dataKey="passRate" radius={[0, 4, 4, 0]} name="Pass Rate %">
                       {stat.subjectAverages.slice(0, 8).map((s, i) => (
                         <Cell key={i} fill={s.passRate >= 50 ? chartColorAt(1) : chartColorAt(3)} />
                       ))}
+                      <LabelList dataKey="passRate" {...HBAR_LABEL_PROPS} formatter={valueFormatter('percent')} />
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
-              ) : <EmptyState />}
+              ) : (
+                <EmptyState />
+              )}
             </ChartCard>
           </div>
         </div>
       ))}
-      {!isLoading && (!stats || stats.length === 0) && <EmptyState message="No MANEB records for this academic year" />}
-    </div>
-  )
-}
-
-// ─── HR PANELS ───────────────────────────────────────────────────────────────
-
-function HRStaffingPanel() {
-  const { data: depts, isLoading: dl } = useHRStaffByDepartment()
-
-  useExportable<ApiCategoryBreakdown>('Staff by Department', depts, [
-    { label: 'Department', value: (d) => d.category },
-    { label: 'Staff',      value: (d) => d.value },
-  ])
-
-  return (
-    <div className="space-y-5">
-      {depts && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <KpiCard label="Active Staff"   value={depts.reduce((s, d) => s + d.value, 0)} />
-          <KpiCard label="Departments"    value={depts.length} />
-          <KpiCard label="Largest Dept."  value={depts[0]?.category ?? '—'} />
-          <KpiCard label="Smallest Dept." value={depts[depts.length - 1]?.category ?? '—'} />
-        </div>
-      )}
-      {dl ? <SkeletonChart /> : (
-        <ChartCard title="Staff Headcount by Department">
-          {depts && depts.length > 0 ? (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <ResponsiveContainer width="100%" height={200}>
-                <PieChart>
-                  <Pie data={depts} dataKey="value" nameKey="category" cx="50%" cy="50%" outerRadius={80}>
-                    {depts.map((_, i) => <Cell key={i} fill={chartColorAt(i)} />)}
-                  </Pie>
-                  <Tooltip contentStyle={{ fontSize: 12 }} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                </PieChart>
-              </ResponsiveContainer>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={depts} layout="vertical">
-                  <XAxis type="number" tick={{ fontSize: 10 }} />
-                  <YAxis type="category" dataKey="category" tick={{ fontSize: 10 }} width={100} />
-                  <Tooltip contentStyle={{ fontSize: 12 }} />
-                  <Bar dataKey="value" fill={chartColorAt(0)} radius={[0, 4, 4, 0]} name="Staff" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          ) : <EmptyState />}
-        </ChartCard>
-      )}
-    </div>
-  )
-}
-
-function HRLeavePanel() {
-  const { data: typeRaw, isLoading: tl } = useHRLeaveByType()
-  const { data: trendRaw, isLoading: trl } = useHRLeaveTrend(12)
-  const types = typeRaw as ApiCategoryBreakdown[] | undefined
-  const trend = trendRaw as { label: string; value: number; value2: number }[] | undefined
-
-  return (
-    <div className="space-y-5">
-      {tl ? <SkeletonChart /> : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <ChartCard title="Leave Days by Type — Current Year">
-            {types && types.length > 0 ? (
-              <ResponsiveContainer width="100%" height={180}>
-                <PieChart>
-                  <Pie data={types} dataKey="value" nameKey="category" cx="50%" cy="50%" outerRadius={70}>
-                    {types.map((_, i) => <Cell key={i} fill={chartColorAt(i)} />)}
-                  </Pie>
-                  <Tooltip contentStyle={{ fontSize: 12 }} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : <EmptyState />}
-          </ChartCard>
-          {trl ? <SkeletonChart /> : (
-            <ChartCard title="Leave Requests Trend — Last 12 Months">
-              {trend && trend.length > 0 ? (
-                <ResponsiveContainer width="100%" height={180}>
-                  <ComposedChart data={trend}>
-                    <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                    <YAxis tick={{ fontSize: 10 }} />
-                    <Tooltip contentStyle={{ fontSize: 12 }} />
-                    <Legend wrapperStyle={{ fontSize: 11 }} />
-                    <Bar dataKey="value"  fill={chartColorAt(1)} radius={[4, 4, 0, 0]} name="Approved" />
-                    <Bar dataKey="value2" fill={chartColorAt(3)} radius={[4, 4, 0, 0]} name="Rejected" />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              ) : <EmptyState />}
-            </ChartCard>
-          )}
-        </div>
+      {!isLoading && (!stats || stats.length === 0) && (
+        <EmptyState message="No MANEB records for this academic year" />
       )}
     </div>
   )
@@ -1744,145 +2243,66 @@ function HRLeavePanel() {
 // endpoints (marks distribution, MANEB candidate list), and the seven
 // zero-consumer report hooks (one Summary tab per role).
 
-/** report.viewAttendanceSummary — high_rank, lower_rank, academic, hr, exam_officer. */
-function AttendanceSummaryPanel({ academicYear, term }: { academicYear: string; term: number }) {
-  const { data, isLoading } = useAttendanceSummary(academicYear, term)
-
-  useExportable<ApiAttendanceSummaryRow>(
-    `Attendance ${academicYear} Term ${term}`,
-    data?.byClass,
-    [
-      { label: 'Class',          value: (r) => r.className },
-      { label: 'Form',           value: (r) => r.form },
-      { label: 'Students',       value: (r) => r.studentCount },
-      { label: 'Present',        value: (r) => r.daysPresent },
-      { label: 'Absent',         value: (r) => r.daysAbsent },
-      { label: 'Late',           value: (r) => r.daysLate },
-      { label: 'Attendance (%)', value: (r) => r.attendanceRate },
-    ],
-  )
-
-  if (isLoading) return <SkeletonChart />
-  if (!data || data.byClass.length === 0) return <EmptyState message="No attendance recorded for this term" />
-
-  return (
-    <div className="space-y-5">
-      <SectionHeader title={`Attendance — ${academicYear} Term ${term}`} icon={<Activity className="w-4 h-4" />} />
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <KpiCard label="Attendance Rate" value={`${data.attendanceRate}%`} warn={data.attendanceRate < 85} />
-        <KpiCard label="Days Present"    value={data.daysPresent.toLocaleString()} />
-        <KpiCard label="Days Absent"     value={data.daysAbsent.toLocaleString()} warn={data.daysAbsent > 0} />
-        <KpiCard label="Days Late"       value={data.daysLate.toLocaleString()} />
-      </div>
-      <ChartCard title="Attendance Rate by Class">
-        <ResponsiveContainer width="100%" height={260}>
-          <BarChart data={data.byClass}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-            <XAxis dataKey="className" tick={{ fontSize: 10 }} />
-            <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
-            <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [`${num(v)}%`, 'Attendance']} />
-            <ReferenceLine y={85} stroke={chartColorAt(3)} strokeDasharray="4 4" />
-            <Bar dataKey="attendanceRate" radius={[4, 4, 0, 0]} name="Attendance %">
-              {data.byClass.map((c) => (
-                <Cell key={c.classId} fill={c.attendanceRate >= 85 ? chartColorAt(1) : chartColorAt(2)} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </ChartCard>
-    </div>
-  )
-}
-
-/** report.viewOwnAttendance — the student's own record. */
-function StudentAttendancePanel({ studentId, academicYear, term }: { studentId: string; academicYear: string; term: number }) {
-  const { data, isLoading } = useOwnAttendance(studentId, academicYear, term)
-
-  useExportable('My Attendance', data ? [data] : undefined, [
-    { label: 'Academic Year',  value: (r: typeof data & object) => r.academicYear },
-    { label: 'Term',           value: (r: typeof data & object) => r.term },
-    { label: 'Days Present',   value: (r: typeof data & object) => r.daysPresent },
-    { label: 'Days Absent',    value: (r: typeof data & object) => r.daysAbsent },
-    { label: 'Days Late',      value: (r: typeof data & object) => r.daysLate },
-    { label: 'Total Days',     value: (r: typeof data & object) => r.totalDays },
-    { label: 'Attendance (%)', value: (r: typeof data & object) => r.attendanceRate },
-  ])
-
-  if (isLoading) return <SkeletonChart />
-  if (!data || data.totalDays === 0) return <EmptyState message="No attendance recorded for this term" />
-
-  const breakdown = [
-    { category: 'Present', value: data.daysPresent, pct: 0 },
-    { category: 'Late',    value: data.daysLate,    pct: 0 },
-    { category: 'Absent',  value: data.daysAbsent,  pct: 0 },
-  ].filter((b) => b.value > 0)
-
-  return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <KpiCard label="Attendance Rate" value={`${data.attendanceRate}%`} warn={data.attendanceRate < 85} />
-        <KpiCard label="Present" value={data.daysPresent} />
-        <KpiCard label="Late"    value={data.daysLate} />
-        <KpiCard label="Absent"  value={data.daysAbsent} warn={data.daysAbsent > 0} />
-      </div>
-      <ChartCard title={`My Attendance — ${academicYear} Term ${term}`}>
-        <ResponsiveContainer width="100%" height={220}>
-          <PieChart>
-            <Pie data={breakdown} dataKey="value" nameKey="category" cx="50%" cy="50%" outerRadius={80} label={(p: PieLabelRenderProps) => `${p.name ?? ''} ${num(p.value)}`} fontSize={11}>
-              {breakdown.map((b, i) => (
-                <Cell key={b.category} fill={[chartColorAt(1), chartColorAt(2), chartColorAt(3)][i % 3]} />
-              ))}
-            </Pie>
-            <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [`${num(v)} days`, '']} />
-          </PieChart>
-        </ResponsiveContainer>
-      </ChartCard>
-    </div>
-  )
-}
-
 /** report.viewScholarshipSummary — high_rank, finance. */
 function FinanceScholarshipsPanel({ academicYear }: { academicYear: string }) {
   const { data, isLoading } = useScholarshipSummary(academicYear)
 
-  useExportable<ApiScholarshipSummaryRow>(
-    `Scholarships ${academicYear}`,
-    data?.byScholarship,
-    [
-      { label: 'Scholarship',    value: (r) => r.name },
-      { label: 'Discount Type',  value: (r) => r.discountType },
-      { label: 'Recipients',     value: (r) => r.recipientCount },
-      { label: 'Discount (MWK)', value: (r) => r.totalDiscount },
-    ],
-  )
+  useExportable<ApiScholarshipSummaryRow>(`Scholarships ${academicYear}`, data?.byScholarship, [
+    { label: 'Scholarship', value: (r) => r.name },
+    { label: 'Discount type', value: (r) => r.discountType },
+    { label: 'Recipients', value: (r) => r.recipientCount },
+    { label: 'Discount (MWK)', value: (r) => r.totalDiscount },
+  ])
 
   if (isLoading) return <SkeletonChart />
-  if (!data || data.byScholarship.length === 0) return <EmptyState message="No active scholarships this year" />
+  if (!data || data.byScholarship.length === 0)
+    return <EmptyState message="No active scholarships this year" />
 
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <KpiCard label="Active Awards"   value={data.activeScholarships} />
-        <KpiCard label="Recipients"      value={data.recipientCount} />
-        <KpiCard label="Total Discount"  value={`MWK ${data.totalDiscountMwk.toLocaleString()}`} />
+        <KpiCard label="Active awards" value={data.activeScholarships} />
+        <KpiCard label="Recipients" value={data.recipientCount} />
+        <KpiCard label="Total discount" value={`MWK ${data.totalDiscountMwk.toLocaleString()}`} />
       </div>
-      <ChartCard title={`Scholarship Value — ${academicYear}`}>
+      <ChartCard title={`Scholarship Value: ${academicYear}`}>
         <ResponsiveContainer width="100%" height={260}>
-          <BarChart data={data.byScholarship} layout="vertical">
-            <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}K`} />
-            <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={130} />
+          <BarChart data={data.byScholarship} layout="vertical" margin={{ top: 4, right: 48, left: 0, bottom: 0 }}>
+            <XAxis
+              type="number"
+              tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
+              tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}K`}
+            />
+            <YAxis
+              type="category" interval={0}
+              dataKey="name"
+              tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
+              width={130}
+            />
             <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [mwk(v), 'Discount']} />
-            <Bar dataKey="totalDiscount" fill={chartColorAt(4)} radius={[0, 4, 4, 0]} name="Discount" />
+            <Legend wrapperStyle={{ fontSize: 11 }} />
+            <Bar
+              dataKey="totalDiscount"
+              fill={chartColorAt(4)}
+              radius={[0, 4, 4, 0]}
+              name="Discount">
+              <LabelList dataKey="totalDiscount" {...HBAR_LABEL_PROPS} formatter={valueFormatter('mwk')} />
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       </ChartCard>
-      <div className="border border-base rounded-2xl overflow-hidden">
+      <div className="overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="bg-page border-b border-base">
                 {['Scholarship', 'Type', 'Recipients', 'Total Discount'].map((h) => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase whitespace-nowrap">{h}</th>
+                  <th
+                    key={h}
+                    className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted whitespace-nowrap"
+                  >
+                    {h}
+                  </th>
                 ))}
               </tr>
             </thead>
@@ -1890,7 +2310,9 @@ function FinanceScholarshipsPanel({ academicYear }: { academicYear: string }) {
               {data.byScholarship.map((r) => (
                 <tr key={r.name} className="border-b border-base last:border-0">
                   <td className="px-4 py-3 font-medium text-brand-navy">{r.name}</td>
-                  <td className="px-4 py-3 text-muted">{r.discountType === 'PERCENTAGE' ? 'Percentage' : 'Fixed amount'}</td>
+                  <td className="px-4 py-3 text-muted">
+                    {r.discountType === 'PERCENTAGE' ? 'Percentage' : 'Fixed amount'}
+                  </td>
                   <td className="px-4 py-3">{r.recipientCount}</td>
                   <td className="px-4 py-3 font-medium">MWK {r.totalDiscount.toLocaleString()}</td>
                 </tr>
@@ -1899,6 +2321,40 @@ function FinanceScholarshipsPanel({ academicYear }: { academicYear: string }) {
           </table>
         </div>
       </div>
+
+      {/* Who funds the awards: learners sponsored by each type. 'Not specified'
+          covers awards recorded before the sponsor field existed. */}
+      {data.bySponsor && data.bySponsor.length > 0 && (
+        <div className="overflow-hidden">
+          <p className="font-heading font-semibold text-sm text-brand-navy mb-2">By sponsor</p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="bg-page border-b border-base">
+                  {['Sponsor', 'Learners', 'Total Discount'].map((h) => (
+                    <th key={h} className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted whitespace-nowrap">
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.bySponsor.map((r) => (
+                  <tr key={r.sponsorType} className="border-b border-base last:border-0">
+                    <td className="px-4 py-3 font-medium text-brand-navy">
+                      {r.sponsorType === 'NOT_SPECIFIED'
+                        ? 'Not specified'
+                        : (SPONSOR_TYPE_LABELS as Record<string, string>)[r.sponsorType] ?? r.sponsorType}
+                    </td>
+                    <td className="px-4 py-3">{r.recipientCount}</td>
+                    <td className="px-4 py-3 font-medium">MWK {r.totalDiscount.toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -1913,15 +2369,18 @@ function MarksDistributionPanel() {
   const { data: buckets, isLoading } = useAcademicMarksDistribution(examId)
 
   useExportable<ApiMarksDistributionBucket>('Marks Distribution', buckets, [
-    { label: 'Mark Range', value: (b) => b.bucket },
-    { label: 'Students',   value: (b) => b.count },
+    { label: 'Mark range', value: (b) => b.bucket },
+    { label: 'Students', value: (b) => b.count },
   ])
 
   return (
     <div className="space-y-5">
-      <div className="bg-surface border border-base rounded-2xl p-5 flex flex-col sm:flex-row sm:items-end gap-3">
+      <div className="pb-5 border-b border-base flex flex-col sm:flex-row sm:items-end gap-3">
         <div className="flex-1">
-          <label htmlFor="marks-exam-id" className="block text-xs font-medium text-muted uppercase tracking-wide mb-1.5">
+          <label
+            htmlFor="marks-exam-id"
+            className="block text-xs font-medium text-muted mb-1.5"
+          >
             Exam ID
           </label>
           <input
@@ -1942,12 +2401,26 @@ function MarksDistributionPanel() {
       ) : buckets && buckets.length > 0 ? (
         <ChartCard title="Marks Distribution">
           <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={buckets}>
+            <BarChart data={buckets} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-              <XAxis dataKey="bucket" tick={{ fontSize: 11 }} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 10 }} />
-              <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [`${num(v)} students`, '']} />
-              <Bar dataKey="count" fill={chartColorAt(0)} radius={[4, 4, 0, 0]} name="Students" />
+              <XAxis
+                dataKey="bucket"
+                tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
+                interval={0}
+                tickFormatter={(v: unknown) => truncateLabel(v, 14)}
+              />
+              <YAxis
+                allowDecimals={false}
+                tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
+              />
+              <Tooltip
+                contentStyle={{ fontSize: 12 }}
+                formatter={(v) => [`${num(v)} students`, '']}
+              />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Bar dataKey="count" fill={chartColorAt(0)} radius={[4, 4, 0, 0]} name="Students">
+                <LabelList dataKey="count" {...BAR_LABEL_PROPS} formatter={valueFormatter('number')} />
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -1967,21 +2440,27 @@ function ManebCandidatesPanel({ academicYear }: { academicYear: string }) {
   const [examType, setExamType] = useState<'JCE' | 'MSCE' | ''>('')
   const { data: candidates, isLoading } = useManebCandidates(
     academicYear,
-    examType === '' ? undefined : examType,
+    examType === '' ? undefined : examType
   )
 
   useExportable<ApiManebResultSummary>(`MANEB Candidates ${academicYear}`, candidates, [
     { label: 'Candidate No', value: (c) => c.candidateNo },
-    { label: 'Exam',         value: (c) => c.examType },
-    { label: 'Overall Grade', value: (c) => c.overallGrade },
-    { label: 'Status',       value: (c) => c.status },
-    { label: 'Subjects',     value: (c) => c.subjectGrades.map((g) => `${g.subject}:${g.grade}`).join('; ') },
+    { label: 'Exam', value: (c) => c.examType },
+    { label: 'Overall grade', value: (c) => c.overallGrade },
+    { label: 'Status', value: (c) => c.status },
+    {
+      label: 'Subjects',
+      value: (c) => c.subjectGrades.map((g) => `${g.subject}:${g.grade}`).join('; '),
+    },
   ])
 
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <SectionHeader title={`MANEB Candidates — ${academicYear}`} icon={<Users className="w-4 h-4" />} />
+        <SectionHeader
+          title={`MANEB Candidates: ${academicYear}`}
+          icon={<Users className="w-4 h-4" />}
+        />
         <select
           value={examType}
           onChange={(e) => setExamType(e.target.value as 'JCE' | 'MSCE' | '')}
@@ -1994,23 +2473,32 @@ function ManebCandidatesPanel({ academicYear }: { academicYear: string }) {
         </select>
       </div>
 
-      {isLoading ? <SkeletonChart /> : candidates && candidates.length > 0 ? (
-        <div className="border border-base rounded-2xl overflow-hidden">
+      {isLoading ? (
+        <SkeletonChart />
+      ) : candidates && candidates.length > 0 ? (
+        <div className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="bg-page border-b border-base">
                   {['Candidate No', 'Exam', 'Overall', 'Subjects', 'Status'].map((h) => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase whitespace-nowrap">{h}</th>
+                    <th
+                      key={h}
+                      className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted whitespace-nowrap"
+                    >
+                      {h}
+                    </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {candidates.map((c) => (
                   <tr key={c.candidateNo} className="border-b border-base last:border-0">
-                    <td className="px-4 py-3 font-medium text-brand-navy whitespace-nowrap">{c.candidateNo}</td>
+                    <td className="px-4 py-3 font-medium text-brand-navy whitespace-nowrap">
+                      {c.candidateNo}
+                    </td>
                     <td className="px-4 py-3 text-muted">{c.examType}</td>
-                    <td className="px-4 py-3 font-bold">{c.overallGrade ?? '—'}</td>
+                    <td className="px-4 py-3 font-bold">{c.overallGrade ?? '-'}</td>
                     <td className="px-4 py-3 text-muted">{c.subjectGrades.length}</td>
                     <td className="px-4 py-3 text-muted">{c.status}</td>
                   </tr>
@@ -2019,7 +2507,9 @@ function ManebCandidatesPanel({ academicYear }: { academicYear: string }) {
             </table>
           </div>
         </div>
-      ) : <EmptyState message="No MANEB candidates registered for this year" />}
+      ) : (
+        <EmptyState message="No MANEB candidates registered for this year" />
+      )}
     </div>
   )
 }
@@ -2033,35 +2523,207 @@ function SummaryStat({ label, value }: { label: string; value: string | number }
 function HighRankSummaryPanel({ academicYear, term }: { academicYear: string; term: number }) {
   const { data, isLoading } = useSchoolReport(academicYear, term)
 
+  // [PRODUCTION FIX] A "summary" tab that only ever showed 3 KPIs and one
+  // class-size chart wasn't summarizing much. Every hook below is already
+  // imported and already used elsewhere on this exact page (Finance,
+  // Attendance, HR, Admissions, Library, Classes tabs) — this pulls them
+  // together in one place for the first time, which is what an executive
+  // summary is for. No new endpoints, no new permissions — high_rank
+  // already held every one of these.
+  const { data: finance } = useFinanceReport(academicYear, term)
+  const { data: attendance } = useAttendanceSummary(academicYear, term)
+  const { data: staffByDept } = useHRStaffByDepartment()
+  const { data: funnel } = useApplicationsFunnel()
+  const { data: library } = useLibraryInventoryHealth()
+  const { data: classes } = useClassComparison(academicYear, term)
+
   useExportable('School Summary', data?.classStats, [
-    { label: 'Class',    value: (c: { name: string }) => c.name },
+    { label: 'Class', value: (c: { name: string }) => c.name },
     { label: 'Students', value: (c: { _count: { students: number } }) => c._count.students },
   ])
 
   if (isLoading) return <SkeletonChart />
   if (!data) return <EmptyState />
 
+  const totalStaff = staffByDept?.reduce((s, d) => s + d.value, 0)
+  const totalApplications = funnel?.find((f) => f.stage === 'Total Applications')?.count
+  const lowAttendanceClasses = attendance?.byClass.filter((c) => c.attendanceRate < 85) ?? []
+  // A class with no computed results has a null average — not an average of 0.
+  const underperformingClasses = classes?.filter((c) => c.average !== null && c.average < 50) ?? []
+
+  // [PRODUCTION FIX] Each condition below is real, live data already
+  // fetched for other panels on this page — this is what "issues the high
+  // rank should be tracking" actually means: not a new metric, a flag on
+  // an existing one.
+  const issues: { label: string; detail: string }[] = []
+  if ((finance?.outstanding ?? 0) > 0) {
+    issues.push({
+      label: 'Outstanding fees',
+      detail: `MWK ${(finance?.outstanding ?? 0).toLocaleString()} not yet collected`,
+    })
+  }
+  if (lowAttendanceClasses.length > 0) {
+    issues.push({
+      label: 'Low attendance',
+      detail: `${lowAttendanceClasses.length} class${lowAttendanceClasses.length === 1 ? '' : 'es'} below 85% attendance`,
+    })
+  }
+  if (underperformingClasses.length > 0) {
+    issues.push({
+      label: 'Underperforming classes',
+      detail: `${underperformingClasses.length} class${underperformingClasses.length === 1 ? '' : 'es'} averaging below 50%`,
+    })
+  }
+  if ((library?.overdueCount ?? 0) > 0) {
+    issues.push({
+      label: 'Overdue library books',
+      detail: `${library?.overdueCount} book${library?.overdueCount === 1 ? '' : 's'} not yet returned`,
+    })
+  }
+
+  // [PRODUCTION FIX] getSchoolPerformanceReport (server/services/
+  // reportService.ts) has always computed and returned enrollmentByForm —
+  // active students grouped by classId — but ApiSchoolReport never declared
+  // the field, so it was invisible to every consumer even though it was on
+  // every response. Joined here against classStats (same response, now
+  // also declaring `id`) to show active vs total roster per class — a
+  // direct, real data-quality signal, not a cosmetic addition. Falls back
+  // to the raw id rather than dropping the row if a class ever goes
+  // unmatched.
+  const enrollmentByClass = (data.enrollmentByForm ?? []).map((row) => {
+    const match = data.classStats?.find((c) => c.id === row.classId)
+    return {
+      name: match?.name ?? row.classId,
+      active: row._count,
+      roster: match?._count.students ?? 0,
+    }
+  })
+
   return (
-    <div className="space-y-5">
-      <SectionHeader title={`School Summary — ${academicYear} Term ${term}`} icon={<FileText className="w-4 h-4" />} />
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <SummaryStat label="Pass Rate" value={`${data.overall?.passRate ?? 0}%`} />
-        <SummaryStat label="Average"   value={data.overall?.average ?? 0} />
-        <SummaryStat label="Results"   value={data.overall?.total ?? 0} />
+    <div className="space-y-6">
+      <SectionHeader
+        title={`School Summary: ${academicYear} Term ${term}`}
+        icon={<FileText className="w-4 h-4" />}
+      />
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <SummaryStat label="Pass rate" value={`${data.overall?.passRate ?? 0}%`} />
+        <SummaryStat label="Average" value={data.overall?.average ?? 0} />
+        <SummaryStat label="Results" value={data.overall?.total ?? 0} />
+        <SummaryStat
+          label="Attendance"
+          value={attendance ? `${attendance.attendanceRate}%` : '-'}
+        />
       </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <SummaryStat
+          label="Fee collection"
+          value={finance && finance.collectionPct != null ? `${finance.collectionPct}%` : '-'}
+        />
+        <SummaryStat label="Total staff" value={totalStaff ?? '-'} />
+        <SummaryStat label="Applications" value={totalApplications ?? '-'} />
+        <SummaryStat label="Library books" value={library ? library.totalTitles : '-'} />
+      </div>
+
+      <div className="pt-2">
+        <SectionHeader
+          title="Issues needing attention"
+          icon={<AlertTriangle className="w-4 h-4" />}
+        />
+        {issues.length === 0 ? (
+          <p className="text-sm text-muted mt-3">No outstanding issues flagged for this term.</p>
+        ) : (
+          <div className="mt-3 space-y-2">
+            {issues.map((issue) => (
+              <div
+                key={issue.label}
+                className="flex items-start gap-3 bg-brand-coral/10 rounded-xl px-4 py-3"
+              >
+                <AlertTriangle className="w-4 h-4 text-tone-coral shrink-0 mt-0.5" aria-hidden />
+                <div>
+                  <p className="text-sm font-semibold text-brand-navy">{issue.label}</p>
+                  <p className="text-xs text-muted">{issue.detail}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {data.classStats && data.classStats.length > 0 ? (
-        <ChartCard title="Class Sizes">
+        <ChartCard title="Class sizes">
           <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={data.classStats}>
+            <BarChart data={data.classStats} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-              <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 10 }} />
+              <XAxis
+                dataKey="name"
+                tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
+                interval={0}
+                tickFormatter={(v: unknown) => truncateLabel(v, 14)}
+                angle={-30} textAnchor="end" height={56}
+              />
+              <YAxis
+                allowDecimals={false}
+                tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
+              />
               <Tooltip contentStyle={{ fontSize: 12 }} />
-              <Bar dataKey="_count.students" fill={chartColorAt(0)} radius={[4, 4, 0, 0]} name="Students" />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Bar
+                dataKey="_count.students"
+                fill={chartColorAt(0)}
+                radius={[4, 4, 0, 0]}
+                name="Students">
+                <LabelList dataKey="_count.students" {...BAR_LABEL_PROPS} formatter={valueFormatter('number')} />
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
-      ) : <EmptyState message="No class statistics for this term" />}
+      ) : (
+        <EmptyState message="No class statistics for this term" />
+      )}
+
+      {enrollmentByClass.length > 0 && (
+        <ChartCard title="Active enrollment vs total roster by class">
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={enrollmentByClass} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+              <XAxis
+                dataKey="name"
+                tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
+                interval={0}
+                tickFormatter={(v: unknown) => truncateLabel(v, 14)}
+                angle={-30} textAnchor="end" height={56}
+              />
+              <YAxis
+                allowDecimals={false}
+                tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
+              />
+              <Tooltip contentStyle={{ fontSize: 12 }} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              {/* [PRODUCTION FIX] "Total Roster" is a neutral headcount, not
+                 a bad/at-risk figure, but chartColorAt(3) put it on the
+                 palette's red — the same colour "Rejected"/"At Risk"/
+                 "Departed" use elsewhere in this file. Moved to neutral
+                 navy so red keeps one consistent meaning across every
+                 chart on this page. */}
+              <Bar
+                dataKey="roster"
+                fill={chartColorAt(0)}
+                radius={[4, 4, 0, 0]}
+                name="Total Roster">
+                <LabelList dataKey="roster" {...BAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('number')} />
+              </Bar>
+              <Bar
+                dataKey="active"
+                fill={chartColorAt(1)}
+                radius={[4, 4, 0, 0]}
+                name="Active Students">
+                <LabelList dataKey="active" {...BAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('number')} />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+      )}
     </div>
   )
 }
@@ -2074,85 +2736,32 @@ function FinanceSummaryPanel({ academicYear, term }: { academicYear: string; ter
 
   return (
     <div className="space-y-5">
-      <SectionHeader title={`Fee Collection Summary — ${academicYear}`} icon={<FileText className="w-4 h-4" />} />
+      <SectionHeader
+        title={`Fee Collection Summary: ${academicYear}`}
+        icon={<FileText className="w-4 h-4" />}
+      />
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <SummaryStat label="Collected"   value={`MWK ${(data.collected ?? 0).toLocaleString()}`} />
-        <SummaryStat label="Target"      value={`MWK ${(data.target ?? 0).toLocaleString()}`} />
-        <KpiCard label="Outstanding" value={`MWK ${(data.outstanding ?? 0).toLocaleString()}`} warn={(data.outstanding ?? 0) > 0} />
-        <SummaryStat label="Collection" value={`${data.collectionPct ?? 0}%`} />
-      </div>
-    </div>
-  )
-}
-
-function LibrarySummaryPanel() {
-  const { data, isLoading } = useLibraryReport()
-
-  if (isLoading) return <SkeletonChart />
-  if (!data) return <EmptyState />
-
-  return (
-    <div className="space-y-5">
-      <SectionHeader title="Library Summary" icon={<Activity className="w-4 h-4" />} />
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <SummaryStat label="Total Copies"     value={(data.stats?._sum?.totalCopies ?? 0).toLocaleString()} />
-        <SummaryStat label="Available"        value={(data.stats?._sum?.availableCopies ?? 0).toLocaleString()} />
-        <KpiCard label="Overdue"          value={data.overdueBorrowings?.length ?? 0} warn={(data.overdueBorrowings?.length ?? 0) > 0} />
-        <KpiCard label="Pending Approvals" value={data.pendingApprovals ?? 0} warn={(data.pendingApprovals ?? 0) > 0} />
-      </div>
-    </div>
-  )
-}
-
-function HRSummaryPanel() {
-  const { data, isLoading } = useHRReport()
-
-  useExportable('Staff by Department', data?.staffByDept, [
-    { label: 'Department', value: (d: { department: string }) => d.department },
-    { label: 'Staff',      value: (d: { _count: number }) => d._count },
-  ])
-
-  if (isLoading) return <SkeletonChart />
-  if (!data) return <EmptyState />
-
-  return (
-    <div className="space-y-5">
-      <SectionHeader title="HR Summary" icon={<FileText className="w-4 h-4" />} />
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <SummaryStat label="Active Loans"      value={data.activeLoans} />
-        <SummaryStat label="Loan Balance"      value={`MWK ${data.totalLoanBalance.toLocaleString()}`} />
+        <SummaryStat label="Collected" value={`MWK ${(data.collected ?? 0).toLocaleString()}`} />
+        <SummaryStat label="Target" value={`MWK ${(data.target ?? 0).toLocaleString()}`} />
         <KpiCard
-          label="Expiring Contracts"
-          value={data.expiringContracts}
-          sub={`Within ${data.lookaheadDays} days`}
-          warn={data.expiringContracts > 0}
+          label="Outstanding"
+          value={`MWK ${(data.outstanding ?? 0).toLocaleString()}`}
+          warn={(data.outstanding ?? 0) > 0}
         />
+        <SummaryStat label="Collection" value={data.collectionPct != null ? `${data.collectionPct}%` : '-'} />
       </div>
-      {data.staffByDept.length > 0 ? (
-        <ChartCard title="Staff by Department">
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={data.staffByDept} layout="vertical">
-              <XAxis type="number" allowDecimals={false} tick={{ fontSize: 10 }} />
-              <YAxis type="category" dataKey="department" tick={{ fontSize: 10 }} width={120} />
-              <Tooltip contentStyle={{ fontSize: 12 }} />
-              <Bar dataKey="_count" fill={chartColorAt(1)} radius={[0, 4, 4, 0]} name="Staff" />
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartCard>
-      ) : <EmptyState message="No active staff on record" />}
     </div>
   )
 }
-
 function AcademicSummaryPanel({ academicYear }: { academicYear: string }) {
   const { data, isLoading } = useAcademicReport(academicYear)
 
   useExportable<ApiAcademicClassSummary>('My Classes', data?.summaries, [
-    { label: 'Class',         value: (c) => c.className },
-    { label: 'Form',          value: (c) => c.form },
-    { label: 'Results',       value: (c) => c.total },
+    { label: 'Class', value: (c) => c.className },
+    { label: 'Form', value: (c) => c.form },
+    { label: 'Results', value: (c) => c.total },
     { label: 'Pass Rate (%)', value: (c) => c.passRate },
-    { label: 'Average',       value: (c) => c.avg },
+    { label: 'Average', value: (c) => c.avg },
   ])
 
   if (isLoading) return <SkeletonChart />
@@ -2162,14 +2771,22 @@ function AcademicSummaryPanel({ academicYear }: { academicYear: string }) {
 
   return (
     <div className="space-y-5">
-      <SectionHeader title={`My Classes — ${academicYear}`} icon={<GraduationCap className="w-4 h-4" />} />
-      <div className="border border-base rounded-2xl overflow-hidden">
+      <SectionHeader
+        title={`My Classes: ${academicYear}`}
+        icon={<GraduationCap className="w-4 h-4" />}
+      />
+      <div className="overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="bg-page border-b border-base">
                 {['Class', 'Form', 'Results', 'Pass Rate', 'Average'].map((h) => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase whitespace-nowrap">{h}</th>
+                  <th
+                    key={h}
+                    className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted whitespace-nowrap"
+                  >
+                    {h}
+                  </th>
                 ))}
               </tr>
             </thead>
@@ -2179,8 +2796,14 @@ function AcademicSummaryPanel({ academicYear }: { academicYear: string }) {
                   <td className="px-4 py-3 font-medium text-brand-navy">{c.className}</td>
                   <td className="px-4 py-3 text-muted">Form {c.form}</td>
                   <td className="px-4 py-3">{c.total}</td>
-                  <td className={`px-4 py-3 font-medium ${c.passRate >= 50 ? 'text-brand-teal' : 'text-brand-coral'}`}>{c.passRate}%</td>
-                  <td className="px-4 py-3">{c.avg}</td>
+                  <td
+                    className={`px-4 py-3 font-medium ${
+                      c.passRate === null ? 'text-muted' : c.passRate >= 50 ? 'text-tone-teal' : 'text-tone-coral'
+                    }`}
+                  >
+                    {c.passRate === null ? '-' : `${c.passRate}%`}
+                  </td>
+                  <td className="px-4 py-3">{c.avg ?? '-'}</td>
                 </tr>
               ))}
             </tbody>
@@ -2190,35 +2813,16 @@ function AcademicSummaryPanel({ academicYear }: { academicYear: string }) {
     </div>
   )
 }
-
-function ExamOfficerSummaryPanel({ academicYear, term }: { academicYear: string; term: number }) {
-  const { data, isLoading } = useExamOfficerReport(academicYear, term)
-
-  if (isLoading) return <SkeletonChart />
-  if (!data) return <EmptyState />
-
-  return (
-    <div className="space-y-5">
-      <SectionHeader title={`Exam Summary — ${academicYear} Term ${term}`} icon={<FileText className="w-4 h-4" />} />
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <KpiCard label="Pending Marks"    value={data.pendingMarks ?? 0} warn={(data.pendingMarks ?? 0) > 0} />
-        <SummaryStat label="Approved Results" value={data.approvedResults ?? 0} />
-        <SummaryStat label="MANEB Records"    value={data.manebRecords?.length ?? 0} />
-      </div>
-    </div>
-  )
-}
-
 function StudentSummaryPanel({ studentId }: { studentId: string }) {
   const { data, isLoading } = useStudentReport(studentId)
 
   useExportable('My Results', data?.results, [
     { label: 'Academic Year', value: (r: { academicYear: string }) => r.academicYear },
-    { label: 'Term',          value: (r: { term: number }) => r.term },
-    { label: 'Average',       value: (r: { average: number }) => r.average },
-    { label: 'Grade',         value: (r: { grade: string }) => r.grade },
-    { label: 'Position',      value: (r: { position: number | null }) => r.position },
-    { label: 'Passed',        value: (r: { passStatus: boolean }) => (r.passStatus ? 'Yes' : 'No') },
+    { label: 'Term', value: (r: { term: number }) => r.term },
+    { label: 'Average', value: (r: { average: number }) => r.average },
+    { label: 'Grade', value: (r: { grade: string }) => r.grade },
+    { label: 'Position', value: (r: { position: number | null }) => r.position },
+    { label: 'Passed', value: (r: { passStatus: boolean }) => (r.passStatus ? 'Yes' : 'No') },
   ])
 
   if (isLoading) return <SkeletonChart />
@@ -2227,13 +2831,18 @@ function StudentSummaryPanel({ studentId }: { studentId: string }) {
   return (
     <div className="space-y-5">
       <SectionHeader title="My Results" icon={<FileText className="w-4 h-4" />} />
-      <div className="border border-base rounded-2xl overflow-hidden">
+      <div className="overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="bg-page border-b border-base">
                 {['Year', 'Term', 'Average', 'Grade', 'Position', 'Result'].map((h) => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase whitespace-nowrap">{h}</th>
+                  <th
+                    key={h}
+                    className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted whitespace-nowrap"
+                  >
+                    {h}
+                  </th>
                 ))}
               </tr>
             </thead>
@@ -2244,8 +2853,10 @@ function StudentSummaryPanel({ studentId }: { studentId: string }) {
                   <td className="px-4 py-3 text-muted">Term {r.term}</td>
                   <td className="px-4 py-3 font-medium text-brand-navy">{r.average}</td>
                   <td className="px-4 py-3 font-bold">{r.grade}</td>
-                  <td className="px-4 py-3">{r.position ?? '—'}</td>
-                  <td className={`px-4 py-3 font-medium ${r.passStatus ? 'text-brand-teal' : 'text-brand-coral'}`}>
+                  <td className="px-4 py-3">{r.position ?? '-'}</td>
+                  <td
+                    className={`px-4 py-3 font-medium ${r.passStatus ? 'text-tone-teal' : 'text-tone-coral'}`}
+                  >
                     {r.passStatus ? 'Pass' : 'Fail'}
                   </td>
                 </tr>
@@ -2260,60 +2871,56 @@ function StudentSummaryPanel({ studentId }: { studentId: string }) {
 
 export default function ReportsPage() {
   return (
-    <RoleGuard allowed={['admin', 'high_rank', 'finance', 'library', 'hr', 'academic', 'exam_officer', 'student', 'lower_rank']}>
-      <ExportProvider>
-        <ReportsContent />
-      </ExportProvider>
+    <RoleGuard
+      allowed={[
+        'admin',
+        'high_rank',
+        'finance',
+        'library',
+        'hr',
+        'academic',
+        'exam_officer',
+        'student',
+        'lower_rank',
+      ]}
+    >
+      <ReportExportProvider>
+        <Suspense fallback={<SkeletonChart />}>
+          <ReportsContent />
+        </Suspense>
+      </ReportExportProvider>
     </RoleGuard>
   )
 }
 
-/**
- * [R14] Holds whichever panel is currently on screen, so the header's Export
- * button downloads exactly what the user is looking at. `register` and `clear`
- * are stable identities — useExportable depends on them, and a fresh identity
- * each render would re-register forever.
- */
-function ExportProvider({ children }: { children: React.ReactNode }) {
-  const [registration, setRegistration] = useState<ExportRegistration | null>(null)
-
-  const register = useCallback((next: ExportRegistration) => setRegistration(next), [])
-  const clear    = useCallback(() => setRegistration(null), [])
-
-  return (
-    <ExportContext.Provider value={{ registration, register, clear }}>
-      {children}
-    </ExportContext.Provider>
-  )
-}
-
 function ReportsContent() {
-  const { role, user } = useAuthStore()
+  const { role: authRole, user, superUser } = useAuthStore()
+  // alpha_admin can open every staff role's report tabs; everyone else sees their own.
+  const [viewAs, setViewAs] = useState<UserRole>('admin')
+  const role = superUser ? viewAs : authRole
 
-  // [R14] The current academic year and term come from SystemSettings — the
-  // same source R14's routes default from — not from a hardcoded '2025/2026'.
-  // Until they load, no period-scoped query should fire with a wrong guess, so
-  // panels needing a year render only once one is known.
-  const { data: settings, isLoading: settingsLoading } = usePublicSettings()
-  const year = settings?.[SETTING_KEYS.CURRENT_ACADEMIC_YEAR]
-  const currentTerm = settings?.[SETTING_KEYS.CURRENT_TERM]
+  // [UNIVERSAL PERIOD FILTER] Year and term come from the app-wide header
+  // filter (useViewingPeriod): the person's pick if they made one, otherwise
+  // the school's current period from SystemSettings. Until the period
+  // resolves, no period-scoped query fires with a wrong guess, so panels
+  // needing a year render only once one is known. Term comes only from the
+  // global header filter (this page's own term select duplicated it, and the
+  // export toolbar already records "Academic year / Term" in every export).
+  const { academicYear: year, term: viewingTerm, isLoading: settingsLoading } = useViewingPeriod()
+  const term = viewingTerm ?? null
 
-  // R19 — `term` is derived, not seeded via an effect. `termOverride` is null
-  // until the user picks a term from the selector below; until then the
-  // rendered/effective term falls through to `currentTerm` once it loads.
-  // This preserves the original "seed once from currentTerm, never clobber a
-  // user's manual selection" behavior without calling setState from an
-  // effect: `termOverride ?? currentTerm ?? null` recomputes on every render
-  // instead of writing state as a side effect of `currentTerm` arriving.
-  const [termOverride, setTerm] = useState<number | null>(null)
-  const term = termOverride ?? currentTerm ?? null
-
-  const [activeTab, setActiveTab] = useState(() => {
-    const tabs = ROLE_TABS[role ?? 'student'] ?? []
-    return tabs[0]?.id ?? 'overview'
-  })
-
-  const studentId = user?.uid ?? ''
+  // The active tab lives in the URL (?tab=) so dashboard KPIs can deep-link to a
+  // report, a drilled view survives refresh, and Back works. An id the role does
+  // not have falls back to its first tab.
+  const router = useRouter()
+  const [tabParam] = useReportParam('tab')
+  const tabs = ROLE_TABS[role ?? 'student'] ?? []
+  const requested = tabParam ? (TAB_ALIASES[role ?? '']?.[tabParam] ?? tabParam) : undefined
+  const activeTab = tabs.find((t) => t.id === requested)?.id ?? tabs[0]?.id ?? 'overview'
+  const setActiveTab = useCallback(
+    (id: string) => router.replace(`/reports?tab=${encodeURIComponent(id)}`, { scroll: false }),
+    [router],
+  )
 
   // Admin's panels are period-independent, so they render without waiting.
   const periodReady = year !== undefined && term !== null
@@ -2323,143 +2930,298 @@ function ReportsContent() {
       {/* ── Header ── */}
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div>
-          <h1 className="font-heading text-2xl font-bold text-brand-navy">Reports &amp; Analytics</h1>
+          <h1 className="font-heading text-2xl font-bold text-brand-navy">
+            Reports and analytics
+          </h1>
           <p className="text-sm text-muted mt-0.5">
-            {role === 'student' ? 'Your personal academic and financial reports' : 'Analytics dashboard for your role'}
+            {role === 'student'
+              ? 'Your personal academic and financial reports'
+              : 'Analytics dashboard for your role'}
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <select
-            value={term ?? ''}
-            onChange={(e) => setTerm(Number(e.target.value))}
-            disabled={term === null}
-            aria-label="Select term"
-            className="border border-base rounded-xl px-3 py-2 text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-brand-navy/20 disabled:opacity-50"
-          >
-            {[1, 2, 3].map((t) => <option key={t} value={t}>Term {t}</option>)}
-          </select>
-          <ExportButton />
+          {superUser && (
+            <SuperUserRoleSwitcher
+              value={viewAs}
+              onChange={(r) => {
+                setViewAs(r)
+                setActiveTab(ROLE_TABS[r]?.[0]?.id ?? 'overview')
+              }}
+            />
+          )}
+          {term !== null && (
+            <span className="text-xs text-muted" aria-label="Period shown">
+              Term {term}
+            </span>
+          )}
+          <ExportToolbar
+            title={`Reports: ${(role ?? '').replace(/_/g, ' ')}${
+              tabs.find((t) => t.id === activeTab)?.label ? ` - ${tabs.find((t) => t.id === activeTab)?.label}` : ''
+            }`}
+            filters={year ? [`Academic year: ${year}`, ...(term ? [`Term: ${term}`] : [])] : []}
+          />
         </div>
       </div>
 
-      {/* ── Tab Bar ── */}
-      {(ROLE_TABS[role ?? ''] ?? []).length > 1 && (
-        <RoleTabs role={role ?? ''} active={activeTab} onChange={setActiveTab} />
-      )}
+      <ModuleSurface>
+      <FlatSurface>
+        {/* ── Tab Bar ── */}
+        {(ROLE_TABS[role ?? ''] ?? []).length > 1 && (
+          <RoleTabs role={role ?? ''} active={activeTab} onChange={setActiveTab} />
+        )}
 
-      {/* ── Admin Panels (period-independent) ── */}
-      {role === 'admin' && activeTab === 'overview'  && <AdminOverviewPanel />}
-      {role === 'admin' && activeTab === 'security'  && <AdminSecurityPanel />}
-      {role === 'admin' && activeTab === 'audit'     && <AdminAuditPanel />}
+        {/* ── Admin Panels (period-independent) ── */}
+        {role === 'admin' && activeTab === 'overview' && (
+          <div className="space-y-5">
+            <AdminOverviewSection />
+            <AdminOverviewPanel />
+          </div>
+        )}
+        {role === 'admin' && activeTab === 'security' && <AdminSecurityTab />}
+        {role === 'admin' && activeTab === 'sessions' && (
+          <div className="space-y-5">
+            <AdminSessionsReportTab />
+            <AdminSessionsPanel />
+          </div>
+        )}
+        {role === 'admin' && activeTab === 'governance' && (
+          <div className="space-y-5">
+            <AdminGovernanceTab />
+            <AdminHeatmapPanel />
+          </div>
+        )}
+        {role === 'admin' && activeTab === 'adoption' && <AdminAdoptionTab />}
+        {role === 'admin' && activeTab === 'operations' && <AdminOperationsTab />}
+        {role === 'admin' && activeTab === 'assets' && <AssetsTab />}
+        {role === 'admin' && activeTab === 'inventory' && <InventoryTab />}
+        {role === 'admin' && activeTab === 'audit' && <AdminAuditPanel />}
 
-      {/* Every other role's panels are scoped to an academic year and term. */}
-      {role !== 'admin' && !periodReady && (
-        settingsLoading
-          ? <SkeletonChart />
-          : <EmptyState message="The school's current academic year is not configured yet." />
-      )}
+        {/* Every other role's panels are scoped to an academic year and term. */}
+        {role !== 'admin' &&
+          !periodReady &&
+          (settingsLoading ? (
+            <SkeletonChart />
+          ) : (
+            <EmptyState message="The school's current academic year is not configured yet." />
+          ))}
 
-      {role !== 'admin' && periodReady && (
-        <>
-          {/* ── High Rank Panels ── */}
-          {role === 'high_rank' && activeTab === 'performance' && <HighRankPerformancePanel academicYear={year} term={term} />}
-          {role === 'high_rank' && activeTab === 'classes'     && <HighRankClassPanel academicYear={year} term={term} />}
-          {role === 'high_rank' && activeTab === 'teachers'    && <HighRankTeachersPanel academicYear={year} term={term} />}
-          {role === 'high_rank' && activeTab === 'enrollment'  && <HighRankEnrollmentPanel />}
-          {role === 'high_rank' && activeTab === 'attendance'  && <AttendanceSummaryPanel academicYear={year} term={term} />}
-          {role === 'high_rank' && activeTab === 'finance'     && <HighRankFinancePanel academicYear={year} />}
-          {role === 'high_rank' && activeTab === 'placements'  && <PlacementAnalyticsPanel academicYear={year} />}
-          {role === 'high_rank' && activeTab === 'summary'     && <HighRankSummaryPanel academicYear={year} term={term} />}
-
-          {/* ── Finance Panels ── */}
-          {role === 'finance' && activeTab === 'collection'   && <FinanceCollectionPanel />}
-          {role === 'finance' && activeTab === 'outstanding'  && <FinanceOutstandingPanel academicYear={year} term={term} />}
-          {role === 'finance' && activeTab === 'expenses'     && <FinanceExpensesPanel academicYear={year} term={term} />}
-          {role === 'finance' && activeTab === 'cashflow'     && <FinanceCashFlowPanel academicYear={year} />}
-          {role === 'finance' && activeTab === 'payroll'      && <FinancePayrollPanel />}
-          {role === 'finance' && activeTab === 'scholarships' && <FinanceScholarshipsPanel academicYear={year} />}
-          {role === 'finance' && activeTab === 'summary'      && <FinanceSummaryPanel academicYear={year} term={term} />}
-
-          {/* ── Library Panels ── */}
-          {role === 'library' && activeTab === 'overview'  && <LibraryOverviewPanel />}
-          {role === 'library' && activeTab === 'borrowing' && <LibraryBorrowingPanel />}
-          {role === 'library' && activeTab === 'digital'   && <LibraryDigitalPanel />}
-          {role === 'library' && activeTab === 'summary'   && <LibrarySummaryPanel />}
-
-          {/* ── Lower Rank Panels ── */}
-          {role === 'lower_rank' && activeTab === 'applications' && <LowerRankApplicationsPanel />}
-          {role === 'lower_rank' && activeTab === 'enrollment'   && <LowerRankEnrollmentPanel academicYear={year} />}
-          {role === 'lower_rank' && activeTab === 'attendance'   && <AttendanceSummaryPanel academicYear={year} term={term} />}
-
-          {/* ── Academic Staff Panels ── */}
-          {role === 'academic' && activeTab === 'subjects'    && <AcademicSubjectsPanel academicYear={year} term={term} />}
-          {role === 'academic' && activeTab === 'assignments' && <AcademicAssignmentsPanel academicYear={year} />}
-          {role === 'academic' && activeTab === 'marks'       && <MarksDistributionPanel />}
-          {role === 'academic' && activeTab === 'attendance'  && <AttendanceSummaryPanel academicYear={year} term={term} />}
-          {role === 'academic' && activeTab === 'summary'     && <AcademicSummaryPanel academicYear={year} />}
-
-          {/* ── Exam Officer Panels ── */}
-          {role === 'exam_officer' && activeTab === 'maneb'      && <ManebAnalyticsPanel academicYear={year} />}
-          {role === 'exam_officer' && activeTab === 'candidates' && <ManebCandidatesPanel academicYear={year} />}
-          {role === 'exam_officer' && activeTab === 'subjects'   && <AcademicSubjectsPanel academicYear={year} term={term} />}
-          {role === 'exam_officer' && activeTab === 'marks'      && <MarksDistributionPanel />}
-          {role === 'exam_officer' && activeTab === 'placements' && <PlacementAnalyticsPanel academicYear={year} />}
-          {role === 'exam_officer' && activeTab === 'summary'    && <ExamOfficerSummaryPanel academicYear={year} term={term} />}
-
-          {/* ── HR Panels ── */}
-          {role === 'hr' && activeTab === 'staffing' && <HRStaffingPanel />}
-          {role === 'hr' && activeTab === 'leave'    && <HRLeavePanel />}
-          {role === 'hr' && activeTab === 'summary'  && <HRSummaryPanel />}
-
-          {/* ── Student Panels ── */}
-          {role === 'student' && activeTab === 'performance' && <StudentPerformancePanel studentId={studentId} academicYear={year} term={term} />}
-          {role === 'student' && activeTab === 'subjects'    && <StudentSubjectPanel studentId={studentId} academicYear={year} term={term} />}
-          {role === 'student' && activeTab === 'attendance'  && <StudentAttendancePanel studentId={studentId} academicYear={year} term={term} />}
-          {role === 'student' && activeTab === 'fees'        && <StudentFeesPanel studentId={studentId} />}
-          {role === 'student' && activeTab === 'summary'     && <StudentSummaryPanel studentId={studentId} />}
-        </>
-      )}
-    </div>
-  )
-}
-
-// Standalone wrapper for student subject tab (reuses StudentPerformancePanel's sub-component)
-function StudentSubjectPanel({ studentId, academicYear, term }: { studentId: string; academicYear: string; term: number }) {
-  const { data: subjectRaw, isLoading } = useStudentSubjectBreakdown(studentId, academicYear, term)
-  const subjects = subjectRaw as ApiStudentSubjectScore[] | undefined
-
-  return (
-    <div className="space-y-5">
-      {isLoading ? <SkeletonChart /> : (
-        <ChartCard title={`Subject Breakdown — ${academicYear} Term ${term}`}>
-          {subjects && subjects.length > 0 ? (
-            <>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={subjects}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                  <XAxis dataKey="subject" tick={{ fontSize: 9 }} />
-                  <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
-                  <Tooltip contentStyle={{ fontSize: 12 }} />
-                  <Bar dataKey="score" radius={[4, 4, 0, 0]} name="Score">
-                    {subjects.map((s, i) => (
-                      <Cell key={i} fill={(s.score / s.maxMark) * 100 >= 50 ? chartColorAt(1) : chartColorAt(3)} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-4">
-                {subjects.map((s) => (
-                  <div key={s.subject} className="bg-page border border-base rounded-xl p-3">
-                    <p className="text-xs text-muted truncate">{s.subject}</p>
-                    <p className="font-bold text-lg text-brand-navy">{s.score}/{s.maxMark}</p>
-                    <p className={`text-xs font-bold ${s.grade === 'F' ? 'text-brand-coral' : 'text-brand-teal'}`}>{s.grade}</p>
-                  </div>
-                ))}
+        {role !== 'admin' && periodReady && (
+          <>
+            {/* ── High Rank Panels ── */}
+            {role === 'high_rank' && activeTab === 'overview' && (
+              <ExecutiveOverviewTab academicYear={year} term={term} />
+            )}
+            {role === 'high_rank' && activeTab === 'performance' && (
+              <HighRankPerformancePanel academicYear={year} term={term} />
+            )}
+            {role === 'high_rank' && activeTab === 'classes' && (
+              <HighRankClassPanel academicYear={year} term={term} />
+            )}
+            {role === 'high_rank' && activeTab === 'teachers' && (
+              <HighRankTeachersPanel academicYear={year} term={term} />
+            )}
+            {role === 'high_rank' && activeTab === 'enrollment' && (
+              <div className="space-y-5">
+                <EnrollmentTab academicYear={year} />
+                <HighRankEnrollmentPanel />
+                <RetentionPanel academicYear={year} term={term} />
               </div>
-            </>
-          ) : <EmptyState message="No released results for this term" />}
-        </ChartCard>
-      )}
+            )}
+            {role === 'high_rank' && activeTab === 'admissions' && (
+              <AdmissionsTab academicYear={year} term={term} />
+            )}
+            {role === 'high_rank' && activeTab === 'attendance' && (
+              <AttendanceReportTab academicYear={year} term={term} />
+            )}
+            {role === 'high_rank' && activeTab === 'completion' && (
+              <div className="space-y-5">
+                <MarkCompletionTab academicYear={year} term={term} />
+                <ExamWorkflowTab academicYear={year} term={term} />
+              </div>
+            )}
+            {role === 'high_rank' && activeTab === 'finance' && (
+              <HighRankFinancePanel academicYear={year} term={term} />
+            )}
+            {role === 'high_rank' && activeTab === 'aging' && (
+              <FinanceAgingTab academicYear={year} term={term} />
+            )}
+            {role === 'high_rank' && activeTab === 'procurement' && <ProcurementTab />}
+            {role === 'high_rank' && activeTab === 'stocktake' && <StocktakeTab academicYear={year} {...(term !== null ? { term } : {})} />}
+            {role === 'high_rank' && activeTab === 'assets' && <AssetsTab />}
+            {role === 'high_rank' && activeTab === 'inventory' && <InventoryTab />}
+            {role === 'high_rank' && activeTab === 'workforce' && (
+              <div className="space-y-5">
+                <HrOverviewTab academicYear={year} />
+                <HrWorkforceTab />
+              </div>
+            )}
+            {role === 'high_rank' && activeTab === 'leave' && <HrLeaveTab />}
+            {role === 'high_rank' && activeTab === 'contracts' && <HrContractsTab />}
+            {role === 'high_rank' && activeTab === 'teaching' && <HrTeachingTab academicYear={year} />}
+            {role === 'high_rank' && activeTab === 'circulation' && (
+              <div className="space-y-5">
+                <LibraryOverviewSection />
+                <LibraryCirculationTab />
+              </div>
+            )}
+            {role === 'high_rank' && activeTab === 'governance' && <AdminGovernanceTab />}
+            {role === 'high_rank' && activeTab === 'placements' && (
+              <PlacementAnalyticsPanel academicYear={year} />
+            )}
+            {role === 'high_rank' && activeTab === 'summary' && (
+              <HighRankSummaryPanel academicYear={year} term={term} />
+            )}
+
+            {/* ── Finance Panels ── */}
+            {role === 'finance' && activeTab === 'overview' && (
+              <FinanceOverviewTab academicYear={year} term={term} />
+            )}
+            {role === 'finance' && activeTab === 'collection' && <FinanceCollectionPanel />}
+            {role === 'finance' && activeTab === 'outstanding' && (
+              <FinanceOutstandingPanel academicYear={year} term={term} />
+            )}
+            {role === 'finance' && activeTab === 'aging' && (
+              <FinanceAgingTab academicYear={year} term={term} />
+            )}
+            {role === 'finance' && activeTab === 'payments' && (
+              <FinancePaymentsTab academicYear={year} term={term} />
+            )}
+            {role === 'finance' && activeTab === 'expenses' && (
+              <FinanceExpensesPanel academicYear={year} term={term} />
+            )}
+            {role === 'finance' && activeTab === 'cashflow' && (
+              <FinanceCashFlowPanel academicYear={year} />
+            )}
+            {role === 'finance' && activeTab === 'payroll' && <FinancePayrollPanel />}
+            {role === 'finance' && activeTab === 'scholarships' && (
+              <FinanceScholarshipsPanel academicYear={year} />
+            )}
+            {role === 'finance' && activeTab === 'procurement' && <ProcurementTab />}
+            {role === 'finance' && activeTab === 'stocktake' && <StocktakeTab academicYear={year} {...(term !== null ? { term } : {})} />}
+            {role === 'finance' && activeTab === 'assets' && <AssetsTab />}
+            {role === 'finance' && activeTab === 'inventory' && <InventoryTab />}
+            {role === 'finance' && activeTab === 'summary' && (
+              <FinanceSummaryPanel academicYear={year} term={term} />
+            )}
+
+            {/* ── Library Panels ── */}
+            {role === 'library' && activeTab === 'overview' && (
+              <div className="space-y-5">
+                <LibraryOverviewSection />
+                <LibraryOverviewPanel />
+              </div>
+            )}
+            {role === 'library' && activeTab === 'circulation' && <LibraryCirculationTab />}
+            {role === 'library' && activeTab === 'borrowing' && <LibraryBorrowingPanel />}
+            {role === 'library' && activeTab === 'fines' && <LibraryFinesTab />}
+            {role === 'library' && activeTab === 'digital' && <LibraryDigitalTab />}
+            {role === 'library' && activeTab === 'stock' && <LibraryStockTab />}
+
+            {/* ── Lower Rank Panels ── */}
+            {role === 'lower_rank' && activeTab === 'admissions' && (
+              <AdmissionsTab academicYear={year} term={term} />
+            )}
+            {role === 'lower_rank' && activeTab === 'enrollment' && (
+              <EnrollmentTab academicYear={year} />
+            )}
+            {role === 'lower_rank' && activeTab === 'attendance' && (
+              <AttendanceReportTab academicYear={year} term={term} />
+            )}
+
+            {/* ── Academic Staff Panels ── */}
+            {role === 'academic' && activeTab === 'teaching' && (
+              <AcademicTeachingTab academicYear={year} term={term} />
+            )}
+            {role === 'academic' && activeTab === 'assignments' && (
+              <AcademicAssignmentsTab academicYear={year} term={term} />
+            )}
+            {role === 'academic' && activeTab === 'marks' && (
+              <div className="space-y-5">
+                <MarkCompletionTab academicYear={year} term={term} showTeachers={false} />
+                <MarksDistributionPanel />
+              </div>
+            )}
+            {role === 'academic' && activeTab === 'students' && (
+              <AcademicStudentsTab academicYear={year} term={term} />
+            )}
+            {role === 'academic' && activeTab === 'readiness' && (
+              <AcademicReadinessTab academicYear={year} term={term} />
+            )}
+            {role === 'academic' && activeTab === 'attendance' && (
+              <AttendanceReportTab academicYear={year} term={term} />
+            )}
+            {role === 'academic' && activeTab === 'summary' && (
+              <AcademicSummaryPanel academicYear={year} />
+            )}
+
+            {/* ── Exam Officer Panels ── */}
+            {role === 'exam_officer' && activeTab === 'completion' && (
+              <MarkCompletionTab academicYear={year} term={term} />
+            )}
+            {role === 'exam_officer' && activeTab === 'pipeline' && (
+              <ExamWorkflowTab academicYear={year} term={term} />
+            )}
+            {role === 'exam_officer' && activeTab === 'maneb' && (
+              <div className="space-y-5">
+                <ManebStatusCard academicYear={year} />
+                <ManebAnalyticsPanel academicYear={year} />
+              </div>
+            )}
+            {role === 'exam_officer' && activeTab === 'candidates' && (
+              <ManebCandidatesPanel academicYear={year} />
+            )}
+            {role === 'exam_officer' && activeTab === 'subjects' && (
+              <div className="space-y-5">
+                <AcademicSubjectsPanel academicYear={year} term={term} />
+                <SectionHeader
+                  title="Class & Stream Rankings"
+                  icon={<Trophy className="w-4 h-4" />}
+                />
+                <AnalyticsPanel academicYear={year} selectedClassId="" term={term} />
+              </div>
+            )}
+            {role === 'exam_officer' && activeTab === 'marks' && <MarksDistributionPanel />}
+            {role === 'exam_officer' && activeTab === 'placements' && (
+              <PlacementAnalyticsPanel academicYear={year} />
+            )}
+
+            {/* ── HR Panels ── */}
+            {role === 'hr' && activeTab === 'overview' && <HrOverviewTab academicYear={year} />}
+            {role === 'hr' && activeTab === 'workforce' && <HrWorkforceTab />}
+            {role === 'hr' && activeTab === 'leave' && <HrLeaveTab />}
+            {role === 'hr' && activeTab === 'contracts' && <HrContractsTab />}
+            {role === 'hr' && activeTab === 'teaching' && <HrTeachingTab academicYear={year} />}
+            {role === 'hr' && activeTab === 'loans' && <HrLoansTab />}
+            {role === 'hr' && activeTab === 'reviews' && <HrReviewsTab academicYear={year} />}
+
+            {/* ── Student Panels (self-only; fee-gated results) ── */}
+            {role === 'student' && activeTab === 'overview' && (
+              <StudentOverviewTab academicYear={year} term={term} />
+            )}
+            {role === 'student' && activeTab === 'progress' && (
+              <StudentProgressTab academicYear={year} term={term} />
+            )}
+            {role === 'student' && activeTab === 'assignments' && (
+              <StudentAssignmentsTab academicYear={year} term={term} />
+            )}
+            {role === 'student' && activeTab === 'attendance' && (
+              <StudentAttendanceTab academicYear={year} term={term} />
+            )}
+            {role === 'student' && activeTab === 'library' && (
+              <StudentLibraryTab academicYear={year} term={term} />
+            )}
+            {role === 'student' && activeTab === 'fees' && (
+              <StudentFeesTab academicYear={year} term={term} />
+            )}
+            {role === 'student' && activeTab === 'placement' && <StudentPlacementTab />}
+            {role === 'student' && activeTab === 'summary' && (
+              <StudentSummaryPanel studentId={user?.uid ?? ''} />
+            )}
+          </>
+        )}
+      </FlatSurface>
+      </ModuleSurface>
     </div>
   )
 }
+

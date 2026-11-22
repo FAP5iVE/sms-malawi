@@ -1,0 +1,12 @@
+import { pageMetadata } from '@/lib/site'
+
+export const metadata = pageMetadata({
+  title: 'Announcements',
+  description:
+    'General notices and announcements from the school office.',
+  path: '/notices',
+})
+
+export default function Layout({ children }: { children: React.ReactNode }) {
+  return <>{children}</>
+}

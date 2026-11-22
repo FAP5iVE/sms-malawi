@@ -46,6 +46,7 @@ import {
   ClipboardList,
   ClipboardCheck,
   ShieldCheck,
+  CheckSquare,
   Settings,
   Activity,
   Images,
@@ -76,7 +77,7 @@ function rolesFor(href: string): readonly UserRole[] {
 /**
  * Named sources for numeric badge counts on navigation items.
  *
- * 'pendingActions'      — PENDING approval count from /pending-actions/counts.
+ * 'pendingActions'      — requests awaiting THIS user's review (/approvals/badge).
  * 'unreadNotifications' — Unread Firestore notification document count.
  */
 export type NavBadgeKey = 'pendingActions' | 'unreadNotifications'
@@ -271,13 +272,40 @@ export const NAV_ITEMS: readonly NavItem[] = [
     icon:        ClipboardList,
     roles:       rolesFor('/applications'),
   },
+  // [Guardian Portal] Staff side of the parent portal: review queue, per-student guardians,
+  // bulk onboarding and the access log. Gated on guardian.view (admin, high_rank, lower_rank
+  // all hold it); the individual actions inside the page check their own permissions.
+  {
+    label:       'Guardians',
+    mobileLabel: 'Guardians',
+    href:        '/guardians',
+    icon:        Users,
+    roles:       rolesFor('/guardians'),
+    permission:  'guardian.view',
+  },
+  // [PRODUCTION FIX] New nav entry — PendingActionsPanel.tsx (student/class
+  // edit-request approvals) had no page and no nav entry anywhere, so
+  // nothing reviewers needed to act on was ever reachable except by typing
+  // a URL nobody was told about. The 'pendingActions' badge key already
+  // existed and was wired to /pending-actions/counts but was sitting on
+  // User Mgmt below, a page that doesn't render this queue at all and that
+  // high_rank — one of the two actual reviewer roles — can't even open.
+  {
+    label:       'Approvals',
+    mobileLabel: 'Approvals',
+    href:        '/approvals',
+    icon:        CheckSquare,
+    roles:       rolesFor('/approvals'),
+    badge:       'pendingActions',
+  },
   {
     label:       'User Mgmt',
     mobileLabel: 'Users',
     href:        '/user-management',
     icon:        ShieldCheck,
     roles:       rolesFor('/user-management'),
-    badge:       'pendingActions',
+    // [Approvals Hub] The 'pendingActions' badge used to sit here too, which
+    // showed the same number on two nav items. It now lives on Approvals only.
   },
   {
     label:       'Settings',

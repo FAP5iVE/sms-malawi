@@ -384,7 +384,7 @@ export function AuditLogViewer({
           {data && (
             <p className="text-sm text-muted-foreground mt-0.5">
               {data.total.toLocaleString()} total entr{data.total === 1 ? 'y' : 'ies'}
-              {data.total > data.pageSize && ` — page ${data.page} of ${data.pages}`}
+              {data.total > data.pageSize && `, page ${data.page} of ${data.pages}`}
             </p>
           )}
         </div>

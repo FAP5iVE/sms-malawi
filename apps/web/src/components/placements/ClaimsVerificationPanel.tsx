@@ -17,14 +17,12 @@
 'use client'
 
 import { useState } from 'react'
-import { usePublicSchoolInfo } from '@/hooks/usePublic'
+import { useEffectiveViewingPeriod } from '@/hooks/useViewingPeriod'
 import { usePlacementsQueue, useApprovePlacementClaim, useRejectPlacementClaim } from '@/hooks/usePlacements'
-import { AcademicYearSelect } from '@/components/shared/AcademicYearSelect'
 import { MotionBottomSheet } from '@/components/shared/MotionBottomSheet'
+import { StatusText } from '@/components/shared/StatusText'
 import { ShieldCheck, Clock, FileCheck, Check, X, Loader2 } from 'lucide-react'
 import type { ApiUniversityPlacement } from '@shared/types/api'
-
-const FALLBACK_YEAR = '2025/2026'
 
 function studentName(row: ApiUniversityPlacement): string {
   if (!row.student) return row.studentId
@@ -41,27 +39,25 @@ function ClaimCard({
 }) {
   const isPending = row.status === 'PENDING_APPROVAL'
   return (
-    <div className={`rounded-xl border p-4 space-y-3 ${isPending ? 'border-brand-amber/40 bg-brand-amber/5' : 'border-base bg-page'}`}>
+    <div className="app-tint rounded-xl p-4 space-y-3">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ${
-            isPending ? 'bg-brand-amber/15 text-brand-amber' : row.status === 'CONFIRMED' ? 'bg-brand-teal/15 text-brand-teal' : 'bg-brand-coral/15 text-brand-coral'
-          }`}>
-            {isPending ? 'Pending Physical Inspection' : row.status === 'CONFIRMED' ? 'Approved & Confirmed' : 'Rejected'}
-          </span>
+          <StatusText tone={isPending ? 'warning' : row.status === 'CONFIRMED' ? 'success' : 'danger'} size="md">
+            {isPending ? 'Pending physical inspection' : row.status === 'CONFIRMED' ? 'Approved and confirmed' : 'Rejected'}
+          </StatusText>
           <p className="text-xs text-muted mt-1">Submitted: {new Date(row.createdAt).toLocaleString()}</p>
         </div>
         {isPending && onApprove && onReject && (
           <div className="flex items-center gap-2">
             <button
               type="button" onClick={onReject}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-brand-coral text-brand-coral text-xs font-semibold"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-brand-coral text-tone-coral text-xs font-semibold"
             >
               <X className="w-3.5 h-3.5" /> Reject
             </button>
             <button
               type="button" onClick={onApprove} disabled={approving}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-teal text-white text-xs font-semibold disabled:opacity-60"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-btn-brand text-btn-brand-fg text-xs font-semibold disabled:opacity-60"
             >
               {approving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} Approve Selection
             </button>
@@ -78,32 +74,35 @@ function ClaimCard({
       </div>
 
       <div className="grid gap-2 sm:grid-cols-2">
-        <div className="bg-surface border border-base rounded-lg p-3">
-          <p className="text-[11px] font-semibold text-muted uppercase tracking-wide mb-1">Claimed University & Program</p>
+        <div className="bg-surface rounded-lg p-3">
+          <p className="text-xs font-semibold text-muted mb-1">Claimed university and programme</p>
           <p className="text-sm font-medium">{row.placedProgrammeName ?? row.placedProgrammeId ?? '\u2014'}</p>
           <p className="text-xs text-muted">{row.placedUniversityName ?? row.placedUniversityId ?? '\u2014'}</p>
         </div>
-        <div className="bg-surface border border-base rounded-lg p-3">
-          <p className="text-[11px] font-semibold text-muted uppercase tracking-wide mb-1">Physical Evidence / Gazette Citation</p>
+        <div className="bg-surface rounded-lg p-3">
+          <p className="text-xs font-semibold text-muted mb-1">Physical evidence or gazette citation</p>
           <p className="text-xs font-medium">{row.ncheBatchRef ?? '\u2014'}</p>
           {row.claimProofNote && <p className="text-xs text-muted italic mt-1">{row.claimProofNote}</p>}
         </div>
       </div>
 
       {row.status === 'REJECTED' && row.rejectionReason && (
-        <p className="text-xs text-brand-coral"><span className="font-semibold">Reason given:</span> {row.rejectionReason}</p>
+        <p className="text-xs text-tone-coral"><span className="font-semibold">Reason given:</span> {row.rejectionReason}</p>
       )}
       {!isPending && row.verifiedByName && row.verifiedAt && (
-        <p className="text-[11px] text-muted">By: {row.verifiedByName} on {new Date(row.verifiedAt).toLocaleString()}</p>
+        <p className="text-xs text-muted">By: {row.verifiedByName} on {new Date(row.verifiedAt).toLocaleString()}</p>
       )}
     </div>
   )
 }
 
 export function ClaimsVerificationPanel() {
-  const { data: schoolInfo } = usePublicSchoolInfo()
-  const [academicYear, setAcademicYear] = useState<string>('')
-  const effectiveYear = academicYear || schoolInfo?.currentYear || FALLBACK_YEAR
+  // The school's stored current year (SystemSettings), never a literal.
+  // [UNIVERSAL PERIOD FILTER] The year comes ONLY from the app-wide header
+  // filter. The year select this panel used to carry wrote through to it (picking
+  // a year here already moved the whole app), so it was a second control for one
+  // value; it is now a read-only label.
+  const { academicYear: effectiveYear } = useEffectiveViewingPeriod()
 
   const { data: queue = [], isLoading, isError, error } = usePlacementsQueue(effectiveYear)
   const approve = useApprovePlacementClaim()
@@ -126,25 +125,23 @@ export function ClaimsVerificationPanel() {
 
   return (
     <div className="space-y-4">
-      <div className="bg-surface border border-base rounded-xl p-4 flex items-start gap-3">
-        <div className="w-10 h-10 rounded-lg bg-brand-amber/10 text-brand-amber flex items-center justify-center shrink-0">
+      <div className="pb-4 flex items-start gap-3">
+        <div className="w-10 h-10 rounded-lg bg-brand-amber/10 text-tone-amber flex items-center justify-center shrink-0">
           <ShieldCheck className="w-5 h-5" />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <h3 className="font-heading font-semibold text-base">
-              Claims Verification &amp; Approval Desk
+              Claims verification and approval
               {pending.length > 0 && (
-                <span className="ml-2 inline-flex items-center rounded-full bg-brand-amber/15 text-brand-amber text-xs font-bold px-2 py-0.5 align-middle">
+                <span className="ml-2 inline-flex items-center text-tone-amber text-xs font-bold align-middle">
                   {pending.length} Pending
                 </span>
               )}
             </h3>
-            <AcademicYearSelect
-              value={effectiveYear}
-              onChange={(e) => setAcademicYear(e.target.value)}
-              className="border border-base rounded-xl px-3 py-1.5 text-sm bg-page"
-            />
+            <span className="text-xs text-muted" aria-label="Academic year shown">
+              Intake {effectiveYear}
+            </span>
           </div>
           <p className="text-xs text-muted mt-0.5">
             Physically inspect the printed NCHE Gazette against student-submitted placement claims before granting approval.
@@ -157,7 +154,7 @@ export function ClaimsVerificationPanel() {
           type="button"
           onClick={() => setTab('pending')}
           className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px ${
-            tab === 'pending' ? 'border-brand-amber text-brand-amber' : 'border-transparent text-muted hover:text-body'
+            tab === 'pending' ? 'border-brand-amber text-tone-amber' : 'border-transparent text-muted hover:text-body'
           }`}
         >
           <Clock className="w-4 h-4" /> Pending Verification ({pending.length})
@@ -176,9 +173,9 @@ export function ClaimsVerificationPanel() {
       {isLoading ? (
         <p className="text-sm text-muted py-8 text-center">Loading…</p>
       ) : isError ? (
-        <div className="text-sm text-brand-coral py-8 text-center px-4">
+        <div className="text-sm text-tone-coral py-8 text-center px-4">
           <p className="font-medium">Could not load the verification queue.</p>
-          <p className="text-xs text-muted mt-1">{(error as Error)?.message ?? 'Unknown error — check your connection and try again.'}</p>
+          <p className="text-xs text-muted mt-1">{(error as Error)?.message ?? 'Unknown error. Check your connection and try again.'}</p>
         </div>
       ) : tab === 'pending' ? (
         pending.length === 0 ? (
@@ -216,19 +213,19 @@ export function ClaimsVerificationPanel() {
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 rows={3}
-                placeholder="e.g. Name not found on the published NCHE gazette for this batch."
+                placeholder="Name not found on the published NCHE gazette for this batch."
                 className="w-full border border-base rounded-xl px-3 py-2 text-sm bg-surface focus:outline-none resize-none"
               />
             </label>
             {reason.trim().length > 0 && reason.trim().length < 5 && (
-              <p className="text-sm text-brand-coral">Give a slightly longer reason.</p>
+              <p className="text-sm text-tone-coral">Give a slightly longer reason.</p>
             )}
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={handleReject}
                 disabled={reject.isPending || reason.trim().length < 5}
-                className="flex items-center gap-2 min-h-11 px-5 rounded-xl text-sm font-heading font-semibold bg-brand-coral text-white disabled:opacity-60"
+                className="flex items-center gap-2 min-h-11 px-5 rounded-xl text-sm font-heading font-semibold bg-btn-danger text-btn-danger-fg disabled:opacity-60"
               >
                 {reject.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
                 Confirm rejection

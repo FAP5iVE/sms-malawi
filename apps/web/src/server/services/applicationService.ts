@@ -52,6 +52,7 @@ import { prisma }            from '@/lib/prisma'
 import { sendEmail }         from '@/lib/email'
 import { logger }            from '@/lib/logger'
 import * as auditService     from '@/server/services/auditService'
+import * as algolia          from '@/server/services/algoliaService'
 import { getSchoolBranding } from '@/server/services/notificationService'
 import { renderApplicationReceived } from '@/server/templates/emails/application-received'
 import type { ApplicationInput } from '@shared/schemas/student'
@@ -80,7 +81,49 @@ const FORM_LEVEL_BY_CLASS_APPLYING: Record<ApplicationInput['classApplying'], nu
 //  divergent field-name bugs.
 // ─────────────────────────────────────────────────────────
 
+/**
+ * Normalises the special-needs list for storage: one entry per type (a repeated
+ * type is dropped), blank notes removed. Returns undefined - not null - when empty
+ * so Prisma leaves the JSON column untouched (SQL NULL) instead of writing a JSON null.
+ */
+function cleanSupportNeeds(
+  needs: ApplicationInput['supportNeeds'],
+): Array<{ type: string; accommodation?: string; assistiveDevice?: string }> | undefined {
+  if (!needs || needs.length === 0) return undefined
+  const seen = new Set<string>()
+  const out: Array<{ type: string; accommodation?: string; assistiveDevice?: string }> = []
+  for (const n of needs) {
+    if (seen.has(n.type)) continue
+    seen.add(n.type)
+    const accommodation   = n.accommodation?.trim()
+    const assistiveDevice = n.assistiveDevice?.trim()
+    out.push({
+      type: n.type,
+      ...(accommodation   ? { accommodation }   : {}),
+      ...(assistiveDevice ? { assistiveDevice } : {}),
+    })
+  }
+  return out.length > 0 ? out : undefined
+}
+
+/**
+ * Welfare, health and special-needs fields are sensitive child data: the same
+ * rule as the student record (student.viewWelfare) applies while they sit on an
+ * application. The routes call this for every role without that permission, so a
+ * reviewer who can open applications but not welfare never receives them.
+ */
+export const APPLICATION_WELFARE_FIELDS = [
+  'orphanStatus', 'isVulnerable', 'vulnerabilityNote', 'medicalAlert', 'supportNeeds',
+] as const
+
+export function withoutWelfare<T extends object>(row: T): Omit<T, (typeof APPLICATION_WELFARE_FIELDS)[number]> {
+  const copy = { ...row } as Record<string, unknown>
+  for (const key of APPLICATION_WELFARE_FIELDS) delete copy[key]
+  return copy as Omit<T, (typeof APPLICATION_WELFARE_FIELDS)[number]>
+}
+
 function buildApplicationCreateData(data: ApplicationInput) {
+  const supportNeeds = cleanSupportNeeds(data.supportNeeds)
   return {
     firstName:         data.firstName,
     lastName:          data.surname,
@@ -90,6 +133,26 @@ function buildApplicationCreateData(data: ApplicationInput) {
     nationality:       data.nationality,
     district:          data.district ?? '',
     village:           data.village ?? null,
+    traditionalAuthority: data.traditionalAuthority?.trim() || null,
+    // religion was validated by ApplicationSchema and shown on /apply but never
+    // saved (no column existed), so it was silently discarded.
+    religion:          data.religion?.trim() || null,
+    homeLanguage:      data.homeLanguage?.trim() || null,
+    // National ID is optional; '' (an empty input) is "not provided".
+    nrbNumber:         data.nrbNumber?.trim() || null,
+    // Home & Admission. admissionType stays null unless the applicant chose one:
+    // conversion then derives it from the form applied for.
+    residenceType:     data.residenceType ?? null,
+    travelMinutes:     data.travelMinutes ?? null,
+    admissionType:     data.admissionType ?? null,
+    // Welfare / health / special needs (sensitive). orphanStatus falls back to
+    // UNKNOWN - an unanswered question is never recorded as "not an orphan".
+    orphanStatus:      data.orphanStatus ?? 'UNKNOWN',
+    isVulnerable:      data.isVulnerable ?? false,
+    vulnerabilityNote: data.vulnerabilityNote?.trim() || null,
+    medicalAlert:      data.medicalAlert?.trim() || null,
+    // Omitted (SQL NULL) when empty rather than set to undefined/JSON null.
+    ...(supportNeeds ? { supportNeeds } : {}),
     email:             data.email || null,
     phone:             data.phone,
     address:           data.address ?? null,
@@ -103,6 +166,31 @@ function buildApplicationCreateData(data: ApplicationInput) {
     guardianAddress:   data.guardianAddress ?? null,
     applyingForForm:   FORM_LEVEL_BY_CLASS_APPLYING[data.classApplying],
     status:            'PENDING' as const,
+  }
+}
+
+// [ALGOLIA ROLLOUT — Tier 1 item 6] Shared by both create paths (public +
+// internal) and by the admin seed route — one mapping from an Application
+// Prisma row to the search record, instead of duplicating the field list
+// at every call site.
+function toAlgoliaApplication(application: {
+  id: string; firstName: string; lastName: string; otherNames: string | null
+  guardianName: string; previousSchool: string | null; status: string
+  applyingForForm: number; academicYear: string | null; sex: string; createdAt: Date
+}): algolia.AlgoliaApplication {
+  return {
+    objectID:        application.id,
+    firstName:       application.firstName,
+    lastName:        application.lastName,
+    otherNames:      application.otherNames ?? null,
+    fullName:        `${application.firstName} ${application.lastName}`,
+    guardianName:    application.guardianName,
+    previousSchool:  application.previousSchool ?? null,
+    status:          application.status,
+    applyingForForm: application.applyingForForm,
+    academicYear:    application.academicYear ?? null,
+    sex:             application.sex,
+    createdAt:       application.createdAt.toISOString(),
   }
 }
 
@@ -200,6 +288,7 @@ export async function createPublicApplication(data: ApplicationInput) {
   const application = await prisma.application.create({
     data: buildApplicationCreateData(data),
   })
+  void algolia.indexApplication(toAlgoliaApplication(application))
 
   // ── Confirmation emails (fire-and-forget) — rendered via the shared
   // application-received template, not inline HTML strings.
@@ -247,15 +336,29 @@ export async function createPublicApplication(data: ApplicationInput) {
 // ─────────────────────────────────────────────────────────
 
 export async function createApplication(data: ApplicationInput) {
-  return prisma.application.create({
+  const application = await prisma.application.create({
     data: buildApplicationCreateData(data),
   })
+  void algolia.indexApplication(toAlgoliaApplication(application))
+  return application
+}
+
+// [ALGOLIA ROLLOUT — Tier 1 item 6] Bulk seed, same pattern as the other
+// entities' seed routes — called from algoliaAdmin.ts.
+export async function seedAllApplicationsToAlgolia(): Promise<algolia.BulkIndexResult> {
+  const applications = await prisma.application.findMany({
+    select: {
+      id: true, firstName: true, lastName: true, otherNames: true, guardianName: true,
+      previousSchool: true, status: true, applyingForForm: true, academicYear: true,
+      sex: true, createdAt: true,
+    },
+  })
+  return algolia.bulkIndexApplications(applications.map(toAlgoliaApplication))
 }
 
 // ─────────────────────────────────────────────────────────
 //  STATUS UPDATE — approve / deny / mark awaiting admission
 // ─────────────────────────────────────────────────────────
-
 export async function updateApplicationStatus(
   id:        string,
   status:    'APPROVED' | 'DENIED' | 'AWAITING_ADMISSION',
@@ -291,5 +394,7 @@ export async function updateApplicationStatus(
     },
   })
 
+  void algolia.updateApplication({ objectID: id, status })
+
   return updated
-}
+}

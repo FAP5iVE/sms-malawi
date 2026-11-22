@@ -10,6 +10,7 @@ import type {
   TopicMessage,
 } from 'firebase-admin/messaging'
 import { getAdminApp } from '@/lib/verifyAuth'
+import { defaultTopicsForRole } from '@/lib/pushTopics'
 import { logger } from '@/lib/logger'
 
 // ─────────────────────────────────────────────────────────
@@ -623,18 +624,10 @@ export async function subscribeUserToDefaultTopics(
   const tokens = await getTokensForUser(uid)
   if (tokens.length === 0) return
 
-  const topics: string[] = ['announcements_all']
-
-  if (role === 'student') {
-    topics.push('announcements_students')
-    if (classId) topics.push(`announcements_class_${classId}`)
-  } else {
-    topics.push('announcements_staff')
-  }
-
-  if (['academic', 'exam_officer'].includes(role)) {
-    topics.push('announcements_academic')
-  }
+  // Positive per-role selection (lib/pushTopics.ts). A role that is not a
+  // student used to fall through to the staff topic; that is no longer possible.
+  const topics = defaultTopicsForRole(role, classId)
+  if (topics.length === 0) return
 
   await Promise.all(topics.map((topic) => subscribeToTopic(tokens, topic)))
 }

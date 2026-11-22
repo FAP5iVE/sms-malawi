@@ -34,47 +34,43 @@
  */
 
 import {
-  Users,
-  ShieldCheck,
   Activity,
-  ClipboardList,
   UserPlus,
   FileSearch,
   Settings,
   Bell,
 } from 'lucide-react'
-import { StatCard, StatCardGrid, statValue } from '@/components/shared/StatCard'
 import { QuickActions }           from '@/components/shared/QuickActions'
 import type { QuickAction }       from '@/components/shared/QuickActions'
-import { ChartCard }              from '@/components/shared/ChartCard'
 import { ListCard }               from '@/components/shared/ListCard'
 import { Chart }                  from '@/components/shared/chart'
 import type { ChartDataPoint }    from '@/components/shared/chart'
-import { useUsers }               from '@/hooks/useAdmin'
 import { useAdminLoginTrend }     from '@/hooks/useAnalytics'
-import { useSystemHealth }        from '@/hooks/useReports'
+import { useAdminOverview, useAdminAttention } from '@/hooks/reporting/useAdminReporting'
+import { DashboardAttention } from './DashboardReport'
+import { PrimaryOverviewKpis, ReportLinks, SecondaryKpis, TrendCard } from './DashboardSections'
+import type { ReportLink } from './DashboardSections'
 import { useAnnouncements }       from '@/hooks/useAnnouncements'
-import type { ApiUserListResponse, ApiSystemHealth } from '@shared/types/api'
 
 const QUICK_ACTIONS: QuickAction[] = [
   {
-    label: 'Add User',
+    label: 'Add user',
     // R15: was /user-management/new — a route that has never existed.
     // User creation is in-page at /user-management.
     href:  '/user-management',
     icon:  UserPlus,
     color: 'bg-brand-teal/10',
-    text:  'text-brand-teal',
+    text:  'text-tone-teal',
   },
   {
-    label: 'Audit Logs',
-    href:  '/reports',
+    label: 'Audit logs',
+    href:  '/reports?tab=audit',
     icon:  FileSearch,
     color: 'bg-brand-navy/8',
     text:  'text-brand-navy',
   },
   {
-    label: 'System Health',
+    label: 'System health',
     // R15: deep-links to the health tab (page reads ?tab= as of this phase).
     href:  '/user-management?tab=health',
     icon:  Activity,
@@ -86,7 +82,7 @@ const QUICK_ACTIONS: QuickAction[] = [
     href:  '/settings',
     icon:  Settings,
     color: 'bg-brand-amber/10',
-    text:  'text-brand-amber',
+    text:  'text-tone-amber',
   },
   {
     label: 'Announcements',
@@ -97,19 +93,24 @@ const QUICK_ACTIONS: QuickAction[] = [
   },
 ]
 
+/** Lead with platform health and sign-in security; the rest sit in "More figures". Health KPIs only exist when monitoring data does. */
+const PREFERRED = ['services', 'issues', 'failureRate', 'activeNow', 'loginsToday', 'audit24']
+
+const REPORT_LINKS: ReportLink[] = [
+  { label: 'Overview', href: '/reports?tab=overview', description: 'Every figure with its definition' },
+  { label: 'Security', href: '/reports?tab=security', description: 'Failed sign-ins, repeated failures' },
+  { label: 'Sessions', href: '/reports?tab=sessions', description: 'Who is signed in, from where' },
+  { label: 'Governance', href: '/reports?tab=governance', description: 'Audited changes' },
+  { label: 'Operations', href: '/reports?tab=operations', description: 'Platform health and errors' },
+  { label: 'Audit log', href: '/reports?tab=audit', description: 'Searchable record of actions' },
+]
+
 export function AdminDashboard() {
-  const { data: usersData, isLoading: usersLoading }   = useUsers()
-  const { data: healthData, isLoading: healthLoading } = useSystemHealth()
+  const overview = useAdminOverview()
+  const attention = useAdminAttention()
 
-  const users  = usersData  as ApiUserListResponse | undefined
-  const health = healthData as ApiSystemHealth | undefined
-
-  const serviceAlerts = health
-    ? health.services.filter((s) => s.status !== 'ok').length
-    : undefined
-
-  const { data: loginTrend = [], isLoading: loginLoading } = useAdminLoginTrend(30)
-  const loginData: ChartDataPoint[] = loginTrend.map((p) => ({
+  const loginQuery = useAdminLoginTrend(30)
+  const loginData: ChartDataPoint[] = (loginQuery.data ?? []).map((p) => ({
     x: p.date,
     successful: p.successful,
     failed: p.failed,
@@ -119,89 +120,68 @@ export function AdminDashboard() {
   const recentAnnouncements = announcements.slice(0, 5)
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
+      <PrimaryOverviewKpis
+        title="Administration"
+        summary="Review sign-ins, see how the system is being used and check for issues that need attention."
+        overview={overview}
+        preferred={PREFERRED}
+        reportsHref="/reports?tab=overview"
+      />
 
-      {/* Stat row — StatCardGrid orchestrates stagger animation (B8 + C6) */}
-      <StatCardGrid className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard
-          label="Total Users"
-          value={statValue(usersLoading, users?.users.length)}
-          icon={Users}
-          trend="neutral"
-          trendLabel="accounts"
-          iconColor="bg-brand-teal/10"
-          iconText="text-brand-teal"
-        />
-        <StatCard
-          label="Active Users"
-          value={statValue(healthLoading, health?.activeUsersLastHr)}
-          icon={Activity}
-          trend="neutral"
-          trendLabel="last hour"
-          iconColor="bg-blue-50"
-          iconText="text-blue-600"
-        />
-        <StatCard
-          label="Service Alerts"
-          value={statValue(healthLoading, serviceAlerts)}
-          icon={ShieldCheck}
-          trend={serviceAlerts === 0 ? 'up' : serviceAlerts !== undefined ? 'down' : 'neutral'}
-          trendLabel={serviceAlerts === 0 ? 'all healthy' : 'degraded'}
-          iconColor={serviceAlerts ? 'bg-brand-coral/10' : 'bg-emerald-50'}
-          iconText={serviceAlerts ? 'text-brand-coral' : 'text-emerald-600'}
-        />
-        <StatCard
-          label="Actions (24h)"
-          value={statValue(healthLoading, health?.actionsLast24h)}
-          icon={ClipboardList}
-          trend="neutral"
-          trendLabel="audit events"
-          iconColor="bg-brand-amber/10"
-          iconText="text-brand-amber"
-        />
-      </StatCardGrid>
-
-      <QuickActions actions={QUICK_ACTIONS} />
-
-      <div className="grid md:grid-cols-2 gap-4">
-        <ChartCard
-          title="User Activity"
-          sub="Login success vs failure (last 30 days)"
-          isLoading={loginLoading}
+      <TrendCard
+        title="Sign-in activity"
+        sub="Successful and failed sign-ins, last 30 days"
+        isLoading={loginQuery.isLoading}
+        isError={loginQuery.isError}
+        onRetry={() => void loginQuery.refetch()}
+      >
+        <Chart
+          type="line"
+          data={loginData}
+          /* Colours are tied to meaning (good = teal, bad = coral), not to a palette index. */
+          series={[
+            { key: 'successful', label: 'Successful', color: 'var(--color-brand-teal, #0e8a6a)' },
+            { key: 'failed', label: 'Failed', color: 'var(--color-brand-coral, #dc4f3a)' },
+          ]}
           height={200}
-        >
-          <Chart
-            type="line"
-            data={loginData}
-            series={[
-              { key: 'successful', label: 'Successful' },
-              { key: 'failed', label: 'Failed' },
-            ]}
-            height={200}
-            emptyStateMessage="No login activity recorded in the last 30 days."
-            ariaLabel="Login activity over the last 30 days, showing successful versus failed sign-in attempts"
-          />
-        </ChartCard>
-        <ListCard
-          title="Recent Announcements"
-          sub="Latest posts — see the header bell or /announcements"
-          isLoading={announcementsLoading}
-          isEmpty={recentAnnouncements.length === 0}
-          emptyMessage="No announcements have been posted yet."
-        >
-          <ul className="divide-y divide-base">
-            {recentAnnouncements.map((a) => (
-              <li key={a.id} className="py-2.5">
-                <p className="text-sm font-medium text-brand-navy truncate">{a.title}</p>
-                <p className="text-xs text-muted mt-0.5">
-                  {a.postType.charAt(0) + a.postType.slice(1).toLowerCase()}
-                  {a.createdAt ? ` · ${new Date(a.createdAt).toLocaleDateString('en-MW')}` : ''}
-                </p>
-              </li>
-            ))}
-          </ul>
-        </ListCard>
-      </div>
+          emptyStateMessage="No login activity recorded in the last 30 days."
+          ariaLabel="Login activity over the last 30 days, showing successful versus failed sign-in attempts"
+        />
+      </TrendCard>
+
+      <DashboardAttention query={attention} title="Administrator attention queue" limit={5} />
+
+      <SecondaryKpis
+        title="More figures and findings"
+        overview={overview}
+        preferred={PREFERRED}
+        showInsights
+        extra={
+          <ListCard
+            title="Recent announcements"
+            sub="Latest posts"
+            isLoading={announcementsLoading}
+            isEmpty={recentAnnouncements.length === 0}
+            emptyMessage="No announcements have been posted yet."
+          >
+            <ul className="divide-y divide-base">
+              {recentAnnouncements.map((a) => (
+                <li key={a.id} className="py-2.5">
+                  <p className="text-sm font-medium text-brand-navy truncate">{a.title}</p>
+                  <p className="text-xs text-muted mt-0.5">
+                    {a.postType.charAt(0) + a.postType.slice(1).toLowerCase()}
+                    {a.createdAt ? ` · ${new Date(a.createdAt).toLocaleDateString('en-MW')}` : ''}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </ListCard>
+        }
+      />
+
+      <QuickActions actions={QUICK_ACTIONS} compact />
+      <ReportLinks links={REPORT_LINKS} />
     </div>
   )
 }

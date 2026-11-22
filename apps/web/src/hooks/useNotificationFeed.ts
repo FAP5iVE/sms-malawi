@@ -81,7 +81,9 @@ export function useNotificationFeed() {
     queryKey: queryKeys.notifications.feed(),
     queryFn: () => apiFetch<FeedResponse>('/notifications/feed'),
     staleTime: 30_000,
-    refetchInterval: 60_000,
+    // 4 min, and only while the tab is visible (React Query skips interval
+    // refetches in hidden tabs — refetchIntervalInBackground defaults to false).
+    refetchInterval: 4 * 60_000,
   })
 
   const notifications: FeedNotification[] = useMemo(() => {

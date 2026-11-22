@@ -35,6 +35,11 @@ export interface PublicSchoolInfo {
   vision:      string
   mission:     string
   coreValues:  string[]
+  /** [NEW] One resolved entry per Discover card that has a preview photo
+   *  set (Settings -> School Identity -> Discover Cards). A card with no
+   *  matching entry here has no photo yet — the landing page falls back
+   *  to that card's default gradient tint in that case. */
+  discoverCards: { cardKey: 'leadership' | 'academics' | 'student_life' | 'admissions'; photoUrl: string | null }[]
   currentYear: string
   /** [PRODUCTION FIX 2026-07-28] Footer social icons — real URLs, editable
    *  under Settings -> School Identity. null = hide that icon. */
@@ -72,6 +77,9 @@ export interface PublicAnnouncement {
    *  getPublicViewUrl(), not a raw Appwrite file ID. Present only if a
    *  cover image was attached when the announcement was written. */
   imageUrl:  string | null
+  /** [NEW] Byline — rendered as "Written by: <name>" on the detail page.
+   *  null when the author left it blank. */
+  authorName: string | null
 }
 
 /** GET /public/placement-stats — real UniversityPlacement outcomes,
@@ -287,6 +295,7 @@ export function usePublicFeeStructure(year?: string) {
 
 export function useNewsletterSubscribe() {
   return useMutation({
+    meta: { feedback: 'manual' },
     mutationFn: (data: { email: string; name?: string }) =>
       apiFetch<{ message: string }>('/public/newsletter/subscribe', {
         method: 'POST',
@@ -299,6 +308,7 @@ export function useNewsletterSubscribe() {
  *  the "Send us a message" form had no backend at all before this. */
 export function useContactForm() {
   return useMutation({
+    meta: { feedback: 'manual' },
     mutationFn: (data: { name: string; email: string; subject: string; message: string }) =>
       apiFetch<{ message: string }>('/public/contact', {
         method: 'POST',

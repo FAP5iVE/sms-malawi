@@ -50,13 +50,15 @@ import {
   Banknote,
   Library,
   Bell,
-  ChevronRight,
   LayoutList,
   CalendarDays, 
   Search,
   Building2,
+  Hash,
 }                               from 'lucide-react'
 import { useAuthStore }         from '@/store/authStore'
+import { ModuleSurface }        from '@/components/shared/ModuleSurface'
+import { ModuleTabs }           from '@/components/shared/ModuleTabs'
 import { ProfileSettings }      from '@/components/settings/ProfileSettings'
 import { SystemConfigSettings } from '@/components/settings/SystemConfigSettings'
 import { AcademicPolicySettings } from '@/components/settings/AcademicPolicySettings'
@@ -65,6 +67,7 @@ import { FinanceSettings }      from '@/components/settings/FinanceSettings'
 import { LibrarySettings }      from '@/components/settings/LibrarySettings'
 import { HRDepartmentsSettings } from '@/components/settings/HRDepartmentsSettings'
 import { SchoolIdentitySettings } from '@/components/settings/SchoolIdentitySettings'
+import { IdNumberSettings } from '@/components/settings/IdNumberSettings'
 import { ClassroomSettings }    from '@/components/settings/ClassroomSettings'
 import { NotificationSettings } from '@/components/settings/NotificationSettings'
 import type { UserRole }        from '@shared/types/roles'
@@ -86,6 +89,7 @@ type SectionId =
   | 'library'
   | 'hr-departments'
   | 'school-identity'
+  | 'id-numbers'
   | 'classroom'
   | 'notifications'
 
@@ -99,67 +103,73 @@ interface Section {
 const SECTIONS: Section[] = [
   {
     id:    'profile',
-    label: 'Profile & Account',
+    label: 'Profile and account',
     icon:  User,
     roles: ['admin','high_rank','finance','library','hr','academic','exam_officer','lower_rank','student'],
   },
   {
     id:    'system',
-    label: 'System Configuration',
+    label: 'System configuration',
     icon:  Settings,
     roles: ['admin'],
   },
   {
     id:    'holidays',
-    label: 'Public Holidays',
+    label: 'Public holidays',
     icon:  CalendarDays,
     roles: ['admin'],
   },
   {
     id:    'search-index',
-    label: 'Search Index',
+    label: 'Search index',
     icon:  Search,
     roles: ['admin'],
   },
   {
     id:    'academic-policy',
-    label: 'Academic Policy',
+    label: 'Academic policy',
     icon:  BookOpen,
     roles: ['admin', 'high_rank'],
   },
   {
     id:    'exam-grading',
-    label: 'Exam & Grading',
+    label: 'Exam and grading',
     icon:  GraduationCap,
     roles: ['admin', 'high_rank', 'exam_officer'],
   },
   {
     id:    'finance',
-    label: 'Finance Preferences',
+    label: 'Finance preferences',
     icon:  Banknote,
     roles: ['admin', 'finance'],
   },
   {
     id:    'library',
-    label: 'Library Rules',
+    label: 'Library rules',
     icon:  Library,
     roles: ['admin', 'library'],
   },
   {
     id:    'hr-departments',
-    label: 'Departments & Titles',
+    label: 'Departments, leave and retirement',
     icon:  Building2,
     roles: ['admin', 'hr', 'high_rank'],
   },
   {
     id:    'school-identity',
-    label: 'School Identity',
+    label: 'School identity',
     icon:  GraduationCap,
     roles: ['admin', 'hr', 'high_rank'],
   },
   {
+    id:    'id-numbers',
+    label: 'ID numbers',
+    icon:  Hash,
+    roles: ['admin', 'hr', 'high_rank'],
+  },
+  {
     id:    'classroom',
-    label: 'Classroom Preferences',
+    label: 'Classroom preferences',
     icon:  LayoutList,
     roles: ['academic'],
   },
@@ -185,6 +195,7 @@ function SectionContent({ sectionId }: { sectionId: SectionId }) {
     case 'library':          return <LibrarySettings />
     case 'hr-departments':   return <HRDepartmentsSettings />
     case 'school-identity':  return <SchoolIdentitySettings />
+    case 'id-numbers':       return <IdNumberSettings />
     case 'classroom':        return <ClassroomSettings />
     case 'notifications':    return <NotificationSettings />
     case 'holidays':         return <HolidaysManager />
@@ -199,12 +210,12 @@ function SectionContent({ sectionId }: { sectionId: SectionId }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function SettingsPageInner() {
-  const { role }  = useAuthStore()
+  const { role, superUser }  = useAuthStore()
   const [manualSection, setManualSection] = useState<SectionId | null>(null)
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
+  // alpha_admin sees every settings section regardless of the role list.
   const visibleSections = SECTIONS.filter(
-    (s) => role && s.roles.includes(role),
+    (s) => role && (superUser || s.roles.includes(role)),
   )
 
   // R19 — the active section is derived during render via Next's
@@ -214,11 +225,11 @@ function SettingsPageInner() {
   // read window.location.search and called setActive. `role` — and
   // therefore `visibleSections` — resolves asynchronously after mount, so
   // rather than a one-time lazy initializer, `active` is split into a
-  // manual override (set only by an explicit sidebar/mobile-menu click) and
-  // a derived fallback: `?section=` is re-validated against
-  // `visibleSections` on every render, so it still takes effect once role
-  // resolves post-mount, but a manual pick — once made — is never clobbered
-  // by the URL param again, exactly mirroring the old effect's behavior.
+  // manual override (set only by an explicit tab click) and a derived
+  // fallback: `?section=` is re-validated against `visibleSections` on
+  // every render, so it still takes effect once role resolves post-mount,
+  // but a manual pick — once made — is never clobbered by the URL param
+  // again, exactly mirroring the old effect's behavior.
   const searchParams = useSearchParams()
   const sectionParam = searchParams.get('section')
   const urlSection: SectionId | null =
@@ -227,99 +238,35 @@ function SettingsPageInner() {
   const active: SectionId = manualSection ?? urlSection ?? 'profile'
   const setActive = setManualSection
 
-  const activeSection = visibleSections.find((s) => s.id === active) ?? visibleSections[0]
-
   return (
     <div className="space-y-5">
       {/* Page title */}
       <div>
         <h1 className="font-heading text-2xl font-bold text-brand-navy">Settings</h1>
         <p className="text-sm text-muted mt-0.5">
-          Manage your account preferences and system configuration.
+          Account preferences and system configuration.
         </p>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-6 items-start">
+      <ModuleSurface>
+      {/* [PRODUCTION FIX] Was a vertical section list (desktop: a left
+         sidebar of stacked buttons; mobile: a dropdown accordion) —
+         replaced with the same horizontal ModuleTabs bar every other
+         module page uses (Exams, Finance, HR, etc.), which already
+         handles small-screen horizontal scrolling on its own, so the
+         separate mobile dropdown markup is no longer needed. */}
+      <ModuleTabs<SectionId>
+        id="settings-sections"
+        tabs={visibleSections}
+        active={active}
+        onChange={setActive}
+      />
 
-        {/* ── Sidebar (desktop) ─────────────────────────────────────────── */}
-        <aside className="hidden md:flex flex-col w-52 shrink-0 bg-surface border border-base rounded-2xl overflow-hidden">
-          {visibleSections.map((section) => {
-            const Icon     = section.icon
-            const isActive = section.id === active
-            return (
-              <button
-                key={section.id}
-                type="button"
-                onClick={() => setActive(section.id)}
-                className={[
-                  'flex items-center gap-3 px-4 py-3 text-sm font-medium text-left transition-colors border-l-2',
-                  isActive
-                    ? 'border-brand-teal bg-brand-teal/6 text-brand-teal font-semibold'
-                    : 'border-transparent text-muted hover:bg-page hover:text-body',
-                ].join(' ')}
-                aria-current={isActive ? 'page' : undefined}
-              >
-                <Icon className="w-4 h-4 shrink-0" aria-hidden />
-                <span className="truncate">{section.label}</span>
-              </button>
-            )
-          })}
-        </aside>
-
-        {/* ── Mobile section select ─────────────────────────────────────── */}
-        <div className="md:hidden w-full">
-          <button
-            type="button"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="w-full flex items-center justify-between gap-3 bg-surface border border-base rounded-xl px-4 py-3 min-h-11"
-          >
-            <div className="flex items-center gap-3">
-              {activeSection && (
-                <>
-                  <activeSection.icon className="w-4 h-4 text-brand-teal" aria-hidden />
-                  <span className="text-sm font-heading font-semibold text-body">
-                    {activeSection.label}
-                  </span>
-                </>
-              )}
-            </div>
-            <ChevronRight
-              className={`w-4 h-4 text-muted transition-transform ${mobileMenuOpen ? 'rotate-90' : ''}`}
-              aria-hidden
-            />
-          </button>
-
-          {mobileMenuOpen && (
-            <div className="mt-2 bg-surface border border-base rounded-xl overflow-hidden shadow-lg">
-              {visibleSections.map((section) => {
-                const Icon     = section.icon
-                const isActive = section.id === active
-                return (
-                  <button
-                    key={section.id}
-                    type="button"
-                    onClick={() => { setActive(section.id); setMobileMenuOpen(false) }}
-                    className={[
-                      'flex items-center gap-3 w-full px-4 py-3 text-sm text-left transition-colors border-b border-base last:border-0',
-                      isActive
-                        ? 'bg-brand-teal/8 text-brand-teal font-semibold'
-                        : 'text-muted hover:bg-page hover:text-body',
-                    ].join(' ')}
-                  >
-                    <Icon className="w-4 h-4 shrink-0" aria-hidden />
-                    {section.label}
-                  </button>
-                )
-              })}
-            </div>
-          )}
-        </div>
-
-       {/* ── Content panel ─────────────────────────────────────────────── */}
-        <div className="flex-1 min-w-0 bg-surface border border-base rounded-2xl p-6 space-y-6">
-          <SectionContent sectionId={active} />
-        </div>
+      {/* ── Content panel ─────────────────────────────────────────────── */}
+      <div className="space-y-6">
+        <SectionContent sectionId={active} />
       </div>
+      </ModuleSurface>
     </div>
   )
 }

@@ -18,6 +18,14 @@ import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { useApplication } from '@/hooks/useApplications'
 import { RoleGuard } from '@/components/shared/RoleGuard'
+import { usePermissions } from '@/hooks/usePermissions'
+import { StatusText, type StatusTone } from '@/components/shared/StatusText'
+import {
+  RESIDENCE_TYPE_LABELS,
+  ADMISSION_TYPE_LABELS,
+  ORPHAN_STATUS_LABELS,
+  SUPPORT_NEED_LABELS,
+} from '@shared/constants/malawi'
 
 export default function ApplicationDetailPage() {
   return (
@@ -27,18 +35,24 @@ export default function ApplicationDetailPage() {
   )
 }
 
-const STATUS_STYLES: Record<string, string> = {
-  PENDING:             'bg-brand-gold/15 text-brand-gold border-brand-gold/30',
-  APPROVED:            'bg-brand-teal/15 text-brand-teal border-brand-teal/30',
-  DENIED:              'bg-brand-coral/15 text-brand-coral border-brand-coral/30',
-  AWAITING_ADMISSION:  'bg-brand-navy/10 text-brand-navy border-brand-navy/25',
-  ADMITTED:            'bg-brand-teal/15 text-brand-teal border-brand-teal/30',
+const STATUS_TONES: Record<string, StatusTone> = {
+  PENDING:             'warning',
+  APPROVED:            'success',
+  DENIED:              'danger',
+  AWAITING_ADMISSION:  'info',
+  ADMITTED:            'success',
+}
+
+// Sentence case for the visible word (R4): "Awaiting admission", not "AWAITING ADMISSION".
+function statusWord(s: string): string {
+  const w = s.replace(/_/g, ' ').toLowerCase()
+  return w.charAt(0).toUpperCase() + w.slice(1)
 }
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="text-[11px] uppercase tracking-wider text-muted">{label}</span>
+      <span className="text-xs text-muted">{label}</span>
       <span className="text-sm text-body break-words">{value || '—'}</span>
     </div>
   )
@@ -46,7 +60,7 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-surface border border-base rounded-xl p-5">
+    <div className="app-tint rounded-xl p-5">
       <h2 className="font-heading text-sm font-semibold text-brand-navy mb-4">{title}</h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">{children}</div>
     </div>
@@ -56,6 +70,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function ApplicationDetailContent() {
   const { id } = useParams<{ id: string }>()
   const { data: app, isLoading, error } = useApplication(id)
+  const { can } = usePermissions()
 
   if (isLoading) {
     return (
@@ -80,8 +95,7 @@ function ApplicationDetailContent() {
     )
   }
 
-  const statusClass =
-    STATUS_STYLES[app.status] ?? 'bg-page text-muted border-base'
+  const statusTone: StatusTone = STATUS_TONES[app.status] ?? 'neutral'
 
   return (
     <div className="space-y-5">
@@ -89,7 +103,7 @@ function ApplicationDetailContent() {
       <div className="flex items-center gap-3 flex-wrap">
         <Link
           href="/applications"
-          className="p-1.5 rounded-lg hover:bg-page border border-base"
+          className="p-1.5 rounded-lg hover:bg-page"
           aria-label="Back to applications"
         >
           <ArrowLeft className="w-4 h-4 text-muted" />
@@ -97,11 +111,9 @@ function ApplicationDetailContent() {
         <h1 className="font-heading text-xl font-bold text-brand-navy">
           {app.firstName} {app.lastName}
         </h1>
-        <span
-          className={`ml-auto text-xs px-2.5 py-1 rounded-full border font-medium ${statusClass}`}
-        >
-          {app.status.replace(/_/g, ' ')}
-        </span>
+        <StatusText tone={statusTone} size="md" className="ml-auto">
+          {statusWord(app.status)}
+        </StatusText>
       </div>
 
       {/* Applicant */}
@@ -115,8 +127,43 @@ function ApplicationDetailContent() {
         <Field label="Sex" value={app.sex} />
         <Field label="Nationality" value={app.nationality} />
         <Field label="District" value={app.district} />
+        <Field label="Traditional authority" value={app.traditionalAuthority} />
+        <Field label="Village" value={app.village} />
+        <Field label="NRB or birth certificate number" value={app.nrbNumber} />
+        <Field label="Religion" value={app.religion} />
+        <Field label="Home language" value={app.homeLanguage} />
         <Field label="Applying for" value={`Form ${app.applyingForForm}`} />
       </Section>
+
+      {/* Home & Admission */}
+      <Section title="Home & Admission">
+        <Field label="Stays" value={app.residenceType ? RESIDENCE_TYPE_LABELS[app.residenceType] : null} />
+        <Field label="Travel to school" value={app.travelMinutes != null ? `${app.travelMinutes} min` : null} />
+        <Field label="Admission" value={app.admissionType ? ADMISSION_TYPE_LABELS[app.admissionType] : 'Decided at admission'} />
+        <Field label="Previous school" value={app.previousSchool} />
+        <Field label="Reason for transfer" value={app.reasonForTransfer} />
+      </Section>
+
+      {/* Welfare & health: sensitive. The API only sends these fields to roles with
+          student.viewWelfare; the check here just avoids an empty, misleading section. */}
+      {can('student.viewWelfare') && (
+        <Section title="Welfare & Health">
+          <Field label="Orphan status" value={ORPHAN_STATUS_LABELS[app.orphanStatus ?? 'UNKNOWN']} />
+          <Field label="Vulnerable" value={app.isVulnerable ? 'Yes' : 'No'} />
+          {app.vulnerabilityNote ? <Field label="Vulnerability note" value={app.vulnerabilityNote} /> : null}
+          <Field label="Health or medical alert" value={app.medicalAlert ?? 'None recorded'} />
+          <Field
+            label="Special needs"
+            value={
+              app.supportNeeds && app.supportNeeds.length > 0
+                ? app.supportNeeds
+                    .map((n) => SUPPORT_NEED_LABELS[n.type] + (n.accommodation ? ` (${n.accommodation})` : ''))
+                    .join(', ')
+                : 'None recorded'
+            }
+          />
+        </Section>
+      )}
 
       {/* Guardian */}
       <Section title="Guardian">
@@ -127,7 +174,7 @@ function ApplicationDetailContent() {
 
       {/* Application meta */}
       <Section title="Application">
-        <Field label="Status" value={app.status.replace(/_/g, ' ')} />
+        <Field label="Status" value={statusWord(app.status)} />
         <Field
           label="Submitted"
           value={new Date(app.createdAt).toLocaleString()}

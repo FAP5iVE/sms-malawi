@@ -28,13 +28,15 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { format, parseISO } from 'date-fns'
-import { Calendar as CalendarIcon, Clock, MapPin, AlignLeft, Loader2, X } from 'lucide-react'
+import { Calendar as CalendarIcon, Clock, MapPin, AlignLeft, Loader2, AlertCircle } from 'lucide-react'
 import { MotionBottomSheet } from '@/components/shared/MotionBottomSheet'
 import { useCreateCalendarEvent, useUpdateCalendarEvent } from '@/hooks/useCalendarEvents'
 import { CreateCalendarEventSchema } from '@shared/schemas/calendarEvent'
 import { CALENDAR_COLORS } from '@shared/types/calendar'
+import { chipClass } from '@/lib/hills/chip'
 import type { CalendarEvent, CalendarEventCategory } from '@shared/types/calendar'
 import { CATEGORY_LEGEND, DEFAULT_EVENT_CATEGORY, manualEventDbId } from './calendarConfig'
+import { Modal } from '@/components/shared/Modal'
 
 interface CalendarEventFormDialogProps {
   open: boolean
@@ -149,21 +151,21 @@ export function CalendarEventFormDialog({
   const formBody = (
     <form onSubmit={onSubmit} className="space-y-4">
       <div>
-        <label htmlFor="cal-event-title" className="text-xs font-medium text-muted mb-1 block">
-          Event Title
+        <label htmlFor="cal-event-title" className="text-sm font-medium text-body mb-1 block">
+          Event title
         </label>
         <input
           id="cal-event-title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           required
-          placeholder="e.g. Mid-Term Exam, Faculty Review, Lab Practical"
+          placeholder="Mid-term exam, staff review, lab practical"
           className="w-full border border-base rounded-xl px-4 py-2.5 text-sm bg-page min-h-[44px] focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
         />
       </div>
 
       <div>
-        <span className="text-xs font-medium text-muted mb-2 block">Category</span>
+        <span className="text-sm font-medium text-body mb-2 block">Category</span>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {CATEGORY_LEGEND.map(({ category: cat, label }) => {
             const active = category === cat
@@ -174,18 +176,12 @@ export function CalendarEventFormDialog({
                 type="button"
                 onClick={() => setCategory(cat)}
                 aria-pressed={active}
-                className="px-2.5 py-2 min-h-[44px] rounded-xl text-xs font-medium border flex items-center gap-2 text-left transition-colors"
-                style={
-                  active ? { backgroundColor: `${color}18`, borderColor: color, color } : undefined
-                }
+                className={`${chipClass(active)} justify-start gap-2 text-left`}
               >
                 <span
-                  className={
-                    active
-                      ? 'w-2.5 h-2.5 rounded-full shrink-0'
-                      : 'w-2.5 h-2.5 rounded-full shrink-0 border border-base'
-                  }
+                  className={`w-2.5 h-2.5 rounded-full shrink-0 ${active ? 'ring-2 ring-white/80' : 'border border-base'}`}
                   style={{ backgroundColor: color }}
+                  aria-hidden="true"
                 />
                 <span className="truncate">{label}</span>
               </button>
@@ -194,19 +190,19 @@ export function CalendarEventFormDialog({
         </div>
       </div>
 
-      <div className="rounded-xl border border-base bg-page p-4 space-y-3">
+      <div className="rounded-xl app-tint p-4 space-y-3">
         <div className="flex items-center justify-between">
-          <p className="text-xs font-heading font-semibold text-muted uppercase tracking-wider">
+          <p className="text-sm font-heading font-semibold text-body">
             Schedule
           </p>
-          <label className="flex items-center gap-2 text-xs font-medium text-body cursor-pointer">
+          <label className="flex items-center gap-2 min-h-11 text-sm font-medium text-body cursor-pointer">
             <input
               type="checkbox"
               checked={allDay}
               onChange={(e) => setAllDay(e.target.checked)}
               className="w-4 h-4 rounded accent-brand-teal"
             />
-            All-day
+            All day
           </label>
         </div>
 
@@ -221,7 +217,7 @@ export function CalendarEventFormDialog({
             <div>
               <label
                 htmlFor="cal-event-start-date"
-                className="text-xs font-medium text-muted mb-1 block"
+                className="text-sm font-medium text-body mb-1 block"
               >
                 Start
               </label>
@@ -264,9 +260,9 @@ export function CalendarEventFormDialog({
             <div>
               <label
                 htmlFor="cal-event-end-date"
-                className="text-xs font-medium text-muted mb-1 block"
+                className="text-sm font-medium text-body mb-1 block"
               >
-                End <span className="text-muted/70 font-normal">(optional)</span>
+                End <span className="text-muted font-normal">(optional)</span>
               </label>
               <div className={allDay ? '' : 'grid grid-cols-[1fr_auto] gap-2'}>
                 <div className="relative">
@@ -307,15 +303,15 @@ export function CalendarEventFormDialog({
       <div>
         <label
           htmlFor="cal-event-location"
-          className="text-xs font-medium text-muted mb-1 flex items-center gap-1.5"
+          className="text-sm font-medium text-body mb-1 flex items-center gap-1.5"
         >
-          <MapPin className="w-3.5 h-3.5" aria-hidden="true" /> Location / Room
+          <MapPin className="w-3.5 h-3.5" aria-hidden="true" /> Location or room
         </label>
         <input
           id="cal-event-location"
           value={location}
           onChange={(e) => setLocation(e.target.value)}
-          placeholder="e.g. Science Complex Lab 4, Main Auditorium, Room 204"
+          placeholder="Science lab 4, main hall, room 204"
           className="w-full border border-base rounded-xl px-4 py-2.5 text-sm bg-page min-h-[44px] focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
         />
       </div>
@@ -323,22 +319,23 @@ export function CalendarEventFormDialog({
       <div>
         <label
           htmlFor="cal-event-description"
-          className="text-xs font-medium text-muted mb-1 flex items-center gap-1.5"
+          className="text-sm font-medium text-body mb-1 flex items-center gap-1.5"
         >
-          <AlignLeft className="w-3.5 h-3.5" aria-hidden="true" /> Description / Notes
+          <AlignLeft className="w-3.5 h-3.5" aria-hidden="true" /> Description or notes
         </label>
         <textarea
           id="cal-event-description"
           rows={3}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder="Add additional details, agenda or requirements..."
+          placeholder="Details, agenda or requirements"
           className="w-full border border-base rounded-xl px-4 py-2.5 text-sm bg-page resize-none min-h-[44px] focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
         />
       </div>
 
       {(fieldError || mutationError) && (
-        <p role="alert" className="text-xs text-brand-coral">
+        <p role="alert" className="text-sm text-tone-coral flex items-center gap-1.5">
+          <AlertCircle className="w-4 h-4 shrink-0" aria-hidden="true" />
           {fieldError ?? `Failed to ${isEditing ? 'update' : 'create'} event. Please try again.`}
         </p>
       )}
@@ -347,17 +344,17 @@ export function CalendarEventFormDialog({
         <button
           type="button"
           onClick={onClose}
-          className="px-5 py-2 text-sm border border-base rounded-xl hover:bg-page min-h-[44px]"
+          className="px-5 py-2 text-sm font-medium text-body border border-base rounded-xl hover:bg-page min-h-11"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={pending}
-          className="px-5 py-2 text-sm bg-brand-navy text-white rounded-xl font-heading font-semibold flex items-center gap-2 disabled:opacity-60 min-h-[44px]"
+          className="px-5 py-2 text-sm bg-btn-brand hover:bg-btn-brand-hover text-btn-brand-fg rounded-xl font-heading font-semibold flex items-center gap-2 disabled:opacity-60 min-h-11"
         >
           {pending && <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />}
-          {isEditing ? 'Save Changes' : 'Create Event'}
+          {pending ? 'Saving…' : isEditing ? 'Save changes' : 'Create event'}
         </button>
       </div>
     </form>
@@ -372,7 +369,7 @@ export function CalendarEventFormDialog({
       <MotionBottomSheet
         open={open}
         onClose={onClose}
-        title={isEditing ? 'Edit Event' : 'New Calendar Event'}
+        title={isEditing ? 'Edit event' : 'New calendar event'}
       >
         {formBody}
       </MotionBottomSheet>
@@ -381,31 +378,25 @@ export function CalendarEventFormDialog({
 
   if (!open) return null
 
+  // [PRODUCTION FIX] The 'sheet' presentation above (MotionBottomSheet)
+  // already portals correctly. This 'dialog' presentation didn't — a
+  // plain inline `fixed inset-0`, same class of bug as the other
+  // hand-built forms fixed alongside this one. Portals directly under
+  // <body> now, for the same reason.
+  if (typeof document === 'undefined') return null
+
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40"
-      onClick={onClose}
+    <Modal
+      title={
+        <span className="flex items-center gap-2">
+          <CalendarIcon className="w-4 h-4 text-tone-teal" aria-hidden="true" />
+          {isEditing ? 'Edit event' : 'New calendar event'}
+        </span>
+      }
+      onClose={onClose}
+      size="l"
     >
-      <div
-        className="bg-surface rounded-2xl w-full max-w-lg shadow-xl max-h-[90vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="sticky top-0 z-10 bg-surface flex items-center justify-between px-6 py-4 border-b border-base">
-          <h2 className="font-heading font-bold text-brand-navy flex items-center gap-2">
-            <CalendarIcon className="w-4 h-4 text-brand-teal" aria-hidden="true" />
-            {isEditing ? 'Edit Event' : 'New Calendar Event'}
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close event form"
-            className="p-1.5 hover:bg-page rounded-lg"
-          >
-            <X className="w-4 h-4 text-muted" aria-hidden="true" />
-          </button>
-        </div>
-        <div className="p-6">{formBody}</div>
-      </div>
-    </div>
+      {formBody}
+    </Modal>
   )
 }

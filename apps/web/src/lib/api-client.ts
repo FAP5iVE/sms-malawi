@@ -102,6 +102,29 @@ export function buildApiUrl(path: string): string {
   return `${resolveApiBase()}/api${suffix}`
 }
 
+// Shape of an error response body. Most routes answer `{ error: string }`,
+// but Zod-validated routes answer `{ errors: { formErrors, fieldErrors } }`
+// (the flattened ZodError) - which used to surface as a useless
+// "API error 400". messageFromBody() turns either into a sentence a person
+// can act on.
+interface ErrorBody {
+  error?: string
+  errors?: { formErrors?: string[]; fieldErrors?: Record<string, string[] | undefined> }
+}
+
+function messageFromBody(body: ErrorBody, status: number): string {
+  if (typeof body.error === 'string' && body.error.trim()) return body.error
+  const form = body.errors?.formErrors?.filter(Boolean) ?? []
+  const fields = Object.entries(body.errors?.fieldErrors ?? {})
+    .filter(([, msgs]) => msgs && msgs.length > 0)
+    .map(([field, msgs]) => `${field}: ${(msgs ?? []).join(', ')}`)
+  const parts = [...form, ...fields]
+  if (parts.length > 0) return `Please check the form - ${parts.join('; ')}`
+  return `API error ${status}`
+}
+
+const NETWORK_ERROR_MESSAGE = 'Could not reach the server. Check your internet connection and try again.'
+
 export async function apiFetch<T>(
   path: string,
   options?: RequestInit,
@@ -132,10 +155,17 @@ export async function apiFetch<T>(
   }
 
   // ── First attempt
-  const res = await fetch(url, {
-    ...options,
-    headers: await buildHeaders(false),
-  })
+  // A dropped connection makes fetch() REJECT (TypeError: Failed to fetch)
+  // rather than return a response - without this the user saw a raw browser
+  // message, or (with no handler) nothing at all.
+  const firstHeaders = await buildHeaders(false)
+  let res: Response
+  try {
+    res = await fetch(url, { ...options, headers: firstHeaders })
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') throw err
+    throw new ApiError(NETWORK_ERROR_MESSAGE, 0)
+  }
 
   // ── 401: force-refresh token and retry once
   // (tokenOverride callers cannot force-refresh — there is no live user
@@ -151,11 +181,9 @@ export async function apiFetch<T>(
         })
 
         if (!retryRes.ok) {
-          const body = (await retryRes.json().catch(() => ({}))) as {
-            error?: string
-          }
+          const body = (await retryRes.json().catch(() => ({}))) as ErrorBody
           throw new ApiError(
-            body.error ?? `API error ${retryRes.status}`,
+            messageFromBody(body, retryRes.status),
             retryRes.status,
             body,
           )
@@ -171,11 +199,43 @@ export async function apiFetch<T>(
   }
 
   if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { error?: string }
-    throw new ApiError(body.error ?? `API error ${res.status}`, res.status, body)
+    const body = (await res.json().catch(() => ({}))) as ErrorBody
+    throw new ApiError(
+      withRetryHint(messageFromBody(body, res.status), res),
+      res.status,
+      body,
+      retryAfterSeconds(res),
+    )
   }
 
   return res.json() as Promise<T>
+}
+
+// [Issue 6] 429 (rate limited) and 503 (a protective limiter is unavailable) carry
+// a Retry-After header. Surface it so callers can back off, and tell the person
+// how long to wait instead of leaving them to hammer the button.
+function retryAfterSeconds(res: Response): number | undefined {
+  if (res.status !== 429 && res.status !== 503) return undefined
+  const n = Number(res.headers.get('Retry-After'))
+  return Number.isFinite(n) && n > 0 ? Math.ceil(n) : undefined
+}
+
+function withRetryHint(message: string, res: Response): string {
+  const wait = retryAfterSeconds(res)
+  if (wait === undefined) return message
+  return wait >= 90
+    ? `${message} (try again in about ${Math.ceil(wait / 60)} minutes)`
+    : `${message} (try again in ${wait} seconds)`
+}
+
+/**
+ * [Issue 6] A fresh key for one user ACTION (one click on "Run payroll"). Send it as
+ * the `Idempotency-Key` header and reuse the same key if that action is retried, so
+ * a retry after a timeout returns the original result instead of repeating the work.
+ */
+export function newIdempotencyKey(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  return `k-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`
 }
 
 // ─── TYPED API ERROR ──────────────────────────────────────
@@ -192,6 +252,8 @@ export class ApiError extends Error {
     message: string,
     public readonly status: number,
     public readonly details?: unknown,
+    /** [Issue 6] Seconds from the Retry-After header on a 429 / 503, when present. */
+    public readonly retryAfterSeconds?: number,
   ) {
     super(message)
     this.name = 'ApiError'
@@ -212,16 +274,21 @@ export const queryKeys = {
     lists: () => ['students', 'list'] as const,
     list: (filters: Record<string, unknown>) =>
       ['students', 'list', filters] as const,
-    detail: (id: string) => ['students', 'detail', id] as const,
+    // The optional period is APPENDED so existing prefix invalidations
+    // (['students','detail',id]) still match every period's cache entry.
+    detail: (id: string, period?: { academicYear?: string; term?: number }) =>
+      (period ? ['students', 'detail', id, period] : ['students', 'detail', id]) as readonly unknown[],
     /** R15 — student-role self-lookup (GET /students/me, useStudentMe). */
-    me: () => ['students', 'me'] as const,
+    me: (period?: { academicYear?: string; term?: number }) =>
+      (period ? ['students', 'me', period] : ['students', 'me']) as readonly unknown[],
     attendance: (id: string, term?: number) =>
       ['students', id, 'attendance', term] as const,
     feeStatus: (id: string) => ['students', id, 'fee-status'] as const,
     libraryStatus: (id: string) => ['students', id, 'library-status'] as const,
     riskFlags: (id: string) => ['students', id, 'risk'] as const,
     /** GET /students/at-risk, useHighRiskStudents(). */
-    atRisk: (limit?: number) => ['students', 'at-risk', limit ?? 6] as const,
+    atRisk: (limit?: number, period?: { academicYear?: string; term?: number }) =>
+      ['students', 'at-risk', limit ?? 6, period ?? null] as const,
     transcript: (id: string) => ['students', id, 'transcript'] as const,
     photo: (id: string) => ['students', id, 'photo'] as const,
   },
@@ -231,11 +298,20 @@ export const queryKeys = {
     all: () => ['classes'] as const,
     list: (filters?: Record<string, unknown>) =>
       ['classes', 'list', filters ?? {}] as const,
-    detail: (id: string) => ['classes', 'detail', id] as const,
+    detail: (id: string, period?: { academicYear?: string; term?: number }) =>
+      (period ? ['classes', 'detail', id, period] : ['classes', 'detail', id]) as readonly unknown[],
     timetable: (id: string, year?: string, term?: number) =>
       ['classes', id, 'timetable', year, term] as const,
     assignments: (id: string) => ['classes', id, 'assignments'] as const,
+    /** GET /classes/:id/assignments/:assignmentId - nested under `assignments`, so invalidating the list refreshes it too. */
+    assignmentDetail: (id: string, assignmentId: string) => ['classes', id, 'assignments', 'detail', assignmentId] as const,
+    /** GET /classes/:id/assignments/:assignmentId/roster (teacher's class list). */
+    assignmentRoster: (id: string, assignmentId: string) => ['classes', id, 'assignments', 'roster', assignmentId] as const,
+    /** GET /classes/:id/subject-assignments - who teaches each subject in a class. */
+    subjectAssignments: (id: string, year?: string) => ['classes', id, 'subject-assignments', year ?? null] as const,
     subjectAssignmentsMine: (academicYear?: string) => ['classes', 'subject-assignments', 'mine', academicYear ?? null] as const,
+    /** GET/PUT /classes/:id/subjects — preset subjects + 5-day lock state. */
+    subjects: (id: string) => ['classes', id, 'subjects'] as const,
     analytics: (id: string) => ['classes', id, 'analytics'] as const,
     labBookings: (id: string) => ['classes', id, 'lab-bookings'] as const,
     /** GET /classes/my-timetable/today, useMyTimetableToday(). */
@@ -276,7 +352,15 @@ export const queryKeys = {
       detail: (id: string) => ['finances', 'payroll', id] as const,
       payslips: (payrollRunId: string) =>
         ['finances', 'payroll', payrollRunId, 'payslips'] as const,
-      myPayslips: () => ['finances', 'payroll', 'my-payslips'] as const,
+      // [Payroll redesign] scoped by staffUid so the "Viewing Employee"
+      // picker (hr.viewAnyPayslips) doesn't collide with the caller's own
+      // cached payslips/salary under one shared key.
+      myPayslips: (staffUid?: string) =>
+        ['finances', 'payroll', 'my-payslips', staffUid ?? 'self'] as const,
+      mySalary: (staffUid?: string) =>
+        ['finances', 'payroll', 'my-salary', staffUid ?? 'self'] as const,
+      runWindow: (month: number, year: number) =>
+        ['finances', 'payroll', 'run-window', month, year] as const,
     },
     salaryStructure: (staffUid: string) =>
       ['finances', 'salary-structure', staffUid] as const,
@@ -321,12 +405,23 @@ export const queryKeys = {
       ['hr', 'leave', 'requests', filters ?? {}] as const,
     leaveBalances: (staffId: string, year: number) =>
       ['hr', 'leave', 'balances', staffId, year] as const,
+    myLeave:      () => ['hr', 'leave', 'mine'] as const,
+    leaveOptions: () => ['hr', 'leave', 'options'] as const,
+    onLeaveNow:   () => ['hr', 'leave', 'on-leave'] as const,
     loans: (filters?: Record<string, unknown>) =>
       ['hr', 'loans', filters ?? {}] as const,
     loanDetail: (id: string) => ['hr', 'loans', id] as const,
     performance: (staffId: string) => ['hr', 'performance', staffId] as const,
     salaryStructure: (staffUid: string) =>
       ['hr', 'salary-structure', staffUid] as const,
+    // [Salary Structure & Allowances tab, user-requested] finance's staff
+    // picker — see hr.ts's GET /hr/salary-roster header comment.
+    salaryRoster: () => ['hr', 'salary-roster'] as const,
+    /** GET /hr/teacher-roster — academic staff picker (see hr.ts's own
+     *  header comment for the full rationale and permission gate). */
+    teacherRoster: () => ['hr', 'teacher-roster'] as const,
+    /** GET /hr/staff-picker — minimal staff options for any "choose a person" control. */
+    staffPicker: () => ['hr', 'staff-picker'] as const,
     contractAlerts: (days?: number) => ['hr', 'contract-alerts', days ?? 60] as const,
     contractAlertsUpcoming: (days?: number) => ['hr', 'contract-alerts-upcoming', days ?? 60] as const,
   },
@@ -374,6 +469,14 @@ export const queryKeys = {
     list: (filters?: Record<string, unknown>) =>
       ['applications', 'list', filters ?? {}] as const,
     detail: (id: string) => ['applications', 'detail', id] as const,
+  },
+
+  // ── Approvals Hub
+  approvals: {
+    all:     ['approvals'] as const,
+    list:    (params: unknown) => ['approvals', 'list', params] as const,
+    summary: (scope: string)   => ['approvals', 'summary', scope] as const,
+    badge:   ()                => ['approvals', 'badge'] as const,
   },
 
   // ── Announcements
@@ -448,6 +551,8 @@ export const queryKeys = {
     financeCashFlow: (year: string) => ['analytics', 'finance', 'cash-flow', year] as const,
     financePayrollTrend: (months: number) =>
       ['analytics', 'finance', 'payroll-trend', months] as const,
+    financePayrollBreakdown: (months: number) =>
+      ['analytics', 'finance', 'payroll-breakdown', months] as const,
     financeScholarshipSummary: (year: string) =>
       ['analytics', 'finance', 'scholarship-summary', year] as const,
 
@@ -461,26 +566,16 @@ export const queryKeys = {
 
     admissions: () => ['analytics', 'admissions'] as const,
     applicationsFunnel: () => ['analytics', 'admissions', 'applications-funnel'] as const,
-    applicationTrend: (months: number) =>
-      ['analytics', 'admissions', 'application-trend', months] as const,
-    enrollmentByForm: (year: string) =>
-      ['analytics', 'admissions', 'enrollment-by-form', year] as const,
 
     academic: () => ['analytics', 'academic'] as const,
     academicSubjectPerformance: (year: string, term: number) =>
       ['analytics', 'academic', 'subject-performance', year, term] as const,
-    academicAssignmentCompletion: (year: string) =>
-      ['analytics', 'academic', 'assignment-completion', year] as const,
     academicMarksDistribution: (examId: string) =>
       ['analytics', 'academic', 'marks-distribution', examId] as const,
 
     student: () => ['analytics', 'student'] as const,
     studentPerformanceTrend: (studentId: string) =>
       ['analytics', 'student', 'performance-trend', studentId] as const,
-    studentSubjectBreakdown: (studentId: string, year: string, term: number) =>
-      ['analytics', 'student', 'subject-breakdown', studentId, year, term] as const,
-    studentFeeStatement: (studentId: string) =>
-      ['analytics', 'student', 'fee-statement', studentId] as const,
     studentAttendance: (studentId: string, year?: string, term?: number) =>
       ['analytics', 'student', 'attendance', studentId, year ?? null, term ?? null] as const,
 
@@ -491,8 +586,6 @@ export const queryKeys = {
 
     hr: () => ['analytics', 'hr'] as const,
     hrStaffByDepartment: () => ['analytics', 'hr', 'staff-by-department'] as const,
-    hrLeaveByType: (year: number) => ['analytics', 'hr', 'leave-by-type', year] as const,
-    hrLeaveTrend: (months: number) => ['analytics', 'hr', 'leave-trend', months] as const,
 
     capabilities: () => ['analytics', 'capabilities'] as const,
   },
@@ -507,16 +600,20 @@ export const queryKeys = {
       ['reports', 'finance', filters] as const,
     academic: (filters: Record<string, unknown>) =>
       ['reports', 'academic', filters] as const,
-    library: (filters?: Record<string, unknown>) =>
-      ['reports', 'library', filters ?? {}] as const,
-    hr: (filters?: Record<string, unknown>) =>
-      ['reports', 'hr', filters ?? {}] as const,
-    examOfficer: (filters?: Record<string, unknown>) =>
-      ['reports', 'exam-officer', filters ?? {}] as const,
     student: (id: string) => ['reports', 'student', id] as const,
     system: () => ['reports', 'system'] as const,
     auditLogs: (filters: Record<string, unknown>) =>
       ['reports', 'audit-logs', filters] as const,
+  },
+
+  // ── Domain reporting (/reporting/<domain>/<endpoint>) — one generic factory so
+  // every domain's report hooks share one cache namespace and a whole domain
+  // can be invalidated at once: queryKeys.reporting.domain('finance').
+  reporting: {
+    all: () => ['reporting'] as const,
+    domain: (domain: string) => ['reporting', domain] as const,
+    endpoint: (domain: string, endpoint: string, params?: Record<string, unknown>) =>
+      ['reporting', domain, endpoint, params ?? {}] as const,
   },
 
   // ── User Management / Admin
@@ -528,6 +625,12 @@ export const queryKeys = {
     systemHealth: () => ['admin', 'system-health'] as const,
     pendingActions: (filters?: Record<string, unknown>) =>
       ['admin', 'pending-actions', filters ?? {}] as const,
+  },
+
+  // ── Signed-in user's own profile bits
+  me: {
+    /** GET /users/me/sex: picks the dashboard profile picture. */
+    sex: (uid: string) => ['me', 'sex', uid] as const,
   },
 
   // ── Calendar
@@ -589,5 +692,32 @@ export const queryKeys = {
     deployments: (limit?: number) => ['vercelMonitoring', 'deployments', limit ?? null] as const,
     errors: (level?: string) => ['vercelMonitoring', 'errors', level ?? null] as const,
     alerts: () => ['vercelMonitoring', 'alerts'] as const,
+  },
+
+  // ── Sessions (Reports > Admin > Sessions tab)
+  sessions: {
+    list: (window: string, page = 1, pageSize = 15) => ['sessions', 'list', window, page, pageSize] as const,
+    summary: () => ['sessions', 'summary'] as const,
+    activity: (sessionId: string, page = 1, pageSize = 25) => ['sessions', 'activity', sessionId, page, pageSize] as const,
+  },
+
+  // ── Guardian portal, STAFF side (/guardians/*). One root so any link change refreshes every view.
+  guardians: {
+    all: () => ['guardians'] as const,
+    queue: (f: { status?: string | null; reverify?: boolean; skip?: number; search?: string }) => ['guardians', 'queue', f] as const,
+    student: (studentId: string) => ['guardians', 'student', studentId] as const,
+    onboarding: (batchId: string, action?: string | null, skip?: number) => ['guardians', 'onboarding', batchId, action ?? null, skip ?? 0] as const,
+    accessLog: (f: { studentId?: string | null; profileId?: string | null }) => ['guardians', 'access-log', f] as const,
+    studentList: (f: { search?: string; sort?: string; skip?: number }) => ['guardians', 'student-list', f] as const,
+    recentAccess: () => ['guardians', 'access-log', 'recent'] as const,
+  },
+
+  // ── Guardian portal, PARENT side (/parent/*). Keyed by the link id, never the student id.
+  parent: {
+    all: () => ['parent'] as const,
+    me: () => ['parent', 'me'] as const,
+    children: () => ['parent', 'children'] as const,
+    // `extra` distinguishes the period-specific reads (a term's attendance, one term's report card).
+    child: (linkId: string, module: 'profile' | 'results' | 'reportCard' | 'fees' | 'attendance', extra = '') => ['parent', 'child', linkId, module, extra] as const,
   },
 } as const

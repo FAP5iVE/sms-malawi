@@ -31,6 +31,15 @@
  *     single unconfirmed tap — now routes through the shared ConfirmDialog
  *     stating exactly how many students it will archive.
  *
+ * [MAINT 2026-10-23 — Duplicate classes in the filter] The class dropdown listed
+ *   every class three times ("Form 2A" ×3). Class rows are ONE PER ACADEMIC
+ *   YEAR (promotion hands students to next year's row), and useClasses() with
+ *   no year returns every year's rows. The Active tab now lists only the
+ *   school's current-year classes — where active students actually are. The
+ *   other tabs (Graduated / Awaiting MANEB / Archived) hold students whose
+ *   class row is from an earlier year, so they list all years and show the year
+ *   in each option. Changing tab clears the class filter (the list changed).
+ *
  * C5 changes applied:
  *   • COLUMNS gain `priority` field — registrationNo + Student: 'critical' (always
  *     visible); Class: 'important' (md+); Status: 'important' (md+); Fees: 'optional' (lg+).
@@ -46,18 +55,24 @@
 
 import { useState }                               from 'react'
 import { Archive, Pencil, UserPlus }              from 'lucide-react'
-import { useStudents, useArchiveStudent }          from '@/hooks/useStudents'
+import { useStudents, useArchiveStudent, useWelfareSummary } from '@/hooks/useStudents'
 import { useClasses }                             from '@/hooks/useClasses'
+import { useEffectiveAcademicPeriod }                from '@/hooks/useSettings'
 import { usePermissions }                         from '@/hooks/usePermissions'
 import { RoleGuard }                              from '@/components/shared/RoleGuard'
+import { ModuleSurface }                          from '@/components/shared/ModuleSurface'
 import { PermissionGuard }                        from '@/components/shared/PermissionGuard'
 import { StudentForm }                            from '@/components/students/StudentForm'
 import { DataTable }                              from '@/components/shared/DataTable'
 import type { DataColumn, MobileAction }          from '@/components/shared/DataTable'
-import ConfirmDialog                              from '@/components/shared/ConfirmDialog'
+import { Modal }                                  from '@/components/shared/Modal'
+import { EXIT_REASONS, EXIT_REASON_LABELS }       from '@shared/constants/malawi'
+import { StudentExitSchema }                      from '@shared/schemas/student'
 import { StudentRiskBadge }                       from '@/components/shared/StudentRiskBadge'
 import type { ApiStudent }                        from '@shared/types/api'
 import { useRouter }                              from 'next/navigation'
+import StatusText from '@/components/shared/StatusText'
+import { statusWord } from '@/lib/hills/statusWord'
 
 type Student = ApiStudent
 
@@ -65,25 +80,20 @@ type Student = ApiStudent
 // STATUS BADGE
 // ─────────────────────────────────────────────────────────────────────────────
 
-const STATUS_STYLES: Record<string, string> = {
-  ACTIVE:                 'bg-brand-teal/15 text-brand-teal',
-  ARCHIVED:               'bg-base text-muted',
-  AWAITING_MANEB_RESULTS: 'bg-blue-50 text-blue-700',
-  GRADUATED:              'bg-purple-50 text-purple-700',
+// [NO COLOUR BLOCKS] These were filled chips. Two of them used raw Tailwind
+// palette values (blue-50/purple-50) that have no dark variant at all, so in
+// dark mode a pale block sat against the near-black page. Status is now
+// carried by font colour alone, using the theme-aware brand tokens, which
+// resolve correctly under both :root and .dark.
+const STATUS_TONES: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'neutral'> = {
+  ACTIVE:                 'success',
+  ARCHIVED:               'neutral',
+  AWAITING_MANEB_RESULTS: 'info',
+  GRADUATED:              'info',
 }
 
 function StatusBadge({ status }: { status: string }) {
-  return (
-    <span
-      className={`
-        inline-flex items-center px-2.5 py-1 rounded-full
-        text-xs font-heading font-semibold
-        ${STATUS_STYLES[status] ?? 'bg-base text-muted'}
-      `}
-    >
-      {status.replace(/_/g, ' ')}
-    </span>
-  )
+  return <StatusText tone={STATUS_TONES[status] ?? 'neutral'}>{statusWord(status)}</StatusText>
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -93,7 +103,7 @@ function StatusBadge({ status }: { status: string }) {
 const COLUMNS: DataColumn<Student>[] = [
   {
     key:      'registrationNo',
-    label:    'Reg No.',
+    label:    'Reg no.',
     sortable: true,
     width:    'w-28',
     // Always visible — primary identifier on all screen sizes
@@ -110,7 +120,7 @@ const COLUMNS: DataColumn<Student>[] = [
         <p className="font-heading font-medium text-body text-sm">
           {s.firstName} {s.lastName}
         </p>
-        <p className="text-xs text-muted">{s.sex}</p>
+        <p className="text-xs text-muted">{statusWord(s.sex)}</p>
       </div>
     ),
   },
@@ -147,10 +157,8 @@ const COLUMNS: DataColumn<Student>[] = [
       return (
         <span
           className={`
-            text-xs font-semibold px-2 py-0.5 rounded-full
-            ${cleared
-              ? 'bg-emerald-50 text-emerald-700'
-              : 'bg-brand-coral/10 text-brand-coral'}
+            text-xs font-semibold
+            ${cleared ? 'text-tone-teal' : 'text-tone-coral'}
           `}
         >
           {cleared ? 'Cleared' : 'Outstanding'}
@@ -165,7 +173,13 @@ const COLUMNS: DataColumn<Student>[] = [
     // Optional: only visible on desktop (lg+) — a compact severity signal,
     // not the primary reason someone opens this list.
     priority: 'optional',
-    render: (s: Student) => <StudentRiskBadge riskLevel={s.riskLevel ?? 'NONE'} variant="badge" />,
+    render: (s: Student) => (
+      <StudentRiskBadge
+        riskLevel={s.riskLevel ?? 'NONE'}
+        variant="badge"
+        hint={s.riskFactors?.[0]?.detail}
+      />
+    ),
   },
 ]
 
@@ -215,6 +229,12 @@ function StudentsContent() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc' | undefined>(undefined)
   // R15 — ids awaiting bulk-archive confirmation (null = dialog closed)
   const [pendingArchiveIds, setPendingArchiveIds] = useState<string[] | null>(null)
+  // Archiving records WHY the student left (required by the server). One reason,
+  // date and note apply to every student in a bulk archive.
+  const [exitReason, setExitReason] = useState('')
+  const [exitDate, setExitDate]     = useState(() => new Date().toISOString().slice(0, 10))
+  const [exitNote, setExitNote]     = useState('')
+  const [exitError, setExitError]   = useState<string | null>(null)
   // R19 — free-text search, wired to useStudents()'s existing `search` filter
   const [search, setSearch] = useState('')
   // Class filter — useStudents + GET /students already support classId; this
@@ -224,7 +244,14 @@ function StudentsContent() {
   // supported `sex`, the UI just never surfaced it.
   const [sex, setSex] = useState<'' | 'MALE' | 'FEMALE'>('')
 
-  const { data: classes = [] } = useClasses()
+  // Active students live in the CURRENT year's class rows (see header note).
+  // Other tabs: every year, archived rows included, labelled with the year.
+  const { academicYear: schoolYear } = useEffectiveAcademicPeriod()
+  const classListIsAllYears = status !== 'ACTIVE'
+  const { data: classes = [] } = useClasses(
+    classListIsAllYears ? undefined : schoolYear,
+    classListIsAllYears,
+  )
 
   const { data, isLoading } = useStudents(
     sortBy && sortDir
@@ -232,7 +259,11 @@ function StudentsContent() {
       : { status, page, search: search || undefined, classId: classId || undefined, sex: sex || undefined },
   )
   const archive             = useArchiveStudent()
+  const [bulkArchiving, setBulkArchiving] = useState(false)
   const { can }             = usePermissions()
+  // Welfare COUNTS (never names) for roles holding student.viewWelfare.
+  const canSeeWelfare       = can('student.viewWelfare')
+  const { data: welfareSummary } = useWelfareSummary(canSeeWelfare)
 
   // [PRODUCTION FIX 2026-07-27] Fee balance and risk level were shown to
   // every role that could reach this page (including library and HR, who
@@ -245,13 +276,6 @@ function StudentsContent() {
     if (col.key === 'riskLevel')  return can('student.viewRiskStatus')
     return true
   })
-
-  function handleArchive(id: string) {
-    setActionError(null)
-    archive.mutate(id, {
-      onError: (err) => setActionError(err instanceof Error ? err.message : 'Failed to archive student.'),
-    })
-  }
 
   // ── Mobile per-row actions — rendered in the C3 bottom-sheet, gated on
   // the actual permission each action requires rather than shown
@@ -284,14 +308,17 @@ function StudentsContent() {
           <h1 className="font-heading text-xl font-bold text-brand-navy">
             Students
           </h1>
-          <p className="text-sm text-muted mt-0.5">
+          <p className="text-sm app-sky-idle mt-0.5">
             {data?.total ?? '—'} students enrolled
           </p>
         </div>
 
         {/* R19 — server-backed search (GET /students already supports `search`) */}
-        <div className="flex w-full sm:w-auto gap-2">
-          <div className="flex-1 sm:w-72">
+        {/* Wraps on phones: search takes a full row, the two filters split the
+            next one. Previously all three sat on a single row, which at 360px
+            left the search field ~24px wide. */}
+        <div className="flex flex-wrap w-full sm:w-auto sm:flex-nowrap gap-2">
+          <div className="w-full sm:flex-1 sm:w-72">
             <label htmlFor="student-search" className="sr-only">Search students</label>
             <input
               id="student-search"
@@ -299,28 +326,32 @@ function StudentsContent() {
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1) }}
               placeholder="Search by name or registration no…"
-              className="w-full min-h-[44px] border border-base rounded-xl px-4 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+              className="w-full min-h-11 border border-base rounded-xl px-4 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
             />
           </div>
-          <div className="w-40 sm:w-48">
+          <div className="flex-1 min-w-0 sm:flex-none sm:w-48">
             <label htmlFor="student-class-filter" className="sr-only">Filter by class</label>
             <select
               id="student-class-filter"
               value={classId}
               onChange={(e) => { setClassId(e.target.value); setPage(1) }}
-              className="w-full min-h-[44px] border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+              className="w-full min-h-11 border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
             >
               <option value="">All classes</option>
-              {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              {classes.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {classListIsAllYears ? `${c.name} (${c.academicYear})` : c.name}
+                </option>
+              ))}
             </select>
           </div>
-          <div className="w-32 sm:w-40">
+          <div className="flex-1 min-w-0 sm:flex-none sm:w-40">
             <label htmlFor="student-sex-filter" className="sr-only">Filter by gender</label>
             <select
               id="student-sex-filter"
               value={sex}
               onChange={(e) => { setSex(e.target.value as '' | 'MALE' | 'FEMALE'); setPage(1) }}
-              className="w-full min-h-[44px] border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+              className="w-full min-h-11 border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
             >
               <option value="">All genders</option>
               <option value="MALE">Male</option>
@@ -336,22 +367,42 @@ function StudentsContent() {
             onClick={() => setShowForm(true)}
             className="
               flex items-center gap-2
-              min-h-[44px] px-5 rounded-xl
+              min-h-11 px-5 rounded-xl
               text-sm font-heading font-semibold
-              bg-brand-teal text-white
+              bg-btn-brand text-btn-brand-fg
               hover:bg-brand-teal/90 transition-colors
             "
           >
             <UserPlus className="w-4 h-4" aria-hidden />
-            Add Student
+            Add student
           </button>
         </PermissionGuard>
       </div>
 
+      <ModuleSurface>
+      {/* Welfare counts for admin / headteacher / HR. Counts only: no names on a
+          list page. Detail lives on each student's profile behind the same
+          permission. Phase 8a: tint tiles on the surface. */}
+      {canSeeWelfare && welfareSummary && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" aria-label="Welfare summary">
+          {[
+            ['Orphans', welfareSummary.orphans.total],
+            ['Vulnerable', welfareSummary.vulnerable],
+            ['With special needs', welfareSummary.withSupportNeeds],
+            ['Orphan status not recorded', welfareSummary.orphanStatusUnrecorded],
+          ].map(([label, value]) => (
+            <div key={label} className="app-tint rounded-xl p-3">
+              <p className="text-xs text-muted">{label}</p>
+              <p className="text-lg font-heading font-bold text-brand-navy tabular">{value}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
       {actionError && (
         <p
           role="alert"
-          className="text-sm text-brand-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3"
+          className="text-sm text-tone-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3"
         >
           {actionError}
         </p>
@@ -371,6 +422,7 @@ function StudentsContent() {
         activeQuickFilter={status}
         onQuickFilter={(v) => {
           setStatus(v)
+          setClassId('')   // the class list changes with the tab
           setPage(1)
         }}
         rowKey="id"
@@ -388,6 +440,7 @@ function StudentsContent() {
           onPageChange: setPage,
         }}
         emptyMessage="No students found for this filter."
+        bordered={false}
       />
 
       {/* ── StudentForm — create ─────────────────────────────────────────── */}
@@ -413,26 +466,102 @@ function StudentsContent() {
       )}
 
       {/* ── R15 — bulk-archive confirmation ─────────────────────────────── */}
-      <ConfirmDialog
-        open={pendingArchiveIds !== null}
-        title={
-          pendingArchiveIds && pendingArchiveIds.length === 1
-            ? 'Archive this student?'
-            : `Archive ${pendingArchiveIds?.length ?? 0} students?`
-        }
-        description={
-          pendingArchiveIds
-            ? `${pendingArchiveIds.length === 1 ? 'This student' : `These ${pendingArchiveIds.length} students`} will be archived (soft-deleted) and removed from the active list. Records are preserved and can be restored by an administrator.`
-            : ''
-        }
-        confirmLabel="Archive"
-        destructive
-        onConfirm={() => {
-          pendingArchiveIds?.forEach((id) => handleArchive(id))
-          setPendingArchiveIds(null)
-        }}
-        onCancel={() => setPendingArchiveIds(null)}
-      />
+      {pendingArchiveIds !== null && (
+        <Modal
+          title={
+            pendingArchiveIds.length === 1
+              ? 'Archive this student?'
+              : `Archive ${pendingArchiveIds.length} students?`
+          }
+          description={`${pendingArchiveIds.length === 1 ? 'This student' : `These ${pendingArchiveIds.length} students`} will be archived (soft-deleted) and removed from the active list. Records are preserved and can be restored by an administrator. Record why they are leaving.`}
+          onClose={() => setPendingArchiveIds(null)}
+          busy={bulkArchiving}
+          bodyClassName="space-y-4"
+          onSubmit={async (e) => {
+            e.preventDefault()
+            const parsed = StudentExitSchema.safeParse({ exitReason, exitDate, exitNote })
+            if (!parsed.success) {
+              setExitError(exitReason ? (parsed.error.issues[0]?.message ?? 'Check the details.') : 'Choose the reason for leaving.')
+              return
+            }
+            setExitError(null)
+            const ids = pendingArchiveIds
+            setActionError(null)
+            setBulkArchiving(true)
+            // Wait for every request: the dialog shows a spinner meanwhile, and a
+            // partial failure is reported (individual failures are toasted too).
+            const results = await Promise.allSettled(ids.map((id) => archive.mutateAsync({ id, ...parsed.data })))
+            const failed = results.filter((r) => r.status === 'rejected').length
+            if (failed > 0) setActionError(`${failed} of ${ids.length} student(s) could not be archived.`)
+            setBulkArchiving(false)
+            setPendingArchiveIds(null)
+            setExitReason(''); setExitNote('')
+          }}
+          footer={
+            <>
+              <button
+                type="button"
+                disabled={bulkArchiving}
+                onClick={() => setPendingArchiveIds(null)}
+                className="min-h-[44px] px-4 rounded-xl border border-base text-sm font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={bulkArchiving}
+                className="min-h-[44px] px-4 rounded-xl bg-btn-danger text-btn-danger-fg text-sm font-semibold disabled:opacity-40"
+              >
+                {bulkArchiving ? 'Archiving…' : 'Archive'}
+              </button>
+            </>
+          }
+        >
+          <div>
+            <label className="block text-xs font-heading font-semibold text-muted mb-1.5" htmlFor="exit-reason">
+              Reason for leaving
+            </label>
+            <select
+              id="exit-reason"
+              value={exitReason}
+              onChange={(e) => setExitReason(e.target.value)}
+              className="w-full min-h-[44px] border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body"
+            >
+              <option value="">Select…</option>
+              {EXIT_REASONS.map((r) => <option key={r} value={r}>{EXIT_REASON_LABELS[r]}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-heading font-semibold text-muted mb-1.5" htmlFor="exit-date">
+              Date left
+            </label>
+            <input
+              id="exit-date"
+              type="date"
+              value={exitDate}
+              max={new Date().toISOString().slice(0, 10)}
+              onChange={(e) => setExitDate(e.target.value)}
+              className="w-full min-h-[44px] border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-heading font-semibold text-muted mb-1.5" htmlFor="exit-note">
+              Note (optional)
+            </label>
+            <textarea
+              id="exit-note"
+              rows={2}
+              value={exitNote}
+              maxLength={500}
+              onChange={(e) => setExitNote(e.target.value)}
+              className="w-full border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body"
+              placeholder="Visible only to admin, headteacher and HR"
+            />
+          </div>
+          {exitError && <p className="text-sm text-tone-coral" role="alert">{exitError}</p>}
+        </Modal>
+      )}
+      </ModuleSurface>
     </div>
   )
 }

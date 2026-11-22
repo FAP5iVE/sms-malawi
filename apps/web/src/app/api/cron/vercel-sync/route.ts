@@ -17,7 +17,7 @@
  * [DEPENDS ON]: vercelMonitoringService.runScheduledSync, CRON_SECRET
  */
 import { NextResponse } from 'next/server'
-import { headers } from 'next/headers'
+import { guardCron } from '@/lib/cronAuth'
 import * as vercelMonitoringService from '@/server/services/vercelMonitoringService'
 import * as Sentry from '@sentry/nextjs'
 
@@ -26,13 +26,8 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 30 // the runtime-logs fetch itself budgets up to ~4s; this leaves real headroom
 
 export async function GET() {
-  if (!process.env.CRON_SECRET) {
-    return NextResponse.json({ error: 'Server misconfigured.' }, { status: 500 })
-  }
-  const h = await headers()
-  if (h.get('Authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const denied = await guardCron()
+  if (denied) return denied
 
   try {
     const result = await vercelMonitoringService.runScheduledSync()
@@ -46,7 +41,7 @@ export async function GET() {
   } catch (err) {
     Sentry.captureException(err, { tags: { cron: 'vercel-sync' } })
     return NextResponse.json(
-      { ok: false, error: err instanceof Error ? err.message : 'Unknown error' },
+      { ok: false, error: 'Sync failed — see Sentry.' },
       { status: 500 },
     )
   }

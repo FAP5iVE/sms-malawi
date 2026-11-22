@@ -29,43 +29,43 @@
  */
 
 import {
-  Users,
   ClipboardList,
   CalendarDays,
-  GraduationCap,
   UserPlus,
-  UserCheck,
   Bell,
 } from 'lucide-react'
-import { StatCard, StatCardGrid, statValue } from '@/components/shared/StatCard'
 import { QuickActions } from '@/components/shared/QuickActions'
 import { ListCard } from '@/components/shared/ListCard'
-import { useStudents } from '@/hooks/useStudents'
+import { useAdmissionsOverview, useAdmissionsAttention } from '@/hooks/reporting/useAdmissionsReporting'
+import { useAttendanceAttention } from '@/hooks/reporting/useAttendanceReporting'
+import { DashboardAttention } from './DashboardReport'
+import { PrimaryOverviewKpis, ReportLinks, SecondaryKpis } from './DashboardSections'
+import type { ReportLink } from './DashboardSections'
 import { useApplications } from '@/hooks/useApplications'
 import { useExams } from '@/hooks/useExams'
-import { useCurrentAcademicPeriod } from '@/hooks/useSettings'
+import { useViewingPeriod } from '@/hooks/useViewingPeriod'
 import { examsInNextSevenDays } from '@/lib/examFilters'
 import type { QuickAction } from '@/components/shared/QuickActions'
 
 const QUICK_ACTIONS: QuickAction[] = [
   {
-    label: 'Add Student',
+    label: 'Add student',
     // R15: was /students/new — a route that has never existed (404).
     // Student creation is in-page at /students.
     href: '/students',
     icon: UserPlus,
     color: 'bg-brand-teal/10',
-    text: 'text-brand-teal',
+    text: 'text-tone-teal',
   },
   {
     label: 'Applications',
     href: '/applications',
     icon: ClipboardList,
     color: 'bg-brand-amber/10',
-    text: 'text-brand-amber',
+    text: 'text-tone-amber',
   },
   {
-    label: 'View Calendar',
+    label: 'View calendar',
     href: '/calendar',
     icon: CalendarDays,
     color: 'bg-blue-50',
@@ -80,16 +80,25 @@ const QUICK_ACTIONS: QuickAction[] = [
   },
 ]
 
-export function LowerRankDashboard() {
-  const { academicYear, term, isLoading: periodLoading } = useCurrentAcademicPeriod()
+/** Lead with the roll and the admissions queue; the rest sit in "More figures". */
+const PREFERRED = ['active', 'pending', 'awaiting', 'attendanceExceptions']
 
-  const { data: studentsData, isLoading: studentsLoading } =
-    useStudents({ status: 'ACTIVE' })
-  const { data: pendingApps, isLoading: pendingLoading } =
+const REPORT_LINKS: ReportLink[] = [
+  { label: 'Admissions', href: '/reports?tab=admissions', description: 'Applications by stage, conversion' },
+  { label: 'Enrollment', href: '/reports?tab=enrollment', description: 'Students on the roll' },
+  { label: 'Attendance', href: '/reports?tab=attendance', description: 'By class and week' },
+]
+
+export function LowerRankDashboard() {
+  const { academicYear, term, isLoading: periodLoading } = useViewingPeriod()
+
+  const period = { academicYear: academicYear ?? '', term: term ?? undefined }
+  const overview = useAdmissionsOverview(period)
+  const admissionsAttention = useAdmissionsAttention()
+  const attendanceAttention = useAttendanceAttention(period)
+  const { data: pendingApps, isLoading: pendingLoading, isError: pendingError, refetch: refetchPending } =
     useApplications('PENDING')
-  const { data: awaitingApps, isLoading: awaitingLoading } =
-    useApplications('AWAITING_ADMISSION')
-  const { data: examsData, isLoading: examsLoading } = useExams(
+  const { data: examsData, isLoading: examsLoading, isError: examsError, refetch: refetchExams } = useExams(
     undefined,
     academicYear ?? '',
     term ?? 0,
@@ -99,52 +108,24 @@ export function LowerRankDashboard() {
   const recentApplications = (pendingApps?.applications ?? []).slice(0, 5)
 
   return (
-    <div className="space-y-6">
-      <StatCardGrid className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard
-          label="Total Students"
-          value={statValue(studentsLoading, studentsData?.total)}
-          icon={Users}
-          trend="neutral"
-          trendLabel="enrolled"
-          iconColor="bg-blue-50"
-          iconText="text-blue-600"
-        />
-        <StatCard
-          label="Pending Applications"
-          value={statValue(pendingLoading, pendingApps?.total)}
-          icon={ClipboardList}
-          trend="neutral"
-          trendLabel="awaiting review"
-          iconColor="bg-brand-amber/10"
-          iconText="text-brand-amber"
-        />
-        <StatCard
-          label="Awaiting Admission"
-          value={statValue(awaitingLoading, awaitingApps?.total)}
-          icon={UserCheck}
-          trend="neutral"
-          trendLabel="approved, to admit"
-          iconColor="bg-brand-teal/10"
-          iconText="text-brand-teal"
-        />
-        <StatCard
-          label="Exams This Week"
-          value={statValue(periodLoading || examsLoading, examsThisWeekList.length)}
-          icon={GraduationCap}
-          trend="neutral"
-          trendLabel="scheduled"
-          iconColor="bg-purple-50"
-          iconText="text-purple-600"
-        />
-      </StatCardGrid>
-      <QuickActions actions={QUICK_ACTIONS} />
-      <div className="grid md:grid-cols-2 gap-4">
+    <div className="space-y-4 md:space-y-6">
+      <PrimaryOverviewKpis
+        title="Registry"
+        summary="Keep up with admissions, student registration and attendance issues that need follow-up."
+        academicYear={academicYear}
+        term={term}
+        overview={overview}
+        preferred={PREFERRED}
+        reportsHref="/reports?tab=admissions"
+      />
+      <div className="grid md:grid-cols-2 gap-3 md:gap-4">
         <ListCard
-          title="Exam Schedule This Week"
+          title="Exam schedule this week"
           sub="Next 7 days"
           isLoading={periodLoading || examsLoading}
           isEmpty={examsThisWeekList.length === 0}
+          isError={examsError}
+          onRetry={() => void refetchExams()}
           emptyMessage="No exams scheduled in the next 7 days."
         >
           <ul className="divide-y divide-base">
@@ -164,10 +145,12 @@ export function LowerRankDashboard() {
           </ul>
         </ListCard>
         <ListCard
-          title="Recent Applications"
+          title="Recent applications"
           sub="Pending review"
           isLoading={pendingLoading}
           isEmpty={recentApplications.length === 0}
+          isError={pendingError}
+          onRetry={() => void refetchPending()}
           emptyMessage="No pending applications right now."
         >
           <ul className="divide-y divide-base">
@@ -187,6 +170,13 @@ export function LowerRankDashboard() {
           </ul>
         </ListCard>
       </div>
+      <div className="grid md:grid-cols-2 gap-3 md:gap-4">
+        <DashboardAttention query={admissionsAttention} title="Admissions queue" limit={5} />
+        <DashboardAttention query={attendanceAttention} title="Attendance exceptions" limit={5} />
+      </div>
+      <SecondaryKpis title="More figures and findings" overview={overview} preferred={PREFERRED} showInsights />
+      <QuickActions actions={QUICK_ACTIONS} compact />
+      <ReportLinks links={REPORT_LINKS} />
     </div>
   )
 }

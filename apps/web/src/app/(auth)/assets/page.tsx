@@ -20,11 +20,13 @@
  *   ('/assets' — same phase)
  */
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { RoleGuard } from '@/components/shared/RoleGuard'
+import { ModuleSurface } from '@/components/shared/ModuleSurface'
 import { PermissionGuard } from '@/components/shared/PermissionGuard'
 import { StatCard, StatCardGrid } from '@/components/shared/StatCard'
-import { useStaffDirectory } from '@/hooks/useHR'
+import { StaffSelect } from '@/components/shared/StaffSelect'
 import {
   useAssets,
   useAsset,
@@ -54,7 +56,6 @@ import { formatMWK } from '@shared/constants/malawi'
 import {
   Boxes,
   Plus,
-  X as XIcon,
   Search,
   Wrench,
   Trash2,
@@ -67,7 +68,14 @@ import {
   Loader2,
   DoorOpen,
   HandCoins,
+  Warehouse,
+  ClipboardCheck,
+  MapPin,
 } from 'lucide-react'
+import { InventoryOperationsTab } from '@/components/assets/InventoryOperationsTab'
+import { StocktakesTab } from '@/components/assets/StocktakesTab'
+import { LocationsTab } from '@/components/assets/LocationsTab'
+import { Modal, MODAL_BTN_PRIMARY, MODAL_BTN_SECONDARY } from '@/components/shared/Modal'
 
 const CATEGORIES = [
   'FURNITURE',
@@ -87,19 +95,22 @@ function humanize(s: string) {
 }
 
 const STATUS_COLOR: Record<string, string> = {
-  IN_STORE: 'bg-brand-teal/10 text-brand-teal',
-  ALLOCATED: 'bg-brand-navy/10 text-brand-navy',
-  UNDER_REPAIR: 'bg-amber-100 text-amber-700',
-  DISPOSED: 'bg-base text-muted',
-  LOST: 'bg-brand-coral/10 text-brand-coral',
+  IN_STORE: 'text-status-success',
+  ALLOCATED: 'text-status-info',
+  UNDER_REPAIR: 'text-status-warning',
+  DISPOSED: 'text-muted',
+  LOST: 'text-status-danger',
 }
 
-type Tab = 'register' | 'rooms' | 'mine' | 'requests'
+type Tab = 'register' | 'rooms' | 'mine' | 'requests' | 'inventory' | 'stocktakes' | 'locations'
 const TABS = [
   { id: 'register' as Tab, label: 'Register', icon: Boxes },
-  { id: 'rooms' as Tab, label: 'By Room/Dept', icon: DoorOpen },
-  { id: 'mine' as Tab, label: 'My Assigned', icon: PackageCheck },
+  { id: 'rooms' as Tab, label: 'By room or department', icon: DoorOpen },
+  { id: 'mine' as Tab, label: 'My assigned', icon: PackageCheck },
   { id: 'requests' as Tab, label: 'Requests', icon: ClipboardList },
+  { id: 'inventory' as Tab, label: 'Inventory', icon: Warehouse },
+  { id: 'stocktakes' as Tab, label: 'Stocktakes', icon: ClipboardCheck },
+  { id: 'locations' as Tab, label: 'Locations', icon: MapPin },
 ]
 
 export default function AssetsPage() {
@@ -116,28 +127,56 @@ export default function AssetsPage() {
         'exam_officer',
       ]}
     >
-      <AssetsContent />
+      {/* useSearchParams() needs a Suspense boundary or `next build` fails. */}
+      <Suspense fallback={<div className="p-8 text-center text-muted" role="status">Loading…</div>}>
+        <AssetsContent />
+      </Suspense>
     </RoleGuard>
   )
 }
 
+const isTab = (v: string | null): v is Tab => TABS.some((t) => t.id === v)
+const oneOf = (v: string | null, allowed: readonly string[]): string => (v !== null && allowed.includes(v) ? v : '')
+
+/**
+ * Report drill-downs arrive as /assets?tab=…&status=…&category=…&condition=…&asset=<id>
+ * (also ?stocktake=<id>, ?item=<code>, ?low=1). Every value is validated before
+ * use, so a stale or hand-edited link falls back to the unfiltered screen.
+ */
 function AssetsContent() {
-  const [tab, setTab] = useState<Tab>('register')
+  const searchParams = useSearchParams()
+  const tabParam = searchParams.get('tab')
+  const [tab, setTab] = useState<Tab>(isTab(tabParam) ? tabParam : 'register')
+  // Re-read ?tab= when only the query string changes (client-side navigation keeps this component mounted).
+  const [prevTabParam, setPrevTabParam] = useState(tabParam)
+  if (tabParam !== prevTabParam) {
+    setPrevTabParam(tabParam)
+    if (isTab(tabParam)) setTab(tabParam)
+  }
+  const preset = {
+    status: oneOf(searchParams.get('status'), STATUSES),
+    category: oneOf(searchParams.get('category'), CATEGORIES),
+    condition: oneOf(searchParams.get('condition'), CONDITIONS),
+    search: (searchParams.get('q') ?? '').slice(0, 100),
+    asset: searchParams.get('asset'),
+  }
+  const presetKey = JSON.stringify(preset)
   const { data: stats } = useInventoryStats()
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="font-heading font-bold text-xl text-brand-navy">Assets &amp; Inventory</h1>
+          <h1 className="font-heading font-bold text-xl text-brand-navy">Assets and inventory</h1>
           <p className="text-sm text-muted mt-0.5">
-            Furniture, IT/lab/sports/kitchen equipment, vehicles and tools — not library books.
+             Centralized tracking, monitoring, and management of the physical and digital resources.
           </p>
         </div>
       </div>
 
+      <ModuleSurface>
       <PermissionGuard permission="assets.viewInventoryReports">
-        <StatCardGrid className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <StatCardGrid className="grid grid-cols-2 md:grid-cols-3 2xl:grid-cols-5 gap-4">
           <StatCard
             index={0}
             label="Assets in store"
@@ -166,7 +205,7 @@ function AssetsContent() {
             label="Pending requests"
             icon={ClipboardList}
             iconColor="bg-brand-coral/10"
-            iconText="text-brand-coral"
+            iconText="text-tone-coral"
             value={stats ? stats.pendingRequests : '…'}
             href="/assets?tab=requests"
           />
@@ -202,10 +241,20 @@ function AssetsContent() {
         ))}
       </div>
 
-      {tab === 'register' && <RegisterTab />}
+      {tab === 'register' && <RegisterTab key={presetKey} preset={preset} />}
       {tab === 'rooms' && <RoomsTab />}
       {tab === 'mine' && <MyAssignedTab />}
       {tab === 'requests' && <RequestsTab />}
+      {tab === 'inventory' && (
+        <InventoryOperationsTab
+          key={`${searchParams.get('item')}|${searchParams.get('low')}`}
+          initialSearch={(searchParams.get('item') ?? '').slice(0, 100)}
+          initialLowStock={searchParams.get('low') === '1'}
+        />
+      )}
+      {tab === 'stocktakes' && <StocktakesTab key={searchParams.get('stocktake') ?? 'all'} initialSelectedId={searchParams.get('stocktake')} />}
+      {tab === 'locations' && <LocationsTab />}
+      </ModuleSurface>
     </div>
   )
 }
@@ -214,19 +263,29 @@ function AssetsContent() {
 // REGISTER TAB
 // ═══════════════════════════════════════════════════════════
 
-function RegisterTab() {
-  const [search, setSearch] = useState('')
-  const [category, setCategory] = useState('')
-  const [status, setStatus] = useState('')
+interface RegisterPreset {
+  status: string
+  category: string
+  condition: string
+  search: string
+  asset: string | null
+}
+
+function RegisterTab({ preset }: { preset: RegisterPreset }) {
+  const [search, setSearch] = useState(preset.search)
+  const [category, setCategory] = useState(preset.category)
+  const [status, setStatus] = useState(preset.status)
+  const [condition, setCondition] = useState(preset.condition)
   const [formAsset, setFormAsset] = useState<ApiAsset | null | undefined>(undefined) // undefined = closed, null = create, ApiAsset = edit
   const [allocateAsset, setAllocateAsset] = useState<ApiAsset | null>(null)
   const [conditionAsset, setConditionAsset] = useState<ApiAsset | null>(null)
-  const [detailAssetId, setDetailAssetId] = useState<string | null>(null)
+  const [detailAssetId, setDetailAssetId] = useState<string | null>(preset.asset)
 
   const { data: assets, isLoading } = useAssets({
     search: search || undefined,
     category: category || undefined,
     status: status || undefined,
+    condition: condition || undefined,
   })
 
   return (
@@ -268,18 +327,31 @@ function RegisterTab() {
             </option>
           ))}
         </select>
+        <select
+          aria-label="Filter by condition"
+          value={condition}
+          onChange={(e) => setCondition(e.target.value)}
+          className="border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+        >
+          <option value="">All conditions</option>
+          {CONDITIONS.map((c) => (
+            <option key={c} value={c}>
+              {humanize(c)}
+            </option>
+          ))}
+        </select>
         <PermissionGuard permission="assets.manageRegister">
           <button
             type="button"
             onClick={() => setFormAsset(null)}
-            className="inline-flex items-center gap-1.5 bg-brand-navy text-white rounded-lg px-4 py-2.5 text-sm font-semibold min-h-11 shrink-0"
+            className="inline-flex items-center gap-1.5 bg-brand-deep text-white rounded-lg px-4 py-2.5 text-sm font-semibold min-h-11 shrink-0"
           >
-            <Plus className="w-4 h-4" /> Add Asset
+            <Plus className="w-4 h-4" /> Add asset
           </button>
         </PermissionGuard>
       </div>
 
-      <div className="bg-surface border border-base rounded-xl overflow-x-auto">
+      <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-base text-left text-xs text-muted">
@@ -313,14 +385,14 @@ function RegisterTab() {
                   <button
                     type="button"
                     onClick={() => setDetailAssetId(a.id)}
-                    className="font-medium text-left hover:underline"
+                    className="font-medium text-left app-action"
                   >
                     {a.name}
                   </button>
                   {a.serialNumber && <p className="text-xs text-muted">S/N {a.serialNumber}</p>}
                 </td>
                 <td className="px-4 py-3">
-                  <span className="text-xs bg-base rounded px-2 py-0.5">
+                  <span className="text-xs">
                     {humanize(a.category)}
                   </span>
                 </td>
@@ -328,7 +400,7 @@ function RegisterTab() {
                 <td className="px-4 py-3 text-xs">{humanize(a.condition)}</td>
                 <td className="px-4 py-3">
                   <span
-                    className={`text-xs rounded px-2 py-0.5 font-medium ${STATUS_COLOR[a.status] ?? 'bg-base text-muted'}`}
+                    className={`text-xs font-medium ${STATUS_COLOR[a.status] ?? 'text-muted'}`}
                   >
                     {humanize(a.status)}
                   </span>
@@ -342,7 +414,7 @@ function RegisterTab() {
                           type="button"
                           onClick={() => setAllocateAsset(a)}
                           aria-label={`Allocate ${a.name}`}
-                          className="text-brand-teal min-h-11 min-w-11 flex items-center justify-center"
+                          className="text-tone-teal min-h-11 min-w-11 flex items-center justify-center"
                         >
                           <UserPlus className="w-4 h-4" />
                         </button>
@@ -430,161 +502,159 @@ function AssetFormModal({ asset, onClose }: { asset: ApiAsset | null; onClose: (
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-      <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto bg-surface rounded-2xl shadow-xl">
-        <div className="sticky top-0 z-10 bg-surface flex items-center justify-between px-6 py-4 border-b border-base">
-          <h2 className="font-heading font-bold text-brand-navy">
-            {asset ? 'Edit Asset' : 'Add Asset'}
-          </h2>
-          <button onClick={onClose} aria-label="Close" className="p-1.5 hover:bg-page rounded-lg">
-            <XIcon className="w-4 h-4 text-muted" />
+    <Modal
+      title={asset ? 'Edit Asset' : 'Add Asset'}
+      onClose={onClose}
+      size="l"
+      bodyClassName="space-y-3"
+      footer={
+        <>
+          <button type="button" onClick={onClose} className={MODAL_BTN_SECONDARY}>
+            Cancel
           </button>
-        </div>
-        <div className="p-6 space-y-3">
-          <div className="grid sm:grid-cols-2 gap-3">
-            <div className="sm:col-span-2">
-              <label htmlFor="asset-name" className="text-xs text-muted mb-1 block">
-                Name
-              </label>
-              <input
-                id="asset-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-              />
-            </div>
-            <div>
-              <label htmlFor="asset-category" className="text-xs text-muted mb-1 block">
-                Category
-              </label>
-              <select
-                id="asset-category"
-                value={category}
-                onChange={(e) => setCategory(e.target.value as never)}
-                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-              >
-                {CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {humanize(c)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="asset-condition" className="text-xs text-muted mb-1 block">
-                Condition
-              </label>
-              <select
-                id="asset-condition"
-                value={condition}
-                onChange={(e) => setCondition(e.target.value as never)}
-                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-              >
-                {CONDITIONS.map((c) => (
-                  <option key={c} value={c}>
-                    {humanize(c)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="asset-serial" className="text-xs text-muted mb-1 block">
-                Serial Number{' '}
-                <span className="text-muted/70">(individually-tracked items only)</span>
-              </label>
-              <input
-                id="asset-serial"
-                value={serialNumber}
-                onChange={(e) => setSerialNumber(e.target.value)}
-                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-              />
-            </div>
-            <div>
-              <label htmlFor="asset-qty" className="text-xs text-muted mb-1 block">
-                Quantity
-              </label>
-              <input
-                id="asset-qty"
-                type="number"
-                min="1"
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
-                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label htmlFor="asset-location" className="text-xs text-muted mb-1 block">
-                Location <span className="text-muted/70">(while in store)</span>
-              </label>
-              <input
-                id="asset-location"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="e.g. Science Lab storeroom"
-                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-              />
-            </div>
-            <div>
-              <label htmlFor="asset-cost" className="text-xs text-muted mb-1 block">
-                Acquisition Cost (MWK)
-              </label>
-              <input
-                id="asset-cost"
-                type="number"
-                min="0"
-                value={acquisitionCost}
-                onChange={(e) => setAcquisitionCost(e.target.value)}
-                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-              />
-            </div>
-            <div>
-              <label htmlFor="asset-supplier" className="text-xs text-muted mb-1 block">
-                Supplier
-              </label>
-              <input
-                id="asset-supplier"
-                value={supplier}
-                onChange={(e) => setSupplier(e.target.value)}
-                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label htmlFor="asset-notes" className="text-xs text-muted mb-1 block">
-                Notes
-              </label>
-              <textarea
-                id="asset-notes"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                rows={2}
-                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page"
-              />
-            </div>
-          </div>
-
           <button
             type="button"
             onClick={handleSave}
             disabled={pending || !name.trim()}
-            className="w-full bg-brand-navy text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-60 min-h-11"
+            className={MODAL_BTN_PRIMARY}
           >
             {pending ? 'Saving…' : asset ? 'Save Changes' : 'Add to Register'}
           </button>
-          {error && (
-            <p className="text-sm text-brand-coral">
-              {error instanceof Error ? error.message : 'Something went wrong.'}
-            </p>
-          )}
+        </>
+      }
+    >
+      <div className="grid sm:grid-cols-2 gap-3">
+        <div className="sm:col-span-2">
+          <label htmlFor="asset-name" className="text-xs text-muted mb-1 block">
+            Name
+          </label>
+          <input
+            id="asset-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+          />
+        </div>
+        <div>
+          <label htmlFor="asset-category" className="text-xs text-muted mb-1 block">
+            Category
+          </label>
+          <select
+            id="asset-category"
+            value={category}
+            onChange={(e) => setCategory(e.target.value as never)}
+            className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+          >
+            {CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {humanize(c)}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="asset-condition" className="text-xs text-muted mb-1 block">
+            Condition
+          </label>
+          <select
+            id="asset-condition"
+            value={condition}
+            onChange={(e) => setCondition(e.target.value as never)}
+            className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+          >
+            {CONDITIONS.map((c) => (
+              <option key={c} value={c}>
+                {humanize(c)}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="asset-serial" className="text-xs text-muted mb-1 block">
+            Serial number{' '}
+            <span className="text-muted">(individually-tracked items only)</span>
+          </label>
+          <input
+            id="asset-serial"
+            value={serialNumber}
+            onChange={(e) => setSerialNumber(e.target.value)}
+            className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+          />
+        </div>
+        <div>
+          <label htmlFor="asset-qty" className="text-xs text-muted mb-1 block">
+            Quantity
+          </label>
+          <input
+            id="asset-qty"
+            type="number"
+            min="1"
+            value={quantity}
+            onChange={(e) => setQuantity(e.target.value)}
+            className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+          />
+        </div>
+        <div className="sm:col-span-2">
+          <label htmlFor="asset-location" className="text-xs text-muted mb-1 block">
+            Location <span className="text-muted">(while in store)</span>
+          </label>
+          <input
+            id="asset-location"
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            placeholder="Science Lab storeroom"
+            className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+          />
+        </div>
+        <div>
+          <label htmlFor="asset-cost" className="text-xs text-muted mb-1 block">
+            Acquisition cost (MWK)
+          </label>
+          <input
+            id="asset-cost"
+            type="number"
+            min="0"
+            value={acquisitionCost}
+            onChange={(e) => setAcquisitionCost(e.target.value)}
+            className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+          />
+        </div>
+        <div>
+          <label htmlFor="asset-supplier" className="text-xs text-muted mb-1 block">
+            Supplier
+          </label>
+          <input
+            id="asset-supplier"
+            value={supplier}
+            onChange={(e) => setSupplier(e.target.value)}
+            className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+          />
+        </div>
+        <div className="sm:col-span-2">
+          <label htmlFor="asset-notes" className="text-xs text-muted mb-1 block">
+            Notes
+          </label>
+          <textarea
+            id="asset-notes"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={2}
+            className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page"
+          />
         </div>
       </div>
-    </div>
+
+      {error && (
+        <p className="text-sm text-tone-coral">
+          {error instanceof Error ? error.message : 'Something went wrong.'}
+        </p>
+      )}
+    </Modal>
   )
 }
 
 function AllocateModal({ asset, onClose }: { asset: ApiAsset; onClose: () => void }) {
   const allocate = useAllocateAsset()
-  const { data: staff } = useStaffDirectory()
   const [assignedToType, setAssignedToType] = useState<'STAFF' | 'DEPARTMENT' | 'ROOM'>('STAFF')
   const [staffId, setStaffId] = useState('')
   const [departmentOrRoom, setDepartmentOrRoom] = useState('')
@@ -610,95 +680,80 @@ function AllocateModal({ asset, onClose }: { asset: ApiAsset; onClose: () => voi
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-      <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-md bg-surface rounded-2xl shadow-xl">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-base">
-          <h2 className="font-heading font-bold text-brand-navy">Allocate — {asset.name}</h2>
-          <button onClick={onClose} aria-label="Close" className="p-1.5 hover:bg-page rounded-lg">
-            <XIcon className="w-4 h-4 text-muted" />
+    <Modal
+      title={<>Allocate: {asset.name}</>}
+      onClose={onClose}
+      size="m"
+      bodyClassName="space-y-3"
+      footer={
+        <>
+          <button type="button" onClick={onClose} className={MODAL_BTN_SECONDARY}>
+            Cancel
           </button>
-        </div>
-        <div className="p-6 space-y-3">
-          <div>
-            <label htmlFor="allocate-type" className="text-xs text-muted mb-1 block">
-              Assign to
-            </label>
-            <select
-              id="allocate-type"
-              value={assignedToType}
-              onChange={(e) => setAssignedToType(e.target.value as never)}
-              className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-            >
-              <option value="STAFF">A staff member</option>
-              <option value="DEPARTMENT">A department</option>
-              <option value="ROOM">A room</option>
-            </select>
-          </div>
-          {assignedToType === 'STAFF' ? (
-            <div>
-              <label htmlFor="allocate-staff" className="text-xs text-muted mb-1 block">
-                Staff member
-              </label>
-              <select
-                id="allocate-staff"
-                value={staffId}
-                onChange={(e) => setStaffId(e.target.value)}
-                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-              >
-                <option value="">Select…</option>
-                {(
-                  staff as
-                    | { id: string; firstName: string; lastName: string; department: string }[]
-                    | undefined
-                )?.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.firstName} {s.lastName} — {s.department}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : (
-            <div>
-              <label htmlFor="allocate-doR" className="text-xs text-muted mb-1 block">
-                {assignedToType === 'DEPARTMENT' ? 'Department' : 'Room'} name
-              </label>
-              <input
-                id="allocate-doR"
-                value={departmentOrRoom}
-                onChange={(e) => setDepartmentOrRoom(e.target.value)}
-                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-              />
-            </div>
-          )}
-          <div>
-            <label htmlFor="allocate-notes" className="text-xs text-muted mb-1 block">
-              Notes
-            </label>
-            <textarea
-              id="allocate-notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={2}
-              className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page"
-            />
-          </div>
           <button
             type="button"
             onClick={handleAllocate}
             disabled={allocate.isPending || !valid}
-            className="w-full bg-brand-navy text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-60 min-h-11"
+            className={MODAL_BTN_PRIMARY}
           >
             {allocate.isPending ? 'Allocating…' : 'Allocate'}
           </button>
-          {allocate.error && (
-            <p className="text-sm text-brand-coral">
-              {allocate.error instanceof Error ? allocate.error.message : 'Something went wrong.'}
-            </p>
-          )}
-        </div>
+        </>
+      }
+    >
+      <div>
+        <label htmlFor="allocate-type" className="text-xs text-muted mb-1 block">
+          Assign to
+        </label>
+        <select
+          id="allocate-type"
+          value={assignedToType}
+          onChange={(e) => setAssignedToType(e.target.value as never)}
+          className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+        >
+          <option value="STAFF">A staff member</option>
+          <option value="DEPARTMENT">A department</option>
+          <option value="ROOM">A room</option>
+        </select>
       </div>
-    </div>
+      {assignedToType === 'STAFF' ? (
+        <div>
+          <label htmlFor="allocate-staff" className="text-xs text-muted mb-1 block">
+            Staff member
+          </label>
+          <StaffSelect id="allocate-staff" value={staffId} onChange={setStaffId} />
+        </div>
+      ) : (
+        <div>
+          <label htmlFor="allocate-doR" className="text-xs text-muted mb-1 block">
+            {assignedToType === 'DEPARTMENT' ? 'Department' : 'Room'} name
+          </label>
+          <input
+            id="allocate-doR"
+            value={departmentOrRoom}
+            onChange={(e) => setDepartmentOrRoom(e.target.value)}
+            className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+          />
+        </div>
+      )}
+      <div>
+        <label htmlFor="allocate-notes" className="text-xs text-muted mb-1 block">
+          Notes
+        </label>
+        <textarea
+          id="allocate-notes"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={2}
+          className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page"
+        />
+      </div>
+      {allocate.error && (
+        <p className="text-sm text-tone-coral">
+          {allocate.error instanceof Error ? allocate.error.message : 'Something went wrong.'}
+        </p>
+      )}
+    </Modal>
   )
 }
 
@@ -710,45 +765,16 @@ function ConditionModal({ asset, onClose }: { asset: ApiAsset; onClose: () => vo
   const [confirmDispose, setConfirmDispose] = useState(false)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-      <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-md bg-surface rounded-2xl shadow-xl">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-base">
-          <h2 className="font-heading font-bold text-brand-navy">Condition — {asset.name}</h2>
-          <button onClick={onClose} aria-label="Close" className="p-1.5 hover:bg-page rounded-lg">
-            <XIcon className="w-4 h-4 text-muted" />
+    <Modal
+      title={<>Condition: {asset.name}</>}
+      onClose={onClose}
+      size="m"
+      bodyClassName="space-y-3"
+      footer={
+        <>
+          <button type="button" onClick={onClose} className={MODAL_BTN_SECONDARY}>
+            Cancel
           </button>
-        </div>
-        <div className="p-6 space-y-3">
-          <div>
-            <label htmlFor="condition-select" className="text-xs text-muted mb-1 block">
-              Condition
-            </label>
-            <select
-              id="condition-select"
-              value={condition}
-              onChange={(e) => setCondition(e.target.value as never)}
-              className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-            >
-              {CONDITIONS.map((c) => (
-                <option key={c} value={c}>
-                  {humanize(c)}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label htmlFor="condition-notes" className="text-xs text-muted mb-1 block">
-              Notes
-            </label>
-            <textarea
-              id="condition-notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={2}
-              className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page"
-            />
-          </div>
           <button
             type="button"
             onClick={() =>
@@ -761,68 +787,98 @@ function ConditionModal({ asset, onClose }: { asset: ApiAsset; onClose: () => vo
               )
             }
             disabled={markCondition.isPending}
-            className="w-full bg-brand-navy text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-60 min-h-11"
+            className={MODAL_BTN_PRIMARY}
           >
             {markCondition.isPending ? 'Saving…' : 'Update Condition'}
           </button>
-          {markCondition.error && (
-            <p className="text-sm text-brand-coral">
-              {markCondition.error instanceof Error
-                ? markCondition.error.message
+        </>
+      }
+    >
+      <div>
+        <label htmlFor="condition-select" className="text-xs text-muted mb-1 block">
+          Condition
+        </label>
+        <select
+          id="condition-select"
+          value={condition}
+          onChange={(e) => setCondition(e.target.value as never)}
+          className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+        >
+          {CONDITIONS.map((c) => (
+            <option key={c} value={c}>
+              {humanize(c)}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label htmlFor="condition-notes" className="text-xs text-muted mb-1 block">
+          Notes
+        </label>
+        <textarea
+          id="condition-notes"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={2}
+          className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page"
+        />
+      </div>
+      {markCondition.error && (
+        <p className="text-sm text-tone-coral">
+          {markCondition.error instanceof Error
+            ? markCondition.error.message
+            : 'Something went wrong.'}
+        </p>
+      )}
+
+      <PermissionGuard permission="assets.dispose">
+        <div className="pt-4 mt-2 border-t border-base">
+          {confirmDispose ? (
+            <div className="flex items-center gap-3">
+              <p className="text-xs text-muted flex-1">
+                Mark this asset disposed? It leaves the active register (must not be currently
+                allocated).
+              </p>
+              <button
+                type="button"
+                disabled={disposeAsset.isPending}
+                onClick={() =>
+                  disposeAsset.mutate(
+                    { id: asset.id, data: { notes: notes.trim() || undefined } },
+                    { onSuccess: onClose }
+                  )
+                }
+                className="text-xs font-semibold text-tone-coral app-action shrink-0"
+              >
+                Confirm
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmDispose(false)}
+                className="text-xs text-muted app-action shrink-0"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmDispose(true)}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-tone-coral app-action"
+            >
+              <Trash2 className="w-3.5 h-3.5" /> Mark disposed
+            </button>
+          )}
+          {disposeAsset.error && (
+            <p className="text-sm text-tone-coral mt-2">
+              {disposeAsset.error instanceof Error
+                ? disposeAsset.error.message
                 : 'Something went wrong.'}
             </p>
           )}
-
-          <PermissionGuard permission="assets.dispose">
-            <div className="pt-4 mt-2 border-t border-base">
-              {confirmDispose ? (
-                <div className="flex items-center gap-3">
-                  <p className="text-xs text-muted flex-1">
-                    Mark this asset disposed? It leaves the active register (must not be currently
-                    allocated).
-                  </p>
-                  <button
-                    type="button"
-                    disabled={disposeAsset.isPending}
-                    onClick={() =>
-                      disposeAsset.mutate(
-                        { id: asset.id, data: { notes: notes.trim() || undefined } },
-                        { onSuccess: onClose }
-                      )
-                    }
-                    className="text-xs font-semibold text-brand-coral hover:underline shrink-0"
-                  >
-                    Confirm
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setConfirmDispose(false)}
-                    className="text-xs text-muted hover:underline shrink-0"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setConfirmDispose(true)}
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-coral hover:underline"
-                >
-                  <Trash2 className="w-3.5 h-3.5" /> Mark disposed
-                </button>
-              )}
-              {disposeAsset.error && (
-                <p className="text-sm text-brand-coral mt-2">
-                  {disposeAsset.error instanceof Error
-                    ? disposeAsset.error.message
-                    : 'Something went wrong.'}
-                </p>
-              )}
-            </div>
-          </PermissionGuard>
         </div>
-      </div>
-    </div>
+      </PermissionGuard>
+    </Modal>
   )
 }
 
@@ -832,89 +888,83 @@ function AssetDetailModal({ assetId, onClose }: { assetId: string; onClose: () =
   const returnAsset = useReturnAsset()
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-      <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto bg-surface rounded-2xl shadow-xl">
-        <div className="sticky top-0 z-10 bg-surface flex items-center justify-between px-6 py-4 border-b border-base">
-          <h2 className="font-heading font-bold text-brand-navy">{asset?.name ?? 'Asset'}</h2>
-          <button onClick={onClose} aria-label="Close" className="p-1.5 hover:bg-page rounded-lg">
-            <XIcon className="w-4 h-4 text-muted" />
-          </button>
-        </div>
-        <div className="p-6 space-y-4">
-          {asset && (
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <p className="text-xs text-muted">Category</p>
-                <p>{humanize(asset.category)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted">Status</p>
-                <p>{humanize(asset.status)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted">Condition</p>
-                <p>{humanize(asset.condition)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted">Quantity</p>
-                <p>{asset.quantity}</p>
-              </div>
-              {asset.acquisitionCost !== undefined && (
-                <div>
-                  <p className="text-xs text-muted">Acquisition cost</p>
-                  <p>{formatMWK(asset.acquisitionCost)}</p>
-                </div>
-              )}
-              {asset.supplier && (
-                <div>
-                  <p className="text-xs text-muted">Supplier</p>
-                  <p>{asset.supplier}</p>
-                </div>
-              )}
+    <Modal
+      title={asset?.name ?? 'Asset'}
+      onClose={onClose}
+      size="l"
+      bodyClassName="space-y-4"
+    >
+      {asset && (
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          <div>
+            <p className="text-xs text-muted">Category</p>
+            <p>{humanize(asset.category)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted">Status</p>
+            <p>{humanize(asset.status)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted">Condition</p>
+            <p>{humanize(asset.condition)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted">Quantity</p>
+            <p>{asset.quantity}</p>
+          </div>
+          {asset.acquisitionCost !== undefined && (
+            <div>
+              <p className="text-xs text-muted">Acquisition cost</p>
+              <p>{formatMWK(asset.acquisitionCost)}</p>
             </div>
           )}
-          <div>
-            <h3 className="text-xs font-semibold text-muted mb-2">Custody history</h3>
-            <div className="space-y-2">
-              {assignments?.length === 0 && <p className="text-xs text-muted">Never allocated.</p>}
-              {assignments?.map((a) => (
-                <div
-                  key={a.id}
-                  className="flex items-center justify-between bg-page rounded-lg px-3 py-2 text-xs"
-                >
-                  <div>
-                    <p className="font-medium">
-                      {a.assignedToType === 'STAFF'
-                        ? 'Staff member'
-                        : (a.departmentOrRoom ?? a.assignedToType)}
-                    </p>
-                    <p className="text-muted">
-                      {new Date(a.assignedAt).toLocaleDateString()}{' '}
-                      {a.returnedAt
-                        ? `→ ${new Date(a.returnedAt).toLocaleDateString()}`
-                        : '(active)'}
-                    </p>
-                  </div>
-                  <PermissionGuard permission="assets.allocateItem">
-                    {a.status === 'ACTIVE' && (
-                      <button
-                        type="button"
-                        disabled={returnAsset.isPending}
-                        onClick={() => returnAsset.mutate({ assignmentId: a.id, data: {} })}
-                        className="inline-flex items-center gap-1 text-brand-teal font-semibold min-h-11 px-2"
-                      >
-                        <Undo2 className="w-3.5 h-3.5" /> Return
-                      </button>
-                    )}
-                  </PermissionGuard>
-                </div>
-              ))}
+          {asset.supplier && (
+            <div>
+              <p className="text-xs text-muted">Supplier</p>
+              <p>{asset.supplier}</p>
             </div>
-          </div>
+          )}
+        </div>
+      )}
+      <div>
+        <h3 className="text-xs font-semibold text-muted mb-2">Custody history</h3>
+        <div className="space-y-2">
+          {assignments?.length === 0 && <p className="text-xs text-muted">Never allocated.</p>}
+          {assignments?.map((a) => (
+            <div
+              key={a.id}
+              className="flex items-center justify-between bg-page rounded-lg px-3 py-2 text-xs"
+            >
+              <div>
+                <p className="font-medium">
+                  {a.assignedToType === 'STAFF'
+                    ? 'Staff member'
+                    : (a.departmentOrRoom ?? a.assignedToType)}
+                </p>
+                <p className="text-muted">
+                  {new Date(a.assignedAt).toLocaleDateString()}{' '}
+                  {a.returnedAt
+                    ? `→ ${new Date(a.returnedAt).toLocaleDateString()}`
+                    : '(active)'}
+                </p>
+              </div>
+              <PermissionGuard permission="assets.allocateItem">
+                {a.status === 'ACTIVE' && (
+                  <button
+                    type="button"
+                    disabled={returnAsset.isPending}
+                    onClick={() => returnAsset.mutate({ assignmentId: a.id, data: {} })}
+                    className="inline-flex items-center gap-1 text-tone-teal font-semibold min-h-11 px-2"
+                  >
+                    <Undo2 className="w-3.5 h-3.5" /> Return
+                  </button>
+                )}
+              </PermissionGuard>
+            </div>
+          ))}
         </div>
       </div>
-    </div>
+    </Modal>
   )
 }
 
@@ -934,7 +984,7 @@ function RoomsTab() {
 
   if (groups?.length === 0) {
     return (
-      <div className="bg-surface border border-base rounded-xl p-8 text-center text-muted text-sm">
+      <div className="p-8 text-center text-muted text-sm">
         Nothing is currently allocated to a room or department.
       </div>
     )
@@ -945,14 +995,14 @@ function RoomsTab() {
       {groups?.map((g) => (
         <div
           key={`${g.assignedToType}:${g.departmentOrRoom}`}
-          className="bg-surface border border-base rounded-xl p-5"
+          className="pb-5 border-b border-base"
         >
           <div className="flex items-center gap-2 mb-3">
             <DoorOpen className="w-4 h-4 text-brand-navy" />
             <h3 className="font-heading font-semibold text-sm text-brand-navy">
               {g.departmentOrRoom}
             </h3>
-            <span className="text-xs bg-base rounded px-2 py-0.5 text-muted">
+            <span className="text-xs text-muted">
               {g.assignedToType === 'ROOM' ? 'Room' : 'Department'}
             </span>
           </div>
@@ -981,7 +1031,7 @@ function MyAssignedTab() {
   const { data: assignments, isLoading } = useMyAssignedAssets()
 
   return (
-    <div className="bg-surface border border-base rounded-xl overflow-x-auto">
+    <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-base text-left text-xs text-muted">
@@ -1010,7 +1060,7 @@ function MyAssignedTab() {
             <tr key={a.id} className="border-b border-base last:border-0">
               <td className="px-4 py-3 font-medium">{a.asset?.name ?? '—'}</td>
               <td className="px-4 py-3">
-                <span className="text-xs bg-base rounded px-2 py-0.5">
+                <span className="text-xs">
                   {a.asset ? humanize(a.asset.category) : '—'}
                 </span>
               </td>
@@ -1019,7 +1069,7 @@ function MyAssignedTab() {
               </td>
               <td className="px-4 py-3">
                 <span
-                  className={`text-xs rounded px-2 py-0.5 font-medium ${a.status === 'ACTIVE' ? 'bg-brand-navy/10 text-brand-navy' : 'bg-base text-muted'}`}
+                  className={`text-xs font-medium ${a.status === 'ACTIVE' ? 'text-status-info' : 'text-muted'}`}
                 >
                   {a.status === 'ACTIVE' ? 'With you' : 'Returned'}
                 </span>
@@ -1051,15 +1101,15 @@ function RequestsTab() {
   return (
     <div className="space-y-6">
       <PermissionGuard permission="assets.requestItem">
-        <div className="bg-surface border border-base rounded-xl p-5">
+        <div className="pb-2">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="font-heading font-semibold text-brand-navy text-sm">My Requests</h2>
+            <h2 className="font-heading font-semibold text-brand-navy text-sm">My requests</h2>
             <button
               type="button"
               onClick={() => setShowForm(true)}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-navy hover:underline"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-navy app-action"
             >
-              <Plus className="w-3.5 h-3.5" /> New Request
+              <Plus className="w-3.5 h-3.5" /> New request
             </button>
           </div>
           <div className="space-y-2">
@@ -1079,12 +1129,12 @@ function RequestsTab() {
                   </p>
                 </div>
                 <span
-                  className={`rounded px-2 py-0.5 font-medium ${
+                  className={`font-medium ${
                     r.status === 'PENDING'
-                      ? 'bg-amber-100 text-amber-700'
+                      ? 'text-status-warning'
                       : r.status === 'REJECTED'
-                        ? 'bg-brand-coral/10 text-brand-coral'
-                        : 'bg-brand-teal/10 text-brand-teal'
+                        ? 'text-status-danger'
+                        : 'text-status-success'
                   }`}
                 >
                   {humanize(r.status)}
@@ -1096,9 +1146,9 @@ function RequestsTab() {
       </PermissionGuard>
 
       <PermissionGuard permission="assets.approveRequest">
-        <div className="bg-surface border border-base rounded-xl p-5">
+        <div className="pb-2">
           <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
-            <h2 className="font-heading font-semibold text-brand-navy text-sm">Pending Review</h2>
+            <h2 className="font-heading font-semibold text-brand-navy text-sm">Pending review</h2>
             <input
               value={deptFilter}
               onChange={(e) => setDeptFilter(e.target.value)}
@@ -1113,7 +1163,7 @@ function RequestsTab() {
                   key={d.department}
                   type="button"
                   onClick={() => setDeptFilter(d.department)}
-                  className="text-xs bg-page rounded-full px-3 py-1 hover:bg-base"
+                  className="min-h-11 rounded-xl border border-base px-3.5 text-sm text-muted transition-colors hover:bg-page hover:text-body"
                 >
                   {d.department} <span className="font-semibold">({d.count})</span>
                 </button>
@@ -1150,15 +1200,15 @@ function AdvancesPanel() {
   const writeOff = useWriteOffAdvance()
 
   return (
-    <div className="bg-surface border border-base rounded-xl p-5">
+    <div className="pb-2">
       <h2 className="font-heading font-semibold text-brand-navy text-sm mb-3">
-        Procurement Advances
+        Procurement advances
       </h2>
 
       <PermissionGuard permission="assets.manageAdvances">
         {approvedRequests && approvedRequests.length > 0 && (
           <div className="mb-4">
-            <p className="text-xs font-semibold text-muted mb-2">Approved — awaiting procurement</p>
+            <p className="text-xs font-semibold text-muted mb-2">Approved: awaiting procurement</p>
             <div className="space-y-2">
               {approvedRequests.map((r: ApiAssetRequest) => (
                 <div
@@ -1177,7 +1227,7 @@ function AdvancesPanel() {
                     onClick={() => setAdvancingRequestId(r.id)}
                     className="inline-flex items-center gap-1 text-brand-navy font-semibold min-h-11 px-2"
                   >
-                    <HandCoins className="w-3.5 h-3.5" /> Record Advance
+                    <HandCoins className="w-3.5 h-3.5" /> Record advance
                   </button>
                 </div>
               ))}
@@ -1198,7 +1248,7 @@ function AdvancesPanel() {
           >
             <div>
               <p className="font-medium">
-                {a.supplier} — {formatMWK(a.amount)}
+                {a.supplier} - {formatMWK(a.amount)}
               </p>
               <p className="text-muted">
                 {a.assetRequest?.title ?? 'Request deleted'} · advanced{' '}
@@ -1211,7 +1261,7 @@ function AdvancesPanel() {
                   type="button"
                   disabled={reconcile.isPending}
                   onClick={() => reconcile.mutate({ id: a.id, data: {} })}
-                  className="text-brand-teal font-semibold min-h-11 px-1"
+                  className="text-tone-teal font-semibold min-h-11 px-1"
                 >
                   Reconcile
                 </button>
@@ -1219,7 +1269,7 @@ function AdvancesPanel() {
                   type="button"
                   disabled={writeOff.isPending}
                   onClick={() => writeOff.mutate({ id: a.id, data: {} })}
-                  className="text-brand-coral font-semibold min-h-11 px-1"
+                  className="text-tone-coral font-semibold min-h-11 px-1"
                 >
                   Write off
                 </button>
@@ -1246,52 +1296,16 @@ function RecordAdvanceModal({ requestId, onClose }: { requestId: string; onClose
   const [notes, setNotes] = useState('')
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-      <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-sm bg-surface rounded-2xl shadow-xl">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-base">
-          <h2 className="font-heading font-bold text-brand-navy">Record Advance</h2>
-          <button onClick={onClose} aria-label="Close" className="p-1.5 hover:bg-page rounded-lg">
-            <XIcon className="w-4 h-4 text-muted" />
+    <Modal
+      title="Record Advance"
+      onClose={onClose}
+      size="s"
+      bodyClassName="space-y-3"
+      footer={
+        <>
+          <button type="button" onClick={onClose} className={MODAL_BTN_SECONDARY}>
+            Cancel
           </button>
-        </div>
-        <div className="p-6 space-y-3">
-          <div>
-            <label htmlFor="adv-supplier" className="text-xs text-muted mb-1 block">
-              Supplier
-            </label>
-            <input
-              id="adv-supplier"
-              value={supplier}
-              onChange={(e) => setSupplier(e.target.value)}
-              className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-            />
-          </div>
-          <div>
-            <label htmlFor="adv-amount" className="text-xs text-muted mb-1 block">
-              Amount (MWK)
-            </label>
-            <input
-              id="adv-amount"
-              type="number"
-              min="0"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-            />
-          </div>
-          <div>
-            <label htmlFor="adv-notes" className="text-xs text-muted mb-1 block">
-              Notes
-            </label>
-            <textarea
-              id="adv-notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={2}
-              className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page"
-            />
-          </div>
           <button
             type="button"
             disabled={recordAdvance.isPending || !supplier.trim() || !amount}
@@ -1308,20 +1322,57 @@ function RecordAdvanceModal({ requestId, onClose }: { requestId: string; onClose
                 { onSuccess: onClose }
               )
             }
-            className="w-full bg-brand-navy text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-60 min-h-11"
+            className={MODAL_BTN_PRIMARY}
           >
             {recordAdvance.isPending ? 'Recording…' : 'Record Advance'}
           </button>
-          {recordAdvance.error && (
-            <p className="text-sm text-brand-coral">
-              {recordAdvance.error instanceof Error
-                ? recordAdvance.error.message
-                : 'Something went wrong.'}
-            </p>
-          )}
-        </div>
+        </>
+      }
+    >
+      <div>
+        <label htmlFor="adv-supplier" className="text-xs text-muted mb-1 block">
+          Supplier
+        </label>
+        <input
+          id="adv-supplier"
+          value={supplier}
+          onChange={(e) => setSupplier(e.target.value)}
+          className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+        />
       </div>
-    </div>
+      <div>
+        <label htmlFor="adv-amount" className="text-xs text-muted mb-1 block">
+          Amount (MWK)
+        </label>
+        <input
+          id="adv-amount"
+          type="number"
+          min="0"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+        />
+      </div>
+      <div>
+        <label htmlFor="adv-notes" className="text-xs text-muted mb-1 block">
+          Notes
+        </label>
+        <textarea
+          id="adv-notes"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={2}
+          className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page"
+        />
+      </div>
+      {recordAdvance.error && (
+        <p className="text-sm text-tone-coral">
+          {recordAdvance.error instanceof Error
+            ? recordAdvance.error.message
+            : 'Something went wrong.'}
+        </p>
+      )}
+    </Modal>
   )
 }
 
@@ -1348,14 +1399,14 @@ function ReviewRequestRow({ request }: { request: ApiAssetRequest }) {
               type="button"
               disabled={approve.isPending}
               onClick={() => approve.mutate({ id: request.id, data: {} })}
-              className="inline-flex items-center gap-1 text-brand-teal font-semibold min-h-11 px-2"
+              className="inline-flex items-center gap-1 text-tone-teal font-semibold min-h-11 px-2"
             >
               <Check className="w-3.5 h-3.5" /> Approve
             </button>
             <button
               type="button"
               onClick={() => setRejecting(true)}
-              className="inline-flex items-center gap-1 text-brand-coral font-semibold min-h-11 px-2"
+              className="inline-flex items-center gap-1 text-tone-coral font-semibold min-h-11 px-2"
             >
               <PackageX className="w-3.5 h-3.5" /> Reject
             </button>
@@ -1379,7 +1430,7 @@ function ReviewRequestRow({ request }: { request: ApiAssetRequest }) {
                 { onSuccess: () => setRejecting(false) }
               )
             }
-            className="text-brand-coral font-semibold shrink-0"
+            className="text-tone-coral font-semibold shrink-0"
           >
             Confirm
           </button>
@@ -1401,84 +1452,16 @@ function RequestFormModal({ onClose }: { onClose: () => void }) {
   const [justification, setJustification] = useState('')
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-      <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-md bg-surface rounded-2xl shadow-xl">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-base">
-          <h2 className="font-heading font-bold text-brand-navy">Request Equipment</h2>
-          <button onClick={onClose} aria-label="Close" className="p-1.5 hover:bg-page rounded-lg">
-            <XIcon className="w-4 h-4 text-muted" />
+    <Modal
+      title="Request equipment"
+      onClose={onClose}
+      size="m"
+      bodyClassName="space-y-3"
+      footer={
+        <>
+          <button type="button" onClick={onClose} className={MODAL_BTN_SECONDARY}>
+            Cancel
           </button>
-        </div>
-        <div className="p-6 space-y-3">
-          <div>
-            <label htmlFor="req-title" className="text-xs text-muted mb-1 block">
-              What do you need?
-            </label>
-            <input
-              id="req-title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. 10 microscopes for Form 3 Biology"
-              className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="req-category" className="text-xs text-muted mb-1 block">
-                Category
-              </label>
-              <select
-                id="req-category"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-              >
-                {CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {humanize(c)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="req-qty" className="text-xs text-muted mb-1 block">
-                Quantity
-              </label>
-              <input
-                id="req-qty"
-                type="number"
-                min="1"
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
-                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-              />
-            </div>
-          </div>
-          <div>
-            <label htmlFor="req-dept" className="text-xs text-muted mb-1 block">
-              Department
-            </label>
-            <input
-              id="req-dept"
-              value={department}
-              onChange={(e) => setDepartment(e.target.value)}
-              placeholder="e.g. Biology Department"
-              className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-            />
-          </div>
-          <div>
-            <label htmlFor="req-justification" className="text-xs text-muted mb-1 block">
-              Why is this needed?
-            </label>
-            <textarea
-              id="req-justification"
-              value={justification}
-              onChange={(e) => setJustification(e.target.value)}
-              rows={2}
-              className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page"
-            />
-          </div>
           <button
             type="button"
             disabled={createRequest.isPending || !title.trim()}
@@ -1494,19 +1477,88 @@ function RequestFormModal({ onClose }: { onClose: () => void }) {
                 { onSuccess: onClose }
               )
             }
-            className="w-full bg-brand-navy text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-60 min-h-11"
+            className={MODAL_BTN_PRIMARY}
           >
             {createRequest.isPending ? 'Submitting…' : 'Submit Request'}
           </button>
-          {createRequest.error && (
-            <p className="text-sm text-brand-coral">
-              {createRequest.error instanceof Error
-                ? createRequest.error.message
-                : 'Something went wrong.'}
-            </p>
-          )}
+        </>
+      }
+    >
+      <div>
+        <label htmlFor="req-title" className="text-xs text-muted mb-1 block">
+          What do you need?
+        </label>
+        <input
+          id="req-title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="10 microscopes for Form 3 Biology"
+          className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label htmlFor="req-category" className="text-xs text-muted mb-1 block">
+            Category
+          </label>
+          <select
+            id="req-category"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+          >
+            {CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {humanize(c)}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="req-qty" className="text-xs text-muted mb-1 block">
+            Quantity
+          </label>
+          <input
+            id="req-qty"
+            type="number"
+            min="1"
+            value={quantity}
+            onChange={(e) => setQuantity(e.target.value)}
+            className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+          />
         </div>
       </div>
-    </div>
+      <div>
+        <label htmlFor="req-dept" className="text-xs text-muted mb-1 block">
+          Department
+        </label>
+        <input
+          id="req-dept"
+          value={department}
+          onChange={(e) => setDepartment(e.target.value)}
+          placeholder="Biology Department"
+          className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+        />
+      </div>
+      <div>
+        <label htmlFor="req-justification" className="text-xs text-muted mb-1 block">
+          Why is this needed?
+        </label>
+        <textarea
+          id="req-justification"
+          value={justification}
+          onChange={(e) => setJustification(e.target.value)}
+          rows={2}
+          className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page"
+        />
+      </div>
+      {createRequest.error && (
+        <p className="text-sm text-tone-coral">
+          {createRequest.error instanceof Error
+            ? createRequest.error.message
+            : 'Something went wrong.'}
+        </p>
+      )}
+    </Modal>
   )
 }

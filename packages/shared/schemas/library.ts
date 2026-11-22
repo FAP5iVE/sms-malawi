@@ -24,6 +24,9 @@ export const CreateBookSchema = z.object({
   publishedYear: z.number().int().min(1900).max(getMaxPublishedYear()).optional(),
   totalCopies:   z.number().int().positive().default(1),
   barcode:       z.string().optional(),
+  // [R21] Physical shelf/location label (e.g. "M-02") — shown under the
+  // barcode in the redesigned catalog UI.
+  shelf:         z.string().optional(),
 })
 
 // [PRODUCTION FIX 2026-07-28] Catalog management had create + list, but no
@@ -53,6 +56,24 @@ export const IssueBorrowingSchema = z.object({
 export const ReturnBorrowingSchema = z.object({
   condition: z.enum(['GOOD','DAMAGED','LOST']).default('GOOD'),
   notes:     z.string().optional(),
+  /**
+   * MWK charged to the borrower for a DAMAGED or LOST copy. Recorded in the same
+   * transaction as the return (as a DAMAGED/LOST LibraryFine), so a return and its
+   * charge can never get out of step. Ignored for GOOD; 0 / omitted = no charge.
+   * Separate from the overdue (LATE) fine, which is always computed server-side.
+   */
+  fee:       z.number().nonnegative().max(99_999_999).optional(),
+})
+
+// [R21.2] "no where to change [a book's] status" outside of the return
+// flow — marks a *shelf* copy (not currently on loan) damaged/lost
+// directly from the Catalog. `copies` is capped server-side at the
+// book's current availableCopies (you can't mark a copy that's out with
+// a borrower this way — that's still the return flow's job).
+export const MarkBookConditionSchema = z.object({
+  condition: z.enum(['DAMAGED', 'LOST']),
+  copies:    z.number().int().positive().default(1),
+  notes:     z.string().optional(),
 })
 
 export const CreateDigitalResourceSchema = z.object({
@@ -70,6 +91,13 @@ export const CreateRecommendationSchema = z.object({
   type:    z.enum(['BOOK', 'EBOOK', 'JOURNAL', 'OTHER']),
   subject: z.string().optional(),
   reason:  z.string().min(1),
+  // [R21] Requester Name & Role / Class-Form-Department fields added to
+  // match the redesigned "Recommend a Resource" form — all optional and
+  // purely display-side; requestedByUid (set server-side from the
+  // authenticated user) remains the real identity link.
+  requesterName:  z.string().optional(),
+  requesterRole:  z.enum(['Student', 'Staff', 'Parent', 'Other']).optional(),
+  requesterClass: z.string().optional(),
 })
 
 export const ReviewRecommendationSchema = z.object({
@@ -93,6 +121,7 @@ export type CreateBookInput             = z.infer<typeof CreateBookSchema>
 export type UpdateBookInput             = z.infer<typeof UpdateBookSchema>
 export type IssueBorrowingInput         = z.infer<typeof IssueBorrowingSchema>
 export type ReturnBorrowingInput        = z.infer<typeof ReturnBorrowingSchema>
+export type MarkBookConditionInput      = z.infer<typeof MarkBookConditionSchema>
 export type CreateDigitalResourceInput  = z.infer<typeof CreateDigitalResourceSchema>
 export type CreateRecommendationInput   = z.infer<typeof CreateRecommendationSchema>
 export type ReviewRecommendationInput   = z.infer<typeof ReviewRecommendationSchema>

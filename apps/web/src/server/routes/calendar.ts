@@ -82,11 +82,41 @@
  *   already writes for its own venue field, so the frontend's existing
  *   MapPin-icon location display (CalendarEventListItem) renders a manual
  *   event's location with zero new frontend meta-key branching.
+ *
+ * [CHANGE TYPE]: TARGETED EDIT (per-category visibility policy)
+ * [PURPOSE]: Closes a real data-exposure gap: every category was visible
+ *   to every role that can open the calendar page (all 9). Applied
+ *   server/lib/calendarVisibility.ts's canonical policy:
+ *     - term, holiday, announcement: unrestricted (unchanged — "as it is"
+ *       for announcements specifically).
+ *     - exam, timetable, lab_booking: now gated to
+ *       ACADEMIC_VISIBLE_ROLES (student, academic, exam_officer,
+ *       high_rank, lower_rank, admin) — exams previously had no gate at
+ *       all; lab bookings' own gate was missing student and exam_officer;
+ *       timetable's only covered academic/student.
+ *     - leave: source 5 (all-staff view, HR/high_rank/admin) and source 6
+ *       (own leave, by staffId) were already correctly scoped — no change
+ *       to either. The actual leak was source 10: a manually-created
+ *       event with category 'leave' (e.g. logging a staff member's leave
+ *       by hand, exactly like the adopted reference UI's own "Mercy
+ *       Gondwe — Unpaid Leave" example) had no visibility filtering
+ *       applied to it at all, so it was visible to every role including
+ *       student regardless of the real leave sources' correct scoping.
+ *     - assignment: source 9 gained ASSIGNMENT_UNRESTRICTED_ROLES
+ *       (high_rank, admin) on top of its existing academic-own-created /
+ *       student-own-class scoping, which was already correct but missing
+ *       management visibility.
+ *     - Source 10 (manual events) now filters every row through
+ *       roleCanViewManualCategory(role, ev.category), with the event's
+ *       own creator always additionally able to see their own creation —
+ *       this is the fix for the actual reported bug, since manual events
+ *       previously bypassed category-based visibility entirely.
+ * [DEPENDS ON]: apps/web/src/server/lib/calendarVisibility.ts (new, same change)
  */
 import 'server-only'
 
 import { Router }      from 'express'
-import { getFirestore }  from 'firebase-admin/firestore'
+import { getFirestore, Timestamp }  from 'firebase-admin/firestore'
 import { verifyAuth, getAdminApp }  from '@/lib/verifyAuth'
 import { requirePermission } from '@/server/middleware/verifyPermission'
 import { prisma }      from '@/lib/prisma'
@@ -98,8 +128,14 @@ import { COLLECTIONS }       from '@shared/constants/storage'
 import { CreateCalendarEventSchema, UpdateCalendarEventSchema } from '@shared/schemas/calendarEvent'
 import * as settingsService     from '@/server/services/settingsService'
 import * as calendarEventService from '@/server/services/calendarEventService'
-import * as studentService      from '@/server/services/studentService'
-import { format, parseISO, addDays } from 'date-fns'
+import * as assignmentService   from '@/server/services/assignmentService'
+import {
+  ACADEMIC_VISIBLE_ROLES,
+  LEAVE_VISIBLE_ROLES,
+  ASSIGNMENT_UNRESTRICTED_ROLES,
+  roleCanViewManualCategory,
+} from '@/server/lib/calendarVisibility'
+import { format, parseISO, isValid, addDays } from 'date-fns'
 import { sendError } from '@/server/lib/sendError'
 
 export const calendarRouter = Router()
@@ -113,6 +149,29 @@ function nextWeekdayFrom(from: Date, isoWeekday: number): Date {
   const diff = (isoWeekday - d.getDay() + 7) % 7
   d.setDate(d.getDate() + diff)
   return d
+}
+
+/**
+ * Coerces a Firestore field that *should* be an event date but, because
+ * Firestore is schemaless and this collection predates the current write
+ * path, may actually be a Firestore Timestamp, a native Date, or a plain
+ * ISO string depending on when the document was written. Mirrors the same
+ * defensive pattern notificationFeedService.ts's toIso() already uses for
+ * this exact ambiguity elsewhere in the codebase. Returns null for
+ * anything falsy, unrecognized, or that fails to parse as a valid date —
+ * callers should treat null as "skip this row", never throw.
+ */
+function toEventDate(value: unknown): Date | null {
+  if (!value) return null
+  if (value instanceof Timestamp) return value.toDate()
+  if (value instanceof Date) return isValid(value) ? value : null
+  const maybe = value as { toDate?: () => Date }
+  if (typeof maybe?.toDate === 'function') return maybe.toDate()
+  if (typeof value === 'string') {
+    const parsed = parseISO(value)
+    return isValid(parsed) ? parsed : null
+  }
+  return null
 }
 
 /**
@@ -136,6 +195,14 @@ calendarRouter.get('/events',
 
     const rangeStart = startStr ? parseISO(startStr) : parseISO(termDates.term1.start)
     const rangeEnd   = endStr   ? parseISO(endStr)   : parseISO(termDates.term3.end)
+    // [Issue 7] Validate the client-supplied window: an unparseable date reached Prisma
+    // as an Invalid Date (500), and an unbounded window fans out into every event source.
+    if (Number.isNaN(rangeStart.getTime()) || Number.isNaN(rangeEnd.getTime())) {
+      return res.status(400).json({ error: '"start" and "end" must be valid ISO dates.' })
+    }
+    if ((startStr || endStr) && (rangeEnd < rangeStart || rangeEnd.getTime() - rangeStart.getTime() > 400 * 86_400_000)) {
+      return res.status(400).json({ error: 'The calendar window must be between 0 and 400 days.' })
+    }
 
     const events: CalendarEvent[] = []
 
@@ -190,29 +257,38 @@ calendarRouter.get('/events',
     // whether the exam itself belongs on the calendar. The previous
     // `status: { not: 'DRAFT' }` referenced a status value that has never
     // existed in the ExamStatus enum.
-    const exams = await prisma.exam.findMany({
-      where: {
-        date: { gte: rangeStart, lte: rangeEnd },
-      },
-      select: { id: true, subject: true, date: true, timeStart: true, timeEnd: true, type: true, venue: true },
-    })
-    for (const exam of exams) {
-      const dateStr = format(exam.date, 'yyyy-MM-dd')
-      const isManeb = exam.type === 'MANEB_JCE' || exam.type === 'MANEB_MSCE'
-      events.push({
-        id:       `exam-${exam.id}`,
-        title:    `${isManeb ? 'MANEB ' : ''}${exam.subject} Exam`,
-        start:    exam.timeStart ? `${dateStr}T${exam.timeStart}` : dateStr,
-        end:      exam.timeEnd   ? `${dateStr}T${exam.timeEnd}`   : undefined,
-        allDay:   !exam.timeStart,
-        color:    CALENDAR_COLORS.exam,
-        category: 'exam',
-        meta:     { examId: exam.id, venue: exam.venue ?? '' },
+    //
+    // [VISIBILITY] Gated to ACADEMIC_VISIBLE_ROLES — previously had no
+    // role restriction at all, so finance/library/hr staff could see exam
+    // scheduling despite having no academic role in it.
+    if (ACADEMIC_VISIBLE_ROLES.includes(role)) {
+      const exams = await prisma.exam.findMany({
+        where: {
+          date: { gte: rangeStart, lte: rangeEnd },
+        },
+        select: { id: true, subject: true, date: true, timeStart: true, timeEnd: true, type: true, venue: true },
       })
+      for (const exam of exams) {
+        const dateStr = format(exam.date, 'yyyy-MM-dd')
+        const isManeb = exam.type === 'MANEB_JCE' || exam.type === 'MANEB_MSCE'
+        events.push({
+          id:       `exam-${exam.id}`,
+          title:    `${isManeb ? 'MANEB ' : ''}${exam.subject} Exam`,
+          start:    exam.timeStart ? `${dateStr}T${exam.timeStart}` : dateStr,
+          end:      exam.timeEnd   ? `${dateStr}T${exam.timeEnd}`   : undefined,
+          allDay:   !exam.timeStart,
+          color:    CALENDAR_COLORS.exam,
+          category: 'exam',
+          meta:     { examId: exam.id, venue: exam.venue ?? '' },
+        })
+      }
     }
 
     // ── 4. Lab bookings in the range ──
-    if (['admin', 'high_rank', 'academic', 'lower_rank'].includes(role)) {
+    // [VISIBILITY] Widened to ACADEMIC_VISIBLE_ROLES — previously missing
+    // student and exam_officer. Academic staff still only see labs they
+    // personally booked (bookedByUid filter, unchanged).
+    if (ACADEMIC_VISIBLE_ROLES.includes(role)) {
       const labBookings = await prisma.labBooking.findMany({
         where: {
           date: { gte: rangeStart, lte: rangeEnd },
@@ -235,7 +311,10 @@ calendarRouter.get('/events',
     }
 
     // ── 5. Approved staff leave in the range ──
-    if (['admin', 'high_rank', 'hr'].includes(role)) {
+    // [VISIBILITY] Already correctly scoped before this change — sourced
+    // from LEAVE_VISIBLE_ROLES now instead of a locally hardcoded array
+    // so it can never drift from source 6's own exclusion list below.
+    if (LEAVE_VISIBLE_ROLES.includes(role)) {
       const leaves = await prisma.leaveRequest.findMany({
         where: {
           status:    'APPROVED',
@@ -257,8 +336,10 @@ calendarRouter.get('/events',
       }
     }
 
-    // ── 6. Own leave (for all staff roles) ──
-    if (!['admin', 'high_rank', 'hr', 'student'].includes(role)) {
+    // ── 6. Own leave (for all staff roles not already covered by source 5,
+    //      and never for student — a student has no staff leave of their
+    //      own to see) ──
+    if (![...LEAVE_VISIBLE_ROLES, 'student'].includes(role)) {
       const myLeave = await prisma.leaveRequest.findMany({
         where: {
           staffId:   uid,
@@ -282,8 +363,12 @@ calendarRouter.get('/events',
     }
 
     // ── 7. Timetable slots expanded into concrete dates in the range ──
-    //    Academic staff see their own slots; students see their class slots.
-    if (['academic', 'student'].includes(role)) {
+    //    Academic staff see their own slots; every other permitted role
+    //    (student, exam_officer, high_rank, lower_rank, admin) sees the
+    //    whole timetable, capped at the existing `take: 200`.
+    // [VISIBILITY] Widened to ACADEMIC_VISIBLE_ROLES — previously only
+    // academic/student could see timetable at all.
+    if (ACADEMIC_VISIBLE_ROLES.includes(role)) {
       const timetableFilter = role === 'academic'
         ? { teacherUid: uid }
         : {}
@@ -339,47 +424,64 @@ calendarRouter.get('/events',
     // ── 8. Announcements with an event date, published and in range ──
     //      Firestore-native — Announcements have no Prisma model with a
     //      real write path (see this file's header comment).
+    //
+    // [BUG FIX] eventDate is written as a plain string by the current
+    // announcementService.createAnnouncement() (`data.eventDate ?? null`),
+    // but Firestore is schemaless and this collection has lived through
+    // earlier code revisions — a real production document can still have
+    // eventDate stored as a Firestore Timestamp (or, from some other past
+    // write path, a native JS Date auto-converted to Timestamp on save).
+    // parseISO() requires a string and calls dateString.split(...)
+    // internally; handed a Timestamp/Date object instead, that .split()
+    // call throws "e.split is not a function" — an unhandled exception
+    // that 500'd GET /calendar/events for every single user, since one
+    // malformed announcement doc took down the entire aggregated
+    // response. toEventDate() below coerces whichever shape the field is
+    // actually stored as, and each document is now handled in its own
+    // try/catch so a document that's still somehow unreadable is skipped
+    // and logged rather than failing the whole request.
     const announcementsSnap = await getFirestore(getAdminApp())
       .collection(COLLECTIONS.ANNOUNCEMENTS)
       .where('status', '==', 'PUBLISHED')
       .get()
     for (const doc of announcementsSnap.docs) {
-      const data = doc.data() as { title: string; eventDate?: string | null }
-      if (!data.eventDate) continue
-      const d = parseISO(data.eventDate)
-      if (d < rangeStart || d > rangeEnd) continue
-      events.push({
-        id:       `ann-${doc.id}`,
-        title:    data.title,
-        start:    format(d, 'yyyy-MM-dd'),
-        allDay:   true,
-        color:    CALENDAR_COLORS.announcement,
-        category: 'announcement',
-      })
+      try {
+        const data = doc.data() as { title: string; eventDate?: unknown }
+        const d = toEventDate(data.eventDate)
+        if (!d) continue
+        if (d < rangeStart || d > rangeEnd) continue
+        events.push({
+          id:       `ann-${doc.id}`,
+          title:    data.title,
+          start:    format(d, 'yyyy-MM-dd'),
+          allDay:   true,
+          color:    CALENDAR_COLORS.announcement,
+          category: 'announcement',
+        })
+      } catch (err) {
+        logger.warn({ event: 'calendar.announcement_skip', docId: doc.id, err }, '[calendar] Skipped an unreadable announcement eventDate')
+      }
     }
 
     // ── 9. Assignment due dates ──
-    //      academic sees assignments they created; student sees their own
-    //      class's assignments. The 'assignment' category already had a
-    //      color and a rendered filter chip with no backing data before
-    //      this phase.
-    if (['academic', 'student'].includes(role)) {
-      let classId: string | null = null
-      let creatorUid: string | null = null
-      if (role === 'academic') {
-        creatorUid = uid
-      } else {
-        const student = await studentService.resolveStudentFromUid(uid)
-        classId = student?.classId ?? null
-      }
+    //      academic sees only assignments they created; student sees only
+    //      their own class's; high_rank/admin see every assignment
+    //      unrestricted. The 'assignment' category already had a color
+    //      and a rendered filter chip with no backing data before this
+    //      phase.
+    // [VISIBILITY] Added ASSIGNMENT_UNRESTRICTED_ROLES (high_rank, admin)
+    // — the academic-own-created / student-own-class scoping was already
+    // correct, but management had no visibility into assignments at all.
+    // [2026-10-22] Scoping now uses the single assignment-visibility rule
+    //      (assignmentService.scopeForViewer): a student sees only assigned
+    //      subjects of their own class; a teacher sees their class's
+    //      assignments plus the subjects they are assigned to elsewhere.
+    if (['academic', 'student', 'exam_officer', ...ASSIGNMENT_UNRESTRICTED_ROLES].includes(role)) {
+      const scope = await assignmentService.scopeForViewer({ uid, role })
 
-      if (creatorUid || classId) {
+      if (scope) {
         const assignments = await prisma.assignment.findMany({
-          where: {
-            dueDate: { gte: rangeStart, lte: rangeEnd },
-            ...(creatorUid ? { createdByUid: creatorUid } : {}),
-            ...(classId ? { classId } : {}),
-          },
+          where: { AND: [scope, { dueDate: { gte: rangeStart, lte: rangeEnd } }] },
           include: { class: { select: { name: true } } },
         })
         for (const a of assignments) {
@@ -398,13 +500,31 @@ calendarRouter.get('/events',
 
     // ── 10. Manually-created calendar events (this phase's new
     //         CalendarEvent model) — reuses its own stored category for
-    //         color/grouping, same as every other source. ──
+    //         color/grouping, same as every other source.
+    // [VISIBILITY] This is the actual fix for the reported bug: every
+    // manually-created event used to be visible to every role regardless
+    // of category, since roleCanViewManualCategory() didn't exist yet —
+    // a manually-logged "Leave" event (created via the same form the
+    // adopted reference UI itself demonstrates for exactly this, e.g.
+    // "Mercy Gondwe — Unpaid Leave") was visible to students. Each row is
+    // now checked against the category it was created with; its own
+    // creator can always additionally see their own creation regardless,
+    // since a generic CalendarEvent row has no field identifying which
+    // staff member a manual "leave" entry is actually about beyond
+    // whoever logged it — see calendarVisibility.ts's own docstring. ──
     const manualEvents = await calendarEventService.listEvents({
       start: rangeStart.toISOString(),
       end:   rangeEnd.toISOString(),
     })
     for (const ev of manualEvents) {
       const category = ev.category as CalendarEvent['category']
+      const isOwn = ev.createdByUid === uid
+      const canView = isOwn
+        || (category === 'assignment'
+              ? ASSIGNMENT_UNRESTRICTED_ROLES.includes(role)
+              : roleCanViewManualCategory(role, category))
+      if (!canView) continue
+
       const meta: Record<string, string> = {}
       if (ev.description) meta.description = ev.description
       if (ev.location) meta.venue = ev.location

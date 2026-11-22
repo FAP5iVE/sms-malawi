@@ -28,11 +28,37 @@
  * [DEPENDS ON]: W/lib/api-client.ts
  */
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import type { CreateStudentInput, UpdateStudentInput } from '@shared/schemas/student'
-import type { ApiStudent, ApiStudentListResponse, ApiHighRiskStudentsResponse } from '@shared/types/api'
+import type {
+  CreateStudentInput,
+  UpdateStudentInput,
+  GuardianInput,
+  UpdateGuardianInput,
+  UpdateWelfareInput,
+  SupportNeedInput,
+  UpdateSupportNeedInput,
+  StudentExitInput,
+} from '@shared/schemas/student'
+import type {
+  ApiStudent,
+  ApiStudentListResponse,
+  ApiHighRiskStudentsResponse,
+  ApiStudentGuardian,
+  ApiStudentWelfare,
+  ApiSupportNeed,
+  ApiWelfareSummary,
+} from '@shared/types/api'
 import type { ApiStudentDetail } from '@/server/services/studentService'
 import { apiFetch, queryKeys } from '@/lib/api-client'
 import { useAuthStore } from '@/store/authStore'
+import { useViewingPeriod } from '@/hooks/useViewingPeriod'
+
+/** `?academicYear=&term=` for the global viewing period (risk is assessed for it). */
+function periodParams(academicYear?: string, term?: number): URLSearchParams {
+  const p = new URLSearchParams()
+  if (academicYear) p.set('academicYear', academicYear)
+  if (term) p.set('term', String(term))
+  return p
+}
 
 export function useStudents(
   filters: {
@@ -49,7 +75,10 @@ export function useStudents(
     sortDir?: 'asc' | 'desc'
   } = {}
 ) {
-  const params = new URLSearchParams()
+  // Risk badges are assessed for the GLOBAL viewing period, so the list
+  // refetches when the person switches term/year in the header.
+  const { academicYear, term } = useViewingPeriod()
+  const params = periodParams(academicYear, term)
   if (filters.status) params.set('status', filters.status)
   if (filters.classId) params.set('classId', filters.classId)
   if (filters.sex) params.set('sex', filters.sex)
@@ -61,7 +90,7 @@ export function useStudents(
     params.set('sortDir', filters.sortDir)
   }
   return useQuery({
-    queryKey: queryKeys.students.list(filters),
+    queryKey: queryKeys.students.list({ ...filters, academicYear, term }),
     queryFn: () => apiFetch<ApiStudentListResponse>(`/students?${params}`),
     enabled: filters.search === undefined || filters.search.length >= 2,
   })
@@ -76,9 +105,10 @@ export function useStudents(
  */
 export function useStudentMe() {
   const { role } = useAuthStore()
+  const { academicYear, term } = useViewingPeriod()
   return useQuery({
-    queryKey: queryKeys.students.me(),
-    queryFn:  () => apiFetch<ApiStudentDetail>('/students/me'),
+    queryKey: queryKeys.students.me({ academicYear, term }),
+    queryFn:  () => apiFetch<ApiStudentDetail>(`/students/me?${periodParams(academicYear, term)}`),
     enabled:  role === 'student',
   })
 }
@@ -92,16 +122,22 @@ export function useStudentMe() {
  * unreachable without a term average).
  */
 export function useHighRiskStudents(limit = 6) {
+  const { academicYear, term } = useViewingPeriod()
   return useQuery({
-    queryKey: queryKeys.students.atRisk(limit),
-    queryFn: () => apiFetch<ApiHighRiskStudentsResponse>(`/students/at-risk?limit=${limit}`),
+    queryKey: queryKeys.students.atRisk(limit, { academicYear, term }),
+    queryFn: () => {
+      const params = periodParams(academicYear, term)
+      params.set('limit', String(limit))
+      return apiFetch<ApiHighRiskStudentsResponse>(`/students/at-risk?${params}`)
+    },
   })
 }
 
 export function useStudent(id: string) {
+  const { academicYear, term } = useViewingPeriod()
   return useQuery({
-    queryKey: queryKeys.students.detail(id),
-    queryFn: () => apiFetch<ApiStudent>(`/students/${id}`),
+    queryKey: queryKeys.students.detail(id, { academicYear, term }),
+    queryFn: () => apiFetch<ApiStudent>(`/students/${id}?${periodParams(academicYear, term)}`),
     enabled: !!id,
   })
 }
@@ -109,6 +145,7 @@ export function useStudent(id: string) {
 export function useCreateStudent() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Student created', failureTitle: 'Could not create student' },
     mutationFn: (data: CreateStudentInput) =>
       apiFetch<ApiStudent>('/students', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.students.all() }),
@@ -118,6 +155,7 @@ export function useCreateStudent() {
 export function useUpdateStudent() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Student updated', failureTitle: 'Could not update student' },
     mutationFn: ({ id, ...data }: { id: string } & UpdateStudentInput) =>
       apiFetch<ApiStudent>(`/students/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     onSuccess: (_data, variables) => {
@@ -133,8 +171,10 @@ export function useUpdateStudent() {
 export function useArchiveStudent() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id: string) =>
-      apiFetch<{ archived: boolean }>(`/students/${id}`, { method: 'DELETE' }),
+    meta: { successMessage: 'Student archived', failureTitle: 'Could not archive student' },
+    // The reason for leaving and the exit date are required by the server.
+    mutationFn: ({ id, ...exit }: { id: string } & StudentExitInput) =>
+      apiFetch<{ archived: boolean }>(`/students/${id}`, { method: 'DELETE', body: JSON.stringify(exit) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.students.all() }),
   })
 }
@@ -148,5 +188,128 @@ export function useStudentPhotoUrl(studentId: string, hasPhoto: boolean) {
     enabled: !!studentId && hasPhoto,
     staleTime: 50 * 60 * 1000, // 50 minutes
     gcTime: 60 * 60 * 1000, // 60 minutes
+  })
+}
+
+// ─── GUARDIANS ───────────────────────────────────────────────────────────────
+// The primary guardian is mirrored onto the legacy Student columns server-side,
+// so the student detail is invalidated alongside the guardian list.
+
+const guardiansKey = (studentId: string) => ['student-guardians', studentId] as const
+
+export function useStudentGuardians(studentId: string, enabled = true) {
+  return useQuery({
+    queryKey: guardiansKey(studentId),
+    queryFn: () => apiFetch<ApiStudentGuardian[]>(`/students/${studentId}/guardians`),
+    enabled: !!studentId && enabled,
+  })
+}
+
+function useGuardianInvalidation(studentId: string) {
+  const qc = useQueryClient()
+  return () => {
+    qc.invalidateQueries({ queryKey: guardiansKey(studentId) })
+    qc.invalidateQueries({ queryKey: queryKeys.students.detail(studentId) })
+  }
+}
+
+export function useAddGuardian(studentId: string) {
+  const invalidate = useGuardianInvalidation(studentId)
+  return useMutation({
+    meta: { successMessage: 'Guardian added', failureTitle: 'Could not add guardian' },
+    mutationFn: (data: GuardianInput) =>
+      apiFetch<ApiStudentGuardian>(`/students/${studentId}/guardians`, { method: 'POST', body: JSON.stringify(data) }),
+    onSuccess: invalidate,
+  })
+}
+
+export function useUpdateGuardian(studentId: string) {
+  const invalidate = useGuardianInvalidation(studentId)
+  return useMutation({
+    meta: { successMessage: 'Guardian updated', failureTitle: 'Could not update guardian' },
+    mutationFn: ({ guardianId, ...data }: { guardianId: string } & UpdateGuardianInput) =>
+      apiFetch<ApiStudentGuardian>(`/students/${studentId}/guardians/${guardianId}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    onSuccess: invalidate,
+  })
+}
+
+export function useDeleteGuardian(studentId: string) {
+  const invalidate = useGuardianInvalidation(studentId)
+  return useMutation({
+    meta: { successMessage: 'Guardian removed', failureTitle: 'Could not remove guardian' },
+    mutationFn: (guardianId: string) =>
+      apiFetch<{ ok: true }>(`/students/${studentId}/guardians/${guardianId}`, { method: 'DELETE' }),
+    onSuccess: invalidate,
+  })
+}
+
+// ─── WELFARE (sensitive: student.viewWelfare / student.editWelfare) ──────────
+// `enabled` must be passed as can('student.viewWelfare') by the caller so a role
+// without the permission never even issues the request (the server refuses it
+// regardless). The welfare data is never part of the student detail query.
+
+const welfareKey = (studentId: string) => ['student-welfare', studentId] as const
+
+export function useStudentWelfare(studentId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: welfareKey(studentId),
+    queryFn: () => apiFetch<ApiStudentWelfare>(`/students/${studentId}/welfare`),
+    enabled: !!studentId && enabled,
+  })
+}
+
+export function useWelfareSummary(enabled: boolean) {
+  return useQuery({
+    queryKey: ['student-welfare-summary'] as const,
+    queryFn: () => apiFetch<ApiWelfareSummary>('/students/welfare-summary'),
+    enabled,
+  })
+}
+
+function useWelfareInvalidation(studentId: string) {
+  const qc = useQueryClient()
+  return () => {
+    qc.invalidateQueries({ queryKey: welfareKey(studentId) })
+    qc.invalidateQueries({ queryKey: ['student-welfare-summary'] })
+  }
+}
+
+export function useUpdateWelfare(studentId: string) {
+  const invalidate = useWelfareInvalidation(studentId)
+  return useMutation({
+    meta: { successMessage: 'Welfare details saved', failureTitle: 'Could not save welfare details' },
+    mutationFn: (data: UpdateWelfareInput) =>
+      apiFetch<ApiStudentWelfare>(`/students/${studentId}/welfare`, { method: 'PATCH', body: JSON.stringify(data) }),
+    onSuccess: invalidate,
+  })
+}
+
+export function useAddSupportNeed(studentId: string) {
+  const invalidate = useWelfareInvalidation(studentId)
+  return useMutation({
+    meta: { successMessage: 'Special need added', failureTitle: 'Could not add special need' },
+    mutationFn: (data: SupportNeedInput) =>
+      apiFetch<ApiSupportNeed>(`/students/${studentId}/support-needs`, { method: 'POST', body: JSON.stringify(data) }),
+    onSuccess: invalidate,
+  })
+}
+
+export function useUpdateSupportNeed(studentId: string) {
+  const invalidate = useWelfareInvalidation(studentId)
+  return useMutation({
+    meta: { successMessage: 'Special need updated', failureTitle: 'Could not update special need' },
+    mutationFn: ({ needId, ...data }: { needId: string } & UpdateSupportNeedInput) =>
+      apiFetch<ApiSupportNeed>(`/students/${studentId}/support-needs/${needId}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    onSuccess: invalidate,
+  })
+}
+
+export function useDeleteSupportNeed(studentId: string) {
+  const invalidate = useWelfareInvalidation(studentId)
+  return useMutation({
+    meta: { successMessage: 'Special need removed', failureTitle: 'Could not remove special need' },
+    mutationFn: (needId: string) =>
+      apiFetch<{ ok: true }>(`/students/${studentId}/support-needs/${needId}`, { method: 'DELETE' }),
+    onSuccess: invalidate,
   })
 }

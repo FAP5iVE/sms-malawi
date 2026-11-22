@@ -18,6 +18,7 @@ import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import { env } from '@/lib/env'
 import { ensureFresh as sharedEnsureFresh } from './syncState'
+import type { ProblemReportInput } from '@shared/schemas/problemReport'
 
 const SENTRY_BASE = 'https://de.sentry.io/api/0'   // DE region — confirmed, not the default sentry.io host
 const SENTRY_ORG = '5ivestack-labs'                 // matches the literal already hardcoded in next.config.ts
@@ -345,51 +346,150 @@ export async function listReleases(statsPeriod = '30d') {
 }
 
 // ── Logs — proxied live (Logs have no webhook path; Explore-equivalent query) ──
+//
+// [INVESTIGATED, NOT CONFIRMED FIXED] Production 500s from this call
+// (Sentry API 500 on /organizations/.../events/?...&dataset=ourlogs).
+// The sibling fetchApdex() call just above queries the same
+// events/events-stats family and explicitly scopes with `project=-1`
+// (all projects) — this call had no project scoping at all, which is a
+// very plausible trigger for Sentry's Discover-style endpoints to fail
+// server-side rather than cleanly 400ing on a malformed/underscoped
+// query. Added `project=-1` to match that known-working precedent, plus
+// explicit `field` selections (`message`, `timestamp`, `severity`) since
+// Sentry's events endpoint typically expects an explicit field list once
+// a `dataset` is specified. This endpoint's exact contract for the
+// `ourlogs` dataset is NOT confirmed against a live 5ivestack-labs
+// payload (same caveat fetchApdex() already documents for `dataset=metrics`)
+// — if it still 500s, that's Sentry's own API for this dataset, not
+// something inspectable from here. Wrapped in the same fault-isolation
+// fetchApdex() already uses: a failure now degrades to an empty,
+// clearly-flagged log list instead of 500ing the whole /monitoring Logs
+// panel for one flaky upstream call.
 export async function listLogs(opts: { level?: string; limit?: number } = {}) {
-  const params = new URLSearchParams({ statsPeriod: '24h', per_page: String(opts.limit ?? 50) })
+  const params = new URLSearchParams({
+    statsPeriod: '24h',
+    per_page: String(opts.limit ?? 50),
+    project: '-1',
+  })
+  params.append('field', 'message')
+  params.append('field', 'timestamp')
+  params.append('field', 'severity')
   if (opts.level) params.set('query', `severity:${opts.level}`)
-  return sentryFetch<{ data: unknown[] }>(`/organizations/${SENTRY_ORG}/events/?${params.toString()}&dataset=ourlogs`)
-}
-
-// ── User Feedback — write path + read-back list ──
-export async function submitFeedback(input: { message: string; uid: string; role: string; associatedIssueId?: string }) {
-  const eventId = Sentry.captureFeedback(
-    { message: input.message },
-    { captureContext: { user: { id: input.uid }, tags: { role: input.role, ...(input.associatedIssueId ? { associatedIssueId: input.associatedIssueId } : {}) } } },
-  )
-  // BUG FIX: captureFeedback only queues the event in the SDK's internal
-  // transport buffer — it does not send it. On a normal long-running
-  // server that's fine, a background timer flushes it eventually. On
-  // Vercel's serverless functions it is NOT fine: once this route's
-  // response is sent, the execution environment can be frozen/torn down
-  // before that queued event is actually delivered over the network, and
-  // it's silently lost. That's why submissions were "succeeding" (a real
-  // eventId came back, the toast showed, the list query re-fetched) while
-  // nothing ever actually reached Sentry for listFeedback() to read back.
-  // Explicitly awaiting flush() here blocks the response until the event
-  // is really sent (or the timeout hits), which is the fix.
-  const delivered = await Sentry.flush(2000)
-  if (!delivered) {
-    logger.warn({ event: 'monitoring.feedback_flush_timeout', uid: input.uid, eventId })
+  try {
+    return await sentryFetch<{ data: unknown[] }>(
+      `/organizations/${SENTRY_ORG}/events/?${params.toString()}&dataset=ourlogs`
+    )
+  } catch (err) {
+    logger.warn({ event: 'sentry.logs_unavailable', err: err instanceof Error ? err.message : String(err) })
+    return { data: [], available: false }
   }
-  logger.info({ event: 'monitoring.feedback_submitted', uid: input.uid, eventId, delivered })
-  return { eventId }
 }
 
-interface RawSentryFeedbackIssue {
-  id: string; title: string; firstSeen: string
-  metadata?: { value?: string }
+// ── User Feedback ("Report a problem") — write path + read-back list ──
+//
+// Open to every role (monitoring.submitFeedback), including users who cannot
+// see /monitoring at all. Every submission carries the reporter's name /
+// username and their employee number (staff) or student number (students).
+//
+// The report is saved to our own database FIRST and is what the Feedback tab
+// lists, so it appears there immediately and shows who sent it. It is then
+// also forwarded to Sentry (User Feedback) as before; a Sentry outage can
+// never lose a report.
+
+/** Compare ID numbers ignoring case, spaces and dashes ("sms 2025-0001" == "SMS20250001"). */
+function normalizeIdNumber(value: string): string {
+  return value.replace(/[\s\-_/]/g, '').toLowerCase()
+}
+
+/** The number on file for this signed-in account, or null when the account has no profile row. */
+async function lookupAccountIdNumber(uid: string, role: string): Promise<string | null> {
+  try {
+    if (role === 'student') {
+      const s = await prisma.student.findUnique({ where: { firebaseUid: uid }, select: { registrationNo: true } })
+      return s?.registrationNo ?? null
+    }
+    const p = await prisma.staffProfile.findUnique({ where: { uid }, select: { employeeNo: true } })
+    return p?.employeeNo ?? null
+  } catch (err) {
+    // Verification is advisory — never block a report because the lookup failed.
+    logger.warn({ event: 'monitoring.feedback_id_lookup_failed', uid, err: err instanceof Error ? err.message : String(err) })
+    return null
+  }
+}
+
+export async function submitFeedback(input: ProblemReportInput & { uid: string; role: string }) {
+  const reporterIdType = input.role === 'student' ? 'STUDENT_NUMBER' : 'EMPLOYEE_NUMBER'
+  const onFile = await lookupAccountIdNumber(input.uid, input.role)
+  const idMatchesAccount = onFile === null ? null : normalizeIdNumber(onFile) === normalizeIdNumber(input.idNumber)
+
+  // 1) Persist — the source of truth for the Feedback tab.
+  const saved = await prisma.problemReport.create({
+    data: {
+      uid: input.uid,
+      role: input.role,
+      reporterName: input.name,
+      reporterIdNumber: input.idNumber,
+      reporterIdType,
+      idMatchesAccount,
+      message: input.message,
+      pageUrl: input.pageUrl ?? null,
+      associatedIssueId: input.associatedIssueId ?? null,
+    },
+    select: { id: true },
+  })
+
+  // 2) Forward to Sentry (best effort).
+  let eventId: string | undefined
+  try {
+    eventId = Sentry.captureFeedback(
+      { message: input.message, name: input.name },
+      {
+        captureContext: {
+          user: { id: input.uid, username: input.name },
+          tags: {
+            role: input.role,
+            reporterIdType,
+            reporterIdNumber: input.idNumber,
+            ...(input.associatedIssueId ? { associatedIssueId: input.associatedIssueId } : {}),
+          },
+        },
+      },
+    )
+    // captureFeedback only QUEUES the event. On Vercel's serverless runtime the
+    // function can be frozen right after the response is sent, silently losing
+    // the queued event, so flush explicitly before returning.
+    const delivered = await Sentry.flush(2000)
+    if (!delivered) {
+      logger.warn({ event: 'monitoring.feedback_flush_timeout', uid: input.uid, eventId })
+    }
+    if (eventId) {
+      await prisma.problemReport.update({ where: { id: saved.id }, data: { sentryEventId: eventId } })
+    }
+  } catch (err) {
+    logger.warn({ event: 'monitoring.feedback_sentry_forward_failed', uid: input.uid, err: err instanceof Error ? err.message : String(err) })
+  }
+
+  logger.info({ event: 'monitoring.feedback_submitted', uid: input.uid, reportId: saved.id, eventId, idMatchesAccount })
+  return { id: saved.id, eventId }
 }
 
 export async function listFeedback(limit = 50) {
-  const res = await sentryFetch<RawSentryFeedbackIssue[]>(
-    `/organizations/${SENTRY_ORG}/issues/?query=issue.category:feedback&statsPeriod=30d&limit=${limit}`,
-  )
+  const rows = await prisma.problemReport.findMany({
+    orderBy: { createdAt: 'desc' },
+    take: limit,
+  })
   return {
-    data: res.map((f) => ({
-      id: f.id,
-      message: f.metadata?.value ?? f.title,
-      dateCreated: f.firstSeen,
+    data: rows.map((r) => ({
+      id: r.id,
+      message: r.message,
+      submittedByRole: r.role,
+      dateCreated: r.createdAt.toISOString(),
+      associatedIssueId: r.associatedIssueId ?? undefined,
+      reporterName: r.reporterName,
+      reporterIdNumber: r.reporterIdNumber,
+      reporterIdType: r.reporterIdType as 'EMPLOYEE_NUMBER' | 'STUDENT_NUMBER',
+      idMatchesAccount: r.idMatchesAccount,
+      pageUrl: r.pageUrl,
     })),
   }
 }

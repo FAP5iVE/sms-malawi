@@ -13,6 +13,7 @@ import { getAuth } from 'firebase/auth'
 import { Download, Loader2, Eye, EyeOff } from 'lucide-react'
 import { buildApiUrl, apiFetch } from '@/lib/api-client'
 import { formatMWK } from '@shared/constants/malawi'
+import { downloadProtectedFile } from '@/lib/pdfPreview'
 
 interface ReportDef {
   type: string
@@ -23,16 +24,16 @@ interface ReportDef {
 const REPORTS: ReportDef[] = [
   {
     type: 'fee_collection',
-    label: 'Fee Collection',
+    label: 'Fee collection',
     desc: 'All invoices with paid/balance breakdown',
   },
   {
     type: 'outstanding_balances',
-    label: 'Outstanding Balances',
+    label: 'Outstanding balances',
     desc: 'Students with unpaid or overdue fees',
   },
-  { type: 'expense_breakdown', label: 'Expense Breakdown', desc: 'All expenses by category' },
-  { type: 'payroll_summary', label: 'Payroll Summary', desc: 'Monthly payroll runs for the year' },
+  { type: 'expense_breakdown', label: 'Expense breakdown', desc: 'All expenses by category' },
+  { type: 'payroll_summary', label: 'Payroll summary', desc: 'Monthly payroll runs for the year' },
 ]
 
 type ReportRow = Record<string, string | number | null>
@@ -51,7 +52,7 @@ function ReportTable({ rows }: { rows: ReportRow[] }) {
         <thead>
           <tr className="border-b border-base">
             {columns.map((c) => (
-              <th key={c} className="text-left px-3 py-2 font-heading font-semibold text-muted uppercase tracking-wide">
+              <th key={c} className="text-left px-3 py-2 font-heading font-semibold text-muted ">
                 {c.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase())}
               </th>
             ))}
@@ -102,7 +103,7 @@ export function ReportsExportPanel({ academicYear, term }: { academicYear: strin
       })
       if (!res.ok) throw new Error(`Export failed: ${res.status}`)
       const { downloadUrl } = (await res.json()) as { downloadUrl: string }
-      window.open(downloadUrl, '_blank', 'noopener,noreferrer')
+      await downloadProtectedFile(downloadUrl, `${type}.xlsx`)
     } catch (err) {
       console.error('Export error:', err)
       alert('Export failed. Please try again.')
@@ -132,7 +133,7 @@ export function ReportsExportPanel({ academicYear, term }: { academicYear: strin
   }
 
   return (
-    <div className="bg-surface border border-base rounded-xl p-5">
+    <div>
       <p className="font-heading font-semibold text-sm text-brand-navy mb-4">
         Reports
       </p>
@@ -151,7 +152,7 @@ export function ReportsExportPanel({ academicYear, term }: { academicYear: strin
                     type="button"
                     onClick={() => void toggleView(r.type)}
                     aria-label={`View ${r.label} report`}
-                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-teal hover:underline"
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-tone-teal app-action"
                   >
                     {viewingType === r.type ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                     {viewingType === r.type ? 'Hide' : 'View'}
@@ -162,7 +163,7 @@ export function ReportsExportPanel({ academicYear, term }: { academicYear: strin
                     onClick={() => void exportReport(r.type)}
                     disabled={exporting === r.type}
                     aria-label={`Export ${r.label} report`}
-                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-navy hover:underline disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-navy app-action disabled:opacity-50"
                   >
                     {exporting === r.type ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
                     Export .xlsx

@@ -50,6 +50,7 @@
 import { useEffect, useRef }     from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useMotionEnabled }       from '@/store/motionStore'
+import { AttentionBadge }        from '@/components/shared/AttentionBadge'
 import { reducedMotionTransition, SPRING } from '@/lib/motion'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -63,6 +64,8 @@ export interface TabItem<T extends string = string> {
   icon?: React.ElementType
   /** Number shown as a coral badge dot; omit or pass 0 to hide */
   badge?: number
+  /** Finishes the screen reader sentence for the badge: "waiting for approval". Default "items". */
+  badgeNoun?: string
 }
 
 interface ModuleTabsProps<T extends string> {
@@ -76,28 +79,35 @@ interface ModuleTabsProps<T extends string> {
    * Change this when multiple ModuleTabs instances render in the same tree.
    */
   id?: string
+  /**
+   * [NEW] Pill-variant height. 'default' (44px min-height buttons, matching
+   * the WCAG touch-target guideline) is unchanged and used everywhere this
+   * component already appears (Exams, Monitoring, etc.) — this prop has no
+   * effect on the 'underline' variant. 'compact' is opt-in only, added for
+   * Announcements' Published/Pending Approval/Drafts status pill, which
+   * sits in the same row as a 44px-tall search input; the default pill's
+   * own 4px container padding on top of 44px buttons made it taller than
+   * that input. 'compact' trims the outer padding and button height so the
+   * whole control lines up at 44px total instead of 52px.
+   */
+  size?: 'default' | 'compact'
+  /**
+   * Phase 8a: the strip sits on the page sky (above a ModuleSurface), not on a
+   * card. Idle labels then use the stronger sky ink and the active label the
+   * navy title ink, so both keep 4.5:1 on the sky (measured, see HANDOFF).
+   * Underline variant only. Default false: nothing changes for other pages.
+   */
+  onSky?: boolean
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // BADGE COUNT — small coral pill shown alongside tab label
 // ─────────────────────────────────────────────────────────────────────────────
 
-function BadgeCount({ count }: { count: number }) {
-  if (!count) return null
-  return (
-    <span
-      className="
-        inline-flex items-center justify-center
-        ml-1.5 min-w-[16px] h-4 px-1
-        bg-brand-coral text-white
-        text-[9px] font-heading font-bold
-        rounded-full leading-none
-      "
-      aria-label={`${count} items`}
-    >
-      {count > 99 ? '99+' : count}
-    </span>
-  )
+function BadgeCount({ count, noun = 'items' }: { count: number; noun?: string }) {
+  // One shared badge (RULEBOOK section 6): 18px, 11px bold text, "99+", readable
+  // sentence for screen readers. Draws nothing for 0 or a bad number.
+  return <AttentionBadge count={count} noun={noun} className="ml-1.5" />
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -116,7 +126,7 @@ function TabScrollContainer({ children }: { children: React.ReactNode }) {
     <div
       className="
         overflow-x-auto
-        [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
+        [scrollbar-none] [&::-webkit-scrollbar]:hidden
         -mx-4 px-4 sm:mx-0 sm:px-0
       "
       role="tablist"
@@ -137,6 +147,8 @@ export function ModuleTabs<T extends string>({
   onChange,
   variant = 'underline',
   id      = 'tabs',
+  size    = 'default',
+  onSky   = false,
 }: ModuleTabsProps<T>) {
   const motionEnabled = useMotionEnabled()
 
@@ -193,14 +205,16 @@ export function ModuleTabs<T extends string>({
                   'transition-colors duration-150',
                   // Touch target: min-h-[44px] meets WCAG 2.5.5
                   'min-h-[44px]',
-                  isActive ? 'text-brand-teal' : 'text-muted hover:text-body',
+                  isActive
+                    ? (onSky ? 'text-brand-navy' : 'text-brand-teal')
+                    : (onSky ? 'app-sky-idle' : 'text-muted hover:text-body'),
                 ].join(' ')}
               >
                 {Icon && (
                   <Icon className="w-4 h-4 shrink-0" aria-hidden />
                 )}
                 {tab.label}
-                {!!tab.badge && <BadgeCount count={tab.badge} />}
+                {!!tab.badge && <BadgeCount count={tab.badge} noun={tab.badgeNoun} />}
 
                 {/*
                   Animated active indicator — slides under the active tab.
@@ -234,11 +248,12 @@ export function ModuleTabs<T extends string>({
   return (
     <TabScrollContainer>
       <div
-        className="
-          inline-flex gap-1
-          bg-surface border border-base rounded-xl p-1
-          min-w-max
-        "
+        className={[
+          'inline-flex gap-1',
+          'bg-surface border border-base rounded-xl',
+          size === 'compact' ? 'p-0.5' : 'p-1',
+          'min-w-max',
+        ].join(' ')}
       >
         {tabs.map((tab) => {
           const Icon     = tab.icon
@@ -254,12 +269,20 @@ export function ModuleTabs<T extends string>({
               aria-controls={`tabpanel-${tab.id}`}
               onClick={() => onChange(tab.id)}
               className={[
-                'relative flex items-center gap-2',
-                'px-4 py-2 rounded-lg',
+                // [PRODUCTION FIX] `relative` alone does not create a new
+                // stacking context (z-index stays `auto`), so the active
+                // pill's `-z-10` background below was painting behind every
+                // normal-flow card on the page — not just behind this
+                // button — leaving bare white active-tab text on the page's
+                // own light-mode background with nothing behind it. `z-0`
+                // gives the button its own stacking context so `-z-10`
+                // only reaches behind *this* button, restoring the pill.
+                'relative z-0 flex items-center gap-2',
+                size === 'compact' ? 'px-3 py-1.5 min-h-[40px]' : 'px-4 py-2 min-h-[44px]',
+                'rounded-lg',
                 'text-sm font-heading font-semibold',
                 'whitespace-nowrap',
                 'transition-colors duration-150',
-                'min-h-[44px]',
                 isActive ? 'text-white' : 'text-muted hover:text-body',
               ].join(' ')}
             >
@@ -281,7 +304,7 @@ export function ModuleTabs<T extends string>({
 
               {Icon && <Icon className="w-4 h-4 shrink-0" aria-hidden />}
               {tab.label}
-              {!!tab.badge && <BadgeCount count={tab.badge} />}
+              {!!tab.badge && <BadgeCount count={tab.badge} noun={tab.badgeNoun} />}
             </button>
           )
         })}

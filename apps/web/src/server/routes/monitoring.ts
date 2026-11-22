@@ -16,6 +16,7 @@ import { verifyAuth } from '@/lib/verifyAuth'
 import { requirePermission } from '@/server/middleware/verifyPermission'
 import * as monitoringService from '@/server/services/monitoringService'
 import { sendError } from '@/server/lib/sendError'
+import { ProblemReportSchema } from '@shared/schemas/problemReport'
 
 export const monitoringRouter = Router()
 monitoringRouter.use(verifyAuth)
@@ -106,20 +107,25 @@ monitoringRouter.get('/feedback', requirePermission('monitoring.view'), async (_
   }
 })
 
-// POST /monitoring/feedback — "Report a problem" (our own UI, Sentry.captureFeedback under the hood).
-// Broadest gate of this router — every role holds monitoring.submitFeedback,
-// unlike the view/manage-gated read endpoints above.
+// POST /monitoring/feedback — "Report a problem" (saved to problem_reports and
+// forwarded to Sentry User Feedback). Broadest gate of this router — EVERY role
+// holds monitoring.submitFeedback (see ROLE_PERMISSIONS), unlike the
+// view/manage-gated read endpoints above, so users who cannot open /monitoring
+// can still report. The reporter's name/username and employee/student number
+// are mandatory (ProblemReportSchema, shared with the client form).
 monitoringRouter.post('/feedback', requirePermission('monitoring.submitFeedback'), async (req: Request, res: Response) => {
   try {
-    const { message, associatedIssueId } = req.body as { message?: string; associatedIssueId?: string }
-    if (!message || message.trim().length === 0) {
-      return res.status(400).json({ error: 'A message is required.' })
+    const parsed = ProblemReportSchema.safeParse(req.body)
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: parsed.error.issues[0]?.message ?? 'Please fill in all required fields.',
+        fields: parsed.error.flatten().fieldErrors,
+      })
     }
     const result = await monitoringService.submitFeedback({
-      message: message.trim(),
+      ...parsed.data,
       uid: req.user!.uid,
       role: req.user!.role,
-      associatedIssueId,
     })
     return res.status(201).json(result)
   } catch (err) {

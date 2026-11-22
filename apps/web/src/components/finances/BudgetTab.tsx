@@ -2,19 +2,26 @@
 
 import { useState } from 'react'
 import { useBudgetVsActual, useCreateBudget } from '@/hooks/useFinances'
+import { useBudgetWindows } from '@/hooks/useProcurement'
 import { useDepartmentTitles } from '@/hooks/useSettings'
 import { formatMWK } from '@shared/constants/malawi'
 import { MOBILE_BREAKPOINT } from '@shared/constants/breakpoints'
+import { formatChartValue } from '@/components/shared/chart/chartLabels'
 import { Plus, Loader2 } from 'lucide-react'
 import dynamic from 'next/dynamic'
+import { useTheme } from '@/components/providers/ThemeProvider'
 
 // ApexCharts must be dynamically imported — it's not SSR-compatible
 const Chart = dynamic(() => import('react-apexcharts'), { ssr: false })
 
 const EXPENSE_CATEGORIES = ['SALARIES', 'UTILITIES', 'MAINTENANCE', 'PROCUREMENT', 'LIBRARY', 'TRANSPORT', 'MISCELLANEOUS']
 
-export function BudgetTab({ academicYear }: { academicYear: string }) {
-  const { data: budget = [], isLoading } = useBudgetVsActual(academicYear)
+export function BudgetTab({ academicYear, term: viewingTerm }: { academicYear: string; term: number }) {
+  // [UNIVERSAL PERIOD FILTER] Scoped to the viewing year AND term. A term view
+  // includes the full-year (term = null) budgets, which apply to every term.
+  const { data: budget = [], isLoading } = useBudgetVsActual(academicYear, viewingTerm)
+  // Windows for this year, so a new allocation can be filed under one.
+  const { data: windows = [] } = useBudgetWindows(academicYear)
   const createBudget = useCreateBudget()
   // [PRODUCTION FIX 2026-07-28] Budget.department was free-text with no
   // create UI at all (confirmed: CreateBudgetSchema/createBudget had zero
@@ -24,6 +31,16 @@ export function BudgetTab({ academicYear }: { academicYear: string }) {
   // from what departments actually exist.
   const { data: departmentTitles = {} } = useDepartmentTitles()
   const departments = Object.keys(departmentTitles).sort()
+  // [PRODUCTION FIX] chartOptions below previously set no `theme.mode` and
+  // no explicit label/legend/tooltip colours, so ApexCharts fell back to
+  // its own fixed defaults (a dark grey, ~#373d3f) for every axis label,
+  // legend entry, and tooltip — readable on a light page, but nearly
+  // invisible against this app's near-black dark-mode background. Same
+  // fix ApexChartRenderer.tsx (the shared chart module) already applies:
+  // resolve the active theme and pass it through so ApexCharts renders
+  // its own light/dark-correct text and grid colours.
+  const { resolvedTheme } = useTheme()
+  const chartMode: 'light' | 'dark' = resolvedTheme === 'dark' ? 'dark' : 'light'
 
   const [showForm, setShowForm] = useState(false)
   const [term, setTerm] = useState('')
@@ -31,6 +48,7 @@ export function BudgetTab({ academicYear }: { academicYear: string }) {
   const [category, setCategory] = useState('')
   const [allocatedAmount, setAllocatedAmount] = useState('')
   const [description, setDescription] = useState('')
+  const [budgetWindowId, setBudgetWindowId] = useState('')
 
   function submitBudget() {
     if (!department || !category || !allocatedAmount || Number(allocatedAmount) <= 0) return
@@ -42,29 +60,36 @@ export function BudgetTab({ academicYear }: { academicYear: string }) {
         category: category as never,
         allocated: Number(allocatedAmount),
         description: description.trim() || undefined,
+        budgetWindowId: budgetWindowId || undefined,
       },
       {
         onSuccess: () => {
           setShowForm(false)
-          setTerm(''); setDepartment(''); setCategory(''); setAllocatedAmount(''); setDescription('')
+          setTerm(''); setDepartment(''); setCategory(''); setAllocatedAmount(''); setDescription(''); setBudgetWindowId('')
         },
       },
     )
   }
 
-  const categories = budget.map((b) => b.category)
+  // One bar pair per budget LINE (department × category). The old code used
+  // the bare category, so two departments with the same category were
+  // indistinguishable.
+  const categories = budget.map((b) => `${b.department} · ${b.category}`)
   const allocated = budget.map((b) => b.allocated)
   const spent = budget.map((b) => b.spent)
 
   const chartOptions = {
-    chart: { type: 'bar' as const, toolbar: { show: false }, height: 300 },
-    plotOptions: { bar: { horizontal: false, columnWidth: '55%' } },
+    chart: { type: 'bar' as const, toolbar: { show: false }, height: 300, background: 'transparent' },
+    theme: { mode: chartMode },
+    grid: { borderColor: chartMode === 'dark' ? '#2a2f3a' : '#e5e7eb' },
+    plotOptions: { bar: { horizontal: false, columnWidth: '55%', dataLabels: { position: 'top' as const } } },
     xaxis: {
       categories,
       labels: {
         rotate: -45,
         trim: true,
-        hideOverlappingLabels: true,
+        // Never drop a budget line's name: rotate it instead.
+        hideOverlappingLabels: false,
         style: { fontSize: '11px' },
       },
     },
@@ -73,14 +98,23 @@ export function BudgetTab({ academicYear }: { academicYear: string }) {
         formatter: (v: number) => `MWK ${(v / 1_000_000).toFixed(1)}M`,
       },
     },
+    // Allocated (neutral navy) vs Spent (neutral teal) — deliberately NOT
+    // good/bad coloured: spending itself isn't "bad", only overspending
+    // is, and that distinction isn't in this bar pair.
     colors: ['#0F2744', '#0E8A6A'],
-    legend: { position: 'top' as const },
-    // Per-bar numeric labels are dropped in favor of the tooltip below and
-    // the y-axis scale — exact figures are one tap away, and the chart
-    // reads as a clean shape instead of a wall of small numbers on every
-    // bar. This also removes the white-on-white illegible labels that
-    // appeared whenever a bar was too short for its label to fit inside it.
-    dataLabels: { enabled: false },
+    legend: { position: 'top' as const, labels: { colors: chartMode === 'dark' ? '#e4eaf3' : '#0f172a' } },
+    // Every bar carries its own value. The labels sit ABOVE the bar in the
+    // theme's text colour (not inside it), which is what avoids the earlier
+    // white-on-white problem: a short bar never has to contain its label.
+    dataLabels: {
+      enabled: true,
+      offsetY: -18,
+      // Compact but precise: 250 000 → "MWK 250K", not a rounded "MWK 0.3M".
+      formatter: (v: number) => formatChartValue(v, 'mwk'),
+      style: { fontSize: '10px', colors: [chartMode === 'dark' ? '#e4eaf3' : '#0f172a'] },
+      background: { enabled: false },
+      dropShadow: { enabled: false },
+    },
     tooltip: {
       y: { formatter: (v: number) => formatMWK(v) },
     },
@@ -104,18 +138,21 @@ export function BudgetTab({ academicYear }: { academicYear: string }) {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h2 className="font-heading font-semibold text-body">Budget vs Actual — {academicYear}</h2>
+        <div>
+          <h2 className="font-heading font-semibold text-body">Budget vs actual: {academicYear} · Term {viewingTerm}</h2>
+          <p className="text-xs text-muted mt-0.5">Includes full-year budgets, which apply to every term.</p>
+        </div>
         <button
           type="button"
           onClick={() => setShowForm((v) => !v)}
-          className="inline-flex items-center gap-1.5 bg-brand-teal text-white rounded-lg px-3.5 py-2 text-sm font-semibold hover:bg-brand-teal-light min-h-11"
+          className="inline-flex items-center gap-1.5 bg-btn-brand text-btn-brand-fg rounded-lg px-3.5 py-2 text-sm font-semibold hover:bg-brand-teal-light min-h-11"
         >
           <Plus className="w-4 h-4" /> {showForm ? 'Cancel' : 'Create Budget'}
         </button>
       </div>
 
       {showForm && (
-        <div className="bg-surface border border-base rounded-xl p-4 space-y-3">
+        <div className="space-y-3">
           <div className="grid sm:grid-cols-2 gap-3">
             <div>
               <label htmlFor="budget-department" className="text-xs text-muted mb-1 block">Department</label>
@@ -130,7 +167,7 @@ export function BudgetTab({ academicYear }: { academicYear: string }) {
               </select>
               {departments.length === 0 && (
                 <p className="text-xs text-muted mt-1">
-                  No departments defined yet — set them up under Settings → Departments &amp; Titles.
+                  No departments defined yet: set them up under Settings → Departments and Titles.
                 </p>
               )}
             </div>
@@ -158,7 +195,7 @@ export function BudgetTab({ academicYear }: { academicYear: string }) {
               />
             </div>
             <div>
-              <label htmlFor="budget-term" className="text-xs text-muted mb-1 block">Term <span className="text-muted/70">(optional — leave blank for the full year)</span></label>
+              <label htmlFor="budget-term" className="text-xs text-muted mb-1 block">Term <span className="text-muted">(optional: leave blank for the full year)</span></label>
               <select
                 id="budget-term"
                 value={term}
@@ -173,7 +210,21 @@ export function BudgetTab({ academicYear }: { academicYear: string }) {
             </div>
           </div>
           <div>
-            <label htmlFor="budget-description" className="text-xs text-muted mb-1 block">Description <span className="text-muted/70">(optional)</span></label>
+            <label htmlFor="budget-window" className="text-xs text-muted mb-1 block">Budget window <span className="text-muted">(optional)</span></label>
+            <select
+              id="budget-window"
+              value={budgetWindowId}
+              onChange={(e) => setBudgetWindowId(e.target.value)}
+              className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+            >
+              <option value="">Not linked to a window</option>
+              {windows.map((w) => (
+                <option key={w.id} value={w.id}>{w.name} ({w.status.toLowerCase()})</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="budget-description" className="text-xs text-muted mb-1 block">Description <span className="text-muted">(optional)</span></label>
             <textarea
               id="budget-description"
               rows={2}
@@ -186,13 +237,13 @@ export function BudgetTab({ academicYear }: { academicYear: string }) {
             type="button"
             onClick={submitBudget}
             disabled={createBudget.isPending || !department || !category || !allocatedAmount}
-            className="inline-flex items-center gap-2 bg-brand-navy text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-60 min-h-11"
+            className="inline-flex items-center gap-2 bg-brand-deep text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-60 min-h-11"
           >
             {createBudget.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             {createBudget.isPending ? 'Creating…' : 'Save Budget'}
           </button>
           {createBudget.isError && (
-            <p className="text-sm text-brand-coral">
+            <p className="text-sm text-tone-coral">
               {createBudget.error instanceof Error ? createBudget.error.message : 'Failed to create budget.'}
             </p>
           )}
@@ -202,53 +253,49 @@ export function BudgetTab({ academicYear }: { academicYear: string }) {
       {isLoading ? (
         <div className="skeleton h-64 rounded-xl" />
       ) : budget.length === 0 ? (
-        <div className="bg-surface border border-base rounded-xl p-12 text-center text-muted text-sm">
-          No budget data for {academicYear}
+        <div className="py-12 text-center text-muted text-sm">
+          No budget data for {academicYear} · Term {viewingTerm}
         </div>
       ) : (
         <>
           {/* Chart */}
-          <div className="bg-surface border border-base rounded-xl p-5">
+          <div>
             <p className="font-heading font-semibold text-sm text-brand-navy mb-4">
-              Budget vs Actual Spending
+              Budget vs actual spending
             </p>
             <Chart type="bar" options={chartOptions} series={series} />
           </div>
 
-          {/* Table */}
-          <div className="bg-surface border border-base rounded-xl overflow-hidden">
-            <table className="w-full text-sm">
+          {/* Table — one row per budget line (department × category) */}
+          <div className="table-scroll">
+            <table className="w-full text-sm min-w-[720px]">
               <thead>
                 <tr className="border-b border-base bg-page">
-                  <th className="text-left px-4 py-3 font-heading text-xs uppercase tracking-wide text-muted font-semibold">
-                    Category
-                  </th>
-                  <th className="text-right px-4 py-3 font-heading text-xs uppercase tracking-wide text-muted font-semibold">
-                    Allocated
-                  </th>
-                  <th className="text-right px-4 py-3 font-heading text-xs uppercase tracking-wide text-muted font-semibold">
-                    Spent
-                  </th>
-                  <th className="text-right px-4 py-3 font-heading text-xs uppercase tracking-wide text-muted font-semibold">
-                    Remaining
-                  </th>
-                  <th className="text-left px-4 py-3 font-heading text-xs uppercase tracking-wide text-muted font-semibold">
-                    %
-                  </th>
+                  {[
+                    ['Department', 'left'], ['Category', 'left'], ['Applies to', 'left'],
+                    ['Allocated', 'right'], ['Committed', 'right'], ['Spent', 'right'], ['Available', 'right'], ['Used', 'left'],
+                  ].map(([h, align]) => (
+                    <th key={h} className={`${align === 'right' ? 'text-right' : 'text-left'} px-4 py-3 font-heading text-xs text-muted font-semibold`}>
+                      {h}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {budget.map((b) => {
-                  const pct = b.allocated > 0 ? Math.round((b.spent / b.allocated) * 100) : 0
+                  const pct = b.allocated > 0 ? Math.round(((b.spent + b.committed) / b.allocated) * 100) : 0
                   return (
-                    <tr key={b.category} className="border-b border-base hover:bg-page">
-                      <td className="px-4 py-3 font-medium">{b.category}</td>
+                    <tr key={b.id} className="border-b border-base hover:bg-page">
+                      <td className="px-4 py-3 font-medium">{b.department}</td>
+                      <td className="px-4 py-3">{b.category.charAt(0) + b.category.slice(1).toLowerCase()}</td>
+                      <td className="px-4 py-3 text-muted">{b.term ? `Term ${b.term}` : 'Full year'}</td>
                       <td className="px-4 py-3 text-right tabular">{formatMWK(b.allocated)}</td>
+                      <td className="px-4 py-3 text-right tabular text-muted">{formatMWK(b.committed)}</td>
                       <td className="px-4 py-3 text-right tabular">{formatMWK(b.spent)}</td>
                       <td
-                        className={`px-4 py-3 text-right tabular font-semibold ${b.remaining < 0 ? 'text-brand-coral' : 'text-emerald-600'}`}
+                        className={`px-4 py-3 text-right tabular font-semibold ${b.available < 0 ? 'text-tone-coral' : 'text-emerald-600'}`}
                       >
-                        {formatMWK(b.remaining)}
+                        {formatMWK(b.available)}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
@@ -271,4 +318,4 @@ export function BudgetTab({ academicYear }: { academicYear: string }) {
       )}
     </div>
   )
-}
+}

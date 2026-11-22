@@ -60,6 +60,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { addMonths, subMonths } from 'date-fns'
 import { RoleGuard } from '@/components/shared/RoleGuard'
+import { ModuleSurface } from '@/components/shared/ModuleSurface'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import { useIsMobile } from '@/hooks/use-mobile'
 import {
@@ -206,6 +207,9 @@ function CalendarContent() {
 
   const confirmDelete = useCallback(() => {
     if (!deleteTarget) return
+    // Dialog stays open (spinner on its button) until the server answers; the
+    // result is toasted by the shared mutation feedback. On failure it stays
+    // open so the user can retry or cancel.
     deleteEvent.mutate(manualEventDbId(deleteTarget.id), {
       onSuccess: () => setDeleteTarget(null),
     })
@@ -215,12 +219,12 @@ function CalendarContent() {
   // detail (category/time/location) can always be added afterwards via
   // the row's Edit action, which opens this same CalendarEventFormDialog.
   const quickAdd = useCallback(
-    (title: string) => {
+    (title: string, onCreated: () => void) => {
       createEvent.mutate({
         title,
         category: DEFAULT_EVENT_CATEGORY,
         startDate: new Date(`${selectedDateKey}T09:00`).toISOString(),
-      })
+      }, { onSuccess: onCreated })
     },
     [createEvent, selectedDateKey]
   )
@@ -230,11 +234,9 @@ function CalendarContent() {
       {/* ── Header ── */}
       <div>
         <h1 className="font-heading text-2xl font-bold text-brand-navy">Calendar</h1>
-        <p className="text-sm text-muted mt-0.5">
-          School academic calendar — all events, exams, and schedules
-        </p>
       </div>
 
+      <ModuleSurface>
       <DesktopCalendarView
         monthDate={monthDate}
         onNavigateMonth={navigateMonth}
@@ -284,6 +286,7 @@ function CalendarContent() {
         canEdit={canEdit}
         canDelete={canDelete}
         onQuickAdd={quickAdd}
+        quickAdding={createEvent.isPending}
         onOpenCreate={openCreate}
         onEditEvent={openEdit}
         onRequestDelete={requestDelete}
@@ -307,11 +310,14 @@ function CalendarContent() {
             ? `"${deleteTarget.title}" will be permanently removed from the calendar. This can't be undone.`
             : ''
         }
-        confirmLabel="Delete Event"
+        confirmLabel="Delete event"
+        confirmingLabel="Deleting…"
+        confirming={deleteEvent.isPending}
         destructive
         onConfirm={confirmDelete}
         onCancel={() => setDeleteTarget(null)}
       />
+      </ModuleSurface>
     </div>
   )
 }

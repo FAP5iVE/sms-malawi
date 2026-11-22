@@ -24,7 +24,7 @@
  *   extension for jobTitle/employeeNo)
  */
 
-import { getContractExpiryAlert } from '@/server/services/hrService'
+import { getContractExpiryAlert, getLicenceExpiryAlert } from '@/server/services/hrService'
 import { sendContractAlert } from '@/server/services/notificationService'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
@@ -68,6 +68,38 @@ export async function contractExpiryJob(): Promise<void> {
 
     if (expiring.length > 0) {
       logger.info({ event: 'contract_alerts.sent', daysAhead: days, count: expiring.length })
+    }
+  }
+
+  // TCM licence expiry for teaching staff. Same recipients, same 7/30/60-day
+  // exact-day windows (so no licence is emailed twice), same template with the
+  // wording switched to "licence".
+  for (const days of [7, 30, 60]) {
+    const expiring = await getLicenceExpiryAlert(days)
+
+    for (const staff of expiring) {
+      if (!staff.tcmLicenceExpiry) continue
+      try {
+        await sendContractAlert({
+          to:     hrEmails,
+          hrUids,
+          data: {
+            kind:            'licence',
+            staffName:       `${staff.firstName} ${staff.lastName}`,
+            jobTitle:        staff.jobTitle,
+            department:      staff.department,
+            contractExpiry:  staff.tcmLicenceExpiry,
+            daysUntilExpiry: days,
+            employeeNo:      staff.employeeNo,
+          },
+        })
+      } catch (err) {
+        logger.error({ event: 'licence_alert.send_failed', staffId: staff.id, days, err })
+      }
+    }
+
+    if (expiring.length > 0) {
+      logger.info({ event: 'licence_alerts.sent', daysAhead: days, count: expiring.length })
     }
   }
 }

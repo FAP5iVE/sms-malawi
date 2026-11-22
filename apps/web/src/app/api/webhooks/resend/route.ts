@@ -46,7 +46,8 @@ export async function POST(request: Request): Promise<NextResponse> {
       event: 'resend.webhook',
       type: event.type,
       emailId: event.data?.email_id,
-      to: event.data?.to,
+      // [Issue 7] recipient address omitted — personal data does not belong in logs
+      recipientCount: Array.isArray(event.data?.to) ? event.data.to.length : event.data?.to ? 1 : 0,
       bounceType: event.data?.bounce_type,
     },
     `Resend webhook received: ${event.type}`,

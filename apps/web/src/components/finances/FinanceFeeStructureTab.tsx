@@ -32,8 +32,10 @@ import {
 import { formatMWK, FEE_CATEGORY_LABELS, formatFeeScheduleBadge } from '@shared/constants/malawi'
 import type { ApiStudent, ApiFeeStructure } from '@shared/types/api'
 import {
-  Search, Loader2, X, Pencil, Phone, Receipt, GraduationCap, PiggyBank, Wallet2,
+  Search, Loader2, Pencil, Phone, Receipt, GraduationCap, PiggyBank, Wallet2
 } from 'lucide-react'
+import { Modal, MODAL_BTN_PRIMARY
+} from '@/components/shared/Modal'
 
 // ─────────────────────────────────────────────────────────────────────────
 // MAIN COMPONENT
@@ -95,7 +97,7 @@ export function FinanceFeeStructureTab({ academicYear, term }: { academicYear: s
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="font-heading font-semibold text-body">Finance &amp; Bursar Fee Structure Workstation</h2>
+          <h2 className="font-heading font-semibold text-body">Finance and bursar fee structure workstation</h2>
           <p className="text-xs text-muted mt-0.5">
             Manage each student&rsquo;s statutory fee commitments, optional service enrollment, and scholarship concessions.
           </p>
@@ -104,7 +106,7 @@ export function FinanceFeeStructureTab({ academicYear, term }: { academicYear: s
           type="button"
           onClick={billNow}
           disabled={!selectedStudent}
-          className="inline-flex items-center gap-1.5 bg-brand-navy text-white rounded-lg px-3.5 py-2 text-sm font-semibold hover:bg-brand-navy-light disabled:opacity-50 min-h-11"
+          className="inline-flex items-center gap-1.5 bg-brand-deep text-white rounded-lg px-3.5 py-2 text-sm font-semibold hover:brightness-125 disabled:opacity-50 min-h-11"
         >
           <Receipt className="w-4 h-4" />
           {selectedStudent ? `Bill ${selectedStudent.firstName} Now` : 'Bill Now'}
@@ -113,10 +115,10 @@ export function FinanceFeeStructureTab({ academicYear, term }: { academicYear: s
 
       <div className="grid lg:grid-cols-[320px_1fr] gap-5 items-start">
         {/* ── STUDENT ROSTER DIRECTORY ── */}
-        <div className="bg-surface border border-base rounded-xl overflow-hidden">
+        <div className="overflow-hidden">
           <div className="p-3 border-b border-base space-y-2">
             <div className="flex items-center justify-between">
-              <h3 className="font-heading text-sm font-semibold text-body">Student Roster</h3>
+              <h3 className="font-heading text-sm font-semibold text-body">Student roster</h3>
               <span className="text-xs text-muted">{studentsData?.total ?? 0} students</span>
             </div>
             <div className="relative">
@@ -133,7 +135,7 @@ export function FinanceFeeStructureTab({ academicYear, term }: { academicYear: s
               onChange={(e) => setClassFilter(e.target.value)}
               className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
             >
-              <option value="">All Grades &amp; Forms</option>
+              <option value="">All grades and forms</option>
               {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
@@ -167,12 +169,12 @@ export function FinanceFeeStructureTab({ academicYear, term }: { academicYear: s
 
         {/* ── SELECTED STUDENT DETAIL ── */}
         {!selectedStudent ? (
-          <div className="bg-surface border border-base rounded-xl p-12 text-center text-muted text-sm">
+          <div className="py-12 text-center text-muted text-sm">
             Select a student to view their fee structure.
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="bg-surface border border-base rounded-xl p-4">
+            <div>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
@@ -180,7 +182,7 @@ export function FinanceFeeStructureTab({ academicYear, term }: { academicYear: s
                     <h3 className="font-heading font-semibold text-body">
                       {selectedStudent.firstName} {selectedStudent.lastName}
                     </h3>
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-page border border-base text-muted">
+                    <span className="inline-flex items-center gap-1 text-xs font-medium text-muted">
                       <GraduationCap className="w-3 h-3" /> {selectedStudent.class?.name ?? 'Unassigned'}
                     </span>
                   </div>
@@ -203,10 +205,10 @@ export function FinanceFeeStructureTab({ academicYear, term }: { academicYear: s
 
             {/* Summary cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <SummaryStat label="Statutory Tuition" value={formatMWK(statutoryTotal)} icon={Wallet2} />
+              <SummaryStat label="Statutory tuition" value={formatMWK(statutoryTotal)} icon={Wallet2} />
               <SummaryStat label="Enrolled Add-ons" value={formatMWK(addonsTotal)} icon={Receipt} />
               <SummaryStat
-                label="Scholarship Grant"
+                label="Scholarship grant"
                 value={
                   activeScholarship
                     ? activeScholarship.discountType === 'PERCENTAGE'
@@ -217,14 +219,14 @@ export function FinanceFeeStructureTab({ academicYear, term }: { academicYear: s
                 icon={PiggyBank}
                 highlight={!!activeScholarship}
               />
-              <SummaryStat label="Net Term Commitment" value={formatMWK(netCommitment)} icon={Receipt} emphasis />
+              <SummaryStat label="Net term commitment" value={formatMWK(netCommitment)} icon={Receipt} emphasis />
             </div>
 
             {/* Itemized commitments table */}
-            <div className="bg-surface border border-base rounded-xl overflow-hidden">
+            <div className="overflow-hidden">
               <div className="px-4 py-3 border-b border-base">
                 <h3 className="font-heading text-sm font-semibold text-body">
-                  Itemized Term Commitments ({fees.length})
+                  Itemized term commitments ({fees.length})
                 </h3>
               </div>
               {feesLoading ? (
@@ -234,13 +236,14 @@ export function FinanceFeeStructureTab({ academicYear, term }: { academicYear: s
                   No fee commitments for {selectedStudent.firstName} this term yet.
                 </p>
               ) : (
-                <table className="w-full text-sm">
+                <div className="table-scroll">
+                <table className="w-full text-sm min-w-130">
                   <thead>
                     <tr className="border-b border-base bg-page">
-                      <th className="text-left px-4 py-2.5 font-heading text-xs uppercase tracking-wide text-muted font-semibold">Fee Category &amp; Code</th>
-                      <th className="text-left px-4 py-2.5 font-heading text-xs uppercase tracking-wide text-muted font-semibold hidden sm:table-cell">Classification</th>
-                      <th className="text-left px-4 py-2.5 font-heading text-xs uppercase tracking-wide text-muted font-semibold hidden md:table-cell">Schedule</th>
-                      <th className="text-right px-4 py-2.5 font-heading text-xs uppercase tracking-wide text-muted font-semibold">Standard Rate</th>
+                      <th className="text-left px-4 py-2.5 font-heading text-xs text-muted font-semibold">Fee category and code</th>
+                      <th className="text-left px-4 py-2.5 font-heading text-xs text-muted font-semibold hidden sm:table-cell">Classification</th>
+                      <th className="text-left px-4 py-2.5 font-heading text-xs text-muted font-semibold hidden md:table-cell">Schedule</th>
+                      <th className="text-right px-4 py-2.5 font-heading text-xs text-muted font-semibold">Standard rate</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -252,10 +255,10 @@ export function FinanceFeeStructureTab({ academicYear, term }: { academicYear: s
                         </td>
                         <td className="px-4 py-3 hidden sm:table-cell">
                           <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-heading font-semibold border ${
+                            className={`inline-flex items-center text-xs font-heading font-semibold ${
                               f.mandatory
-                                ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/25 dark:text-amber-400 dark:border-amber-800/50'
-                                : 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/25 dark:text-blue-400'
+                                ? 'text-status-warning'
+                                : 'text-status-info'
                             }`}
                           >
                             {f.mandatory ? 'Mandatory / Statutory' : 'Enrolled Service'}
@@ -269,6 +272,7 @@ export function FinanceFeeStructureTab({ academicYear, term }: { academicYear: s
                     ))}
                   </tbody>
                 </table>
+                </div>
               )}
             </div>
           </div>
@@ -305,7 +309,7 @@ function SummaryStat({
   label, value, icon: Icon, highlight, emphasis,
 }: { label: string; value: string; icon: React.ElementType; highlight?: boolean; emphasis?: boolean }) {
   return (
-    <div className={`rounded-xl border p-3.5 min-w-0 ${emphasis ? 'bg-brand-navy border-brand-navy' : 'bg-surface border-base'}`}>
+    <div className={`rounded-xl border p-3.5 min-w-0 ${emphasis ? 'bg-brand-deep border-brand-navy' : 'bg-surface border-base'}`}>
       <div className={`flex items-center gap-1.5 text-xs mb-1 ${emphasis ? 'text-white/70' : 'text-muted'}`}>
         <Icon className="w-3.5 h-3.5 shrink-0" /> <span className="truncate">{label}</span>
       </div>
@@ -357,69 +361,61 @@ function AddOnCommitmentsModal({
   const isLoading = feesLoading || commitmentsLoading
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true">
-      <div className="bg-surface rounded-xl shadow-xl max-w-md w-full max-h-[85vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-base">
-          <div>
-            <h3 className="font-heading font-semibold text-body">Edit Add-on Commitments</h3>
-            <p className="text-xs text-muted">{student.firstName} {student.lastName}</p>
-          </div>
-          <button type="button" onClick={onClose} className="p-1 rounded-lg hover:bg-page text-muted" aria-label="Close">
-            <X className="w-5 h-5" />
-          </button>
+    <Modal
+      title="Edit Add-on Commitments"
+      description={`${student.firstName} ${student.lastName}`}
+      onClose={onClose}
+      size="m"
+      footer={
+        <>
+        <button
+          type="button" onClick={onClose}
+          className={MODAL_BTN_PRIMARY}
+        >
+          Done
+        </button>
+        </>
+      }
+    >
+      {isLoading ? (
+        <div className="space-y-2">
+          {[1, 2, 3].map((i) => <div key={i} className="h-12 rounded-lg bg-page animate-pulse" />)}
         </div>
-
-        <div className="p-5">
-          {isLoading ? (
-            <div className="space-y-2">
-              {[1, 2, 3].map((i) => <div key={i} className="h-12 rounded-lg bg-page animate-pulse" />)}
-            </div>
-          ) : optionalFees.length === 0 ? (
-            <p className="text-sm text-muted text-center py-6">
-              No optional add-on services are defined for this student&rsquo;s class yet.
-            </p>
-          ) : (
-            <ul className="space-y-2">
-              {optionalFees.map((fee) => {
-                const existing = commitmentFor(fee.id)
-                const isCommitted = existing?.status === 'COMMITTED'
-                const isPending =
-                  (upsert.isPending && upsert.variables?.feeStructureId === fee.id) ||
-                  (updateStatus.isPending && updateStatus.variables?.id === existing?.id)
-                return (
-                  <li key={fee.id} className="flex items-center justify-between gap-3 border border-base rounded-lg px-3 py-2.5">
-                    <label className="flex items-center gap-2.5 cursor-pointer min-w-0">
-                      <input
-                        type="checkbox"
-                        checked={isCommitted}
-                        disabled={isPending}
-                        onChange={() => toggle(fee)}
-                        className="w-4 h-4 rounded border-base shrink-0"
-                      />
-                      <span className="min-w-0">
-                        <span className="block text-sm font-medium text-body truncate">{fee.name}</span>
-                        <span className="block text-xs text-muted">
-                          {FEE_CATEGORY_LABELS[fee.category as keyof typeof FEE_CATEGORY_LABELS] ?? fee.category} &middot; {formatMWK(fee.amount)}
-                        </span>
-                      </span>
-                    </label>
-                    {isPending && <Loader2 className="w-4 h-4 animate-spin text-muted shrink-0" />}
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-        </div>
-
-        <div className="flex items-center justify-end px-5 py-4 border-t border-base">
-          <button
-            type="button" onClick={onClose}
-            className="px-4 py-2 text-sm font-semibold bg-brand-navy text-white rounded-lg min-h-11"
-          >
-            Done
-          </button>
-        </div>
-      </div>
-    </div>
+      ) : optionalFees.length === 0 ? (
+        <p className="text-sm text-muted text-center py-6">
+          No optional add-on services are defined for this student&rsquo;s class yet.
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {optionalFees.map((fee) => {
+            const existing = commitmentFor(fee.id)
+            const isCommitted = existing?.status === 'COMMITTED'
+            const isPending =
+              (upsert.isPending && upsert.variables?.feeStructureId === fee.id) ||
+              (updateStatus.isPending && updateStatus.variables?.id === existing?.id)
+            return (
+              <li key={fee.id} className="flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 app-tint">
+                <label className="flex items-center gap-2.5 cursor-pointer min-w-0">
+                  <input
+                    type="checkbox"
+                    checked={isCommitted}
+                    disabled={isPending}
+                    onChange={() => toggle(fee)}
+                    className="w-4 h-4 rounded border-base shrink-0"
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-body truncate">{fee.name}</span>
+                    <span className="block text-xs text-muted">
+                      {FEE_CATEGORY_LABELS[fee.category as keyof typeof FEE_CATEGORY_LABELS] ?? fee.category} &middot; {formatMWK(fee.amount)}
+                    </span>
+                  </span>
+                </label>
+                {isPending && <Loader2 className="w-4 h-4 animate-spin text-muted shrink-0" />}
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </Modal>
   )
 }

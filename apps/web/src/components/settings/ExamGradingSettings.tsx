@@ -35,6 +35,16 @@
  *   - Results release policy (auto vs manual)
  */
 /*
+ * [MAINT 2026-10-22 — Continuous Assessment]: adds the "Continuous
+ *   Assessment" section — an on/off switch for aggregating continuous
+ *   assessments into the end-of-term result, how many there are, and each
+ *   one's weight (percent of the final term mark). The end-of-term exam
+ *   carries the remainder, shown live. Validated with the same
+ *   validateCaConfig() the server runs, so what saves is exactly what the
+ *   term-results calculation accepts. Replaces the old, unused C.A./Exam
+ *   weight fields on the Academic Policy screen.
+ */
+/*
  * [CHANGE TYPE]: TARGETED EDIT
  * [R-PHASE]: R15 — UI/UX Polish: Shared Components, Dashboards,
  *   Confirmation Dialogs & Data-Display Consistency
@@ -46,10 +56,14 @@
  */
 
 import { useState, useEffect }   from 'react'
+import { StatusText } from '@/components/shared/StatusText'
 import { Loader2, Save, RotateCcw, AlertTriangle } from 'lucide-react'
 import { apiFetch }              from '@/lib/api-client'
 import ConfirmDialog             from '@/components/shared/ConfirmDialog'
-import { EXAM_TYPE_LABELS, type ExamTypeKey } from '@shared/constants/exams'
+import {
+  EXAM_TYPE_LABELS, type ExamTypeKey,
+  CA_MAX_COUNT, validateCaConfig, totalCaWeight, examWeightFor,
+} from '@shared/constants/exams'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
@@ -81,12 +95,12 @@ function GradeScaleTable({
   if (rows.length === 0) return null
 
   return (
-    <div className="border border-base rounded-xl overflow-hidden">
+    <div className="overflow-hidden">
       <table className="w-full text-sm border-collapse">
         <thead>
           <tr className="bg-page border-b border-base">
             {['Grade', 'Min %', 'Max %', 'Label', 'Pass?'].map((h) => (
-              <th key={h} className="px-3 py-2.5 text-left text-xs font-heading font-semibold text-muted uppercase tracking-wider">
+              <th key={h} className="px-3 py-2.5 text-left text-xs font-heading font-semibold text-muted">
                 {h}
               </th>
             ))}
@@ -147,6 +161,11 @@ export function ExamGradingSettings() {
   const [activeType,   setActiveType]   = useState<ExamTypeKey>('MSCE')
   const [promotionMin, setPromotionMin] = useState(35)
   const [promotionPasses, setPromotionPasses] = useState(4)
+  // Continuous assessment. caWeights is kept as strings so a field can be
+  // cleared mid-edit; it is parsed + validated before save.
+  const [caEnabled, setCaEnabled] = useState(false)
+  const [caCount,   setCaCount]   = useState(2)
+  const [caWeights, setCaWeights] = useState<string[]>(['15', '15'])
   const [loading,      setLoading]      = useState(true)
   const [saving,       setSaving]       = useState(false)
   const [saved,        setSaved]        = useState(false)
@@ -161,14 +180,24 @@ export function ExamGradingSettings() {
   useEffect(() => {
     Promise.all([
       apiFetch<GradeRow[]>('/settings/grading-scales'),
-      apiFetch<{ promotion_min_average: number; promotion_required_passes: number }>(
-        '/settings/exam',
-      ).catch(() => ({ promotion_min_average: 35, promotion_required_passes: 4 })),
+      apiFetch<{
+        promotion_min_average: number; promotion_required_passes: number
+        ca_aggregate_enabled?: boolean; ca_count?: number; ca_weights?: number[]
+      }>('/settings/exam')
+        .catch(() => ({ promotion_min_average: 35, promotion_required_passes: 4 } as {
+          promotion_min_average: number; promotion_required_passes: number
+          ca_aggregate_enabled?: boolean; ca_count?: number; ca_weights?: number[]
+        })),
     ])
       .then(([scaleData, examSettings]) => {
         setScales(scaleData)
         setPromotionMin(examSettings.promotion_min_average)
         setPromotionPasses(examSettings.promotion_required_passes)
+        setCaEnabled(examSettings.ca_aggregate_enabled ?? false)
+        if (examSettings.ca_count && examSettings.ca_weights?.length === examSettings.ca_count) {
+          setCaCount(examSettings.ca_count)
+          setCaWeights(examSettings.ca_weights.map(String))
+        }
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load settings'))
       .finally(() => setLoading(false))
@@ -184,7 +213,25 @@ export function ExamGradingSettings() {
     )
   }
 
+  // Live view of the continuous-assessment form. NaN/blank => invalid.
+  const caWeightNums = caWeights.map((w) => (w.trim() === '' ? NaN : Number(w)))
+  const caProblem    = validateCaConfig({ count: caCount, weights: caWeightNums })
+  const caTotal      = totalCaWeight(caWeightNums.map((n) => (Number.isFinite(n) ? n : 0)))
+  const caExamShare  = examWeightFor(caWeightNums.map((n) => (Number.isFinite(n) ? n : 0)))
+
+  function changeCaCount(next: number) {
+    const n = Math.max(1, Math.min(CA_MAX_COUNT, Math.round(Number.isFinite(next) ? next : 1)))
+    setCaCount(n)
+    // Keep existing weights; pad new slots with an even-ish default.
+    setCaWeights((prev) => Array.from({ length: n }, (_, i) => prev[i] ?? String(Math.max(1, Math.floor(30 / n)))))
+  }
+
   async function handleSave() {
+    // Block a save that would be rejected (or worse, accepted but unusable).
+    if (caEnabled && caProblem) {
+      setError(caProblem)
+      return
+    }
     setSaving(true)
     setError(null)
     setSaved(false)
@@ -207,6 +254,10 @@ export function ExamGradingSettings() {
           body:   JSON.stringify({
             promotion_min_average:      promotionMin,
             promotion_required_passes:  promotionPasses,
+            ca_aggregate_enabled:       caEnabled,
+            // count/weights are only sent when valid, so a half-edited (but
+            // switched-off) form can never overwrite the stored good values.
+            ...(caProblem ? {} : { ca_count: caCount, ca_weights: caWeightNums }),
           }),
         }),
       ])
@@ -239,12 +290,12 @@ export function ExamGradingSettings() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="font-heading font-bold text-lg text-brand-navy">Exam & Grading Configuration</h2>
+        <h2 className="font-heading font-bold text-lg text-brand-navy">Exam and grading configuration</h2>
         <p className="text-sm text-muted mt-0.5">Configure grade boundaries and promotion thresholds.</p>
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 bg-brand-coral/8 border border-brand-coral/25 rounded-xl px-4 py-3 text-sm text-brand-coral">
+        <div className="flex items-center gap-2 bg-brand-coral/8 border border-brand-coral/25 rounded-xl px-4 py-3 text-sm text-tone-coral">
           <AlertTriangle className="w-4 h-4 shrink-0" />
           {error}
         </div>
@@ -277,15 +328,86 @@ export function ExamGradingSettings() {
           {/* Grade scale table */}
           <GradeScaleTable rows={visibleRows} onUpdate={updateRow} />
 
+          {/* Continuous assessment */}
+          <div className="pt-4 border-t border-base">
+            <h3 className="font-heading font-semibold text-sm text-body mb-1">
+              Continuous assessment
+            </h3>
+            <p className="text-xs text-muted mb-4 max-w-xl">
+              Choose whether tests, quizzes, assignments and midterms (continuous assessments) are
+              added into each subject&apos;s end-of-term result. When off, the end-of-term result is the
+              end-of-term exam alone.
+            </p>
+
+            <label className="flex items-start gap-3 cursor-pointer mb-4">
+              <input
+                type="checkbox"
+                checked={caEnabled}
+                onChange={(e) => setCaEnabled(e.target.checked)}
+                className="mt-0.5 w-4 h-4 accent-brand-teal"
+              />
+              <span className="text-sm font-medium text-body">
+                Aggregate continuous assessments into the end-of-term result
+              </span>
+            </label>
+
+            {caEnabled && (
+              <div className="space-y-4 max-w-md">
+                <div>
+                  <label className="block text-xs font-heading font-semibold text-muted mb-1.5">
+                    Number of continuous assessments per term
+                  </label>
+                  <input
+                    type="number" min={1} max={CA_MAX_COUNT}
+                    value={caCount}
+                    onChange={(e) => changeCaCount(Number(e.target.value))}
+                    className="w-24 min-h-11 border border-base rounded-xl px-3 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+                  />
+                </div>
+
+                <div>
+                  <p className="block text-xs font-heading font-semibold text-muted mb-1.5">
+                    Weight of each (% of the final term mark)
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {caWeights.map((w, i) => (
+                      <div key={i}>
+                        <label className="block text-xs text-muted mb-1">CA {i + 1}</label>
+                        <input
+                          type="number" min={1} max={99} step={1}
+                          value={w}
+                          onChange={(e) => setCaWeights((prev) => prev.map((x, j) => (j === i ? e.target.value : x)))}
+                          aria-label={`CA ${i + 1} weight percent`}
+                          className="w-full min-h-11 border border-base rounded-xl px-3 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className={`rounded-xl border px-4 py-3 text-sm ${caProblem ? 'border-brand-coral/30 bg-brand-coral/5' : 'border-base bg-page'}`}>
+                  <p className="text-body">
+                    Continuous assessments: <span className="font-semibold">{caTotal}%</span>
+                    {' · '}
+                    End-of-term exam: <span className="font-semibold">{caProblem ? '-' : `${caExamShare}%`}</span>
+                    {' · '}
+                    Total: <span className="font-semibold">{caProblem ? '-' : '100%'}</span>
+                  </p>
+                  {caProblem && <p className="text-xs text-tone-coral mt-1">{caProblem}</p>}
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Promotion thresholds */}
           <div className="pt-4 border-t border-base">
             <h3 className="font-heading font-semibold text-sm text-body mb-4">
-              Promotion Thresholds
+              Promotion thresholds
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 max-w-sm">
               <div>
-                <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">
-                  Minimum Average (%)
+                <label className="block text-xs font-heading font-semibold text-muted mb-1.5">
+                  Minimum average (%)
                 </label>
                 <input
                   type="number" min={0} max={100}
@@ -295,8 +417,8 @@ export function ExamGradingSettings() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">
-                  Min Subject Passes
+                <label className="block text-xs font-heading font-semibold text-muted mb-1.5">
+                  Min subject passes
                 </label>
                 <input
                   type="number" min={0} max={20}
@@ -320,7 +442,7 @@ export function ExamGradingSettings() {
                 ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</>
                 : <><Save className="w-4 h-4" /> Save Settings</>}
             </button>
-            {saved && <span className="text-sm text-emerald-600 font-medium">Saved ✓</span>}
+            {saved && <StatusText tone="success" size="md">Saved</StatusText>}
             <button
               type="button"
               onClick={() => setConfirmResetOpen(true)}
@@ -330,7 +452,7 @@ export function ExamGradingSettings() {
               {resetting
                 ? <Loader2 className="w-4 h-4 animate-spin" />
                 : <RotateCcw className="w-4 h-4" />}
-              Reset to MANEB Defaults
+              Reset to MANEB defaults
             </button>
           </div>
         </>
@@ -341,7 +463,7 @@ export function ExamGradingSettings() {
         open={confirmResetOpen}
         title="Reset grading scales?"
         description="All grading scales will be restored to the MANEB defaults. Any custom grade boundaries you have configured will be lost. This cannot be undone."
-        confirmLabel="Reset to Defaults"
+        confirmLabel="Reset to defaults"
         destructive
         onConfirm={() => void handleReset()}
         onCancel={() => setConfirmResetOpen(false)}

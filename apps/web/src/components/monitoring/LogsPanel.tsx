@@ -13,6 +13,7 @@ import { DataTable } from '@/components/shared/DataTable'
 import type { DataColumn } from '@/components/shared/DataTable'
 import { useMonitoringLogs } from '@/hooks/useMonitoring'
 import type { ApiMonitoringLog } from '@shared/types/monitoring'
+import { chipClass } from '@/lib/hills/chip'
 
 const LEVELS = ['info', 'warn', 'error', 'fatal'] as const
 
@@ -30,7 +31,7 @@ export function LogsPanel() {
     {
       key: 'level', label: 'Level', priority: 'critical',
       render: (row) => (
-        <span className={`border-l-2 pl-2 font-semibold uppercase text-xs ${LEVEL_BORDER[row.level] ?? ''}`}>
+        <span className={`border-l-2 pl-2 font-semibold text-xs ${LEVEL_BORDER[row.level] ?? ''}`}>
           {row.level}
         </span>
       ),
@@ -43,12 +44,12 @@ export function LogsPanel() {
     <div className="space-y-4">
       <div className="flex items-center gap-2">
         <button type="button" onClick={() => setLevel(undefined)}
-          className={`px-3 py-1.5 rounded-full text-xs font-semibold ${!level ? 'bg-brand-navy text-white' : 'bg-page text-muted'}`}>
+          className={chipClass(!level)}>
           All
         </button>
         {LEVELS.map((l) => (
           <button key={l} type="button" onClick={() => setLevel(l)}
-            className={`px-3 py-1.5 rounded-full text-xs font-semibold capitalize ${level === l ? 'bg-brand-navy text-white' : 'bg-page text-muted'}`}>
+            className={`${chipClass(level === l)} capitalize`}>
             {l}
           </button>
         ))}
@@ -60,6 +61,7 @@ export function LogsPanel() {
         rowKey="id"
         columns={columns}
         emptyMessage="No log entries for this filter in the last 24 hours."
+        bordered={false}
       />
     </div>
   )

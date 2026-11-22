@@ -57,12 +57,45 @@ import { logger } from '@/lib/logger'
 import { sendBatchEmails } from '@/lib/email'
 import * as notificationService from '@/server/services/notificationService'
 import * as notificationFeedService from '@/server/services/notificationFeedService'
+import * as algolia from '@/server/services/algoliaService'
 import { deriveAudience } from '@shared/schemas/announcement'
 import type { AnnouncementPostType } from '@shared/schemas/announcement'
 import { COLLECTIONS } from '@shared/constants/storage'
 import { STAFF_ROLES } from '@shared/types/roles'
 
 import { getAdminApp } from '@/lib/verifyAuth'
+import { sanitizeRichText } from '@/server/lib/sanitizeRichText'
+
+// [FIX] createAnnouncement() deliberately fires notifyAudience() with
+// `void` — correct for an HTTP handler, which must not hold the response
+// open for a large audience's email/push fan-out (see the comment at that
+// call site). But nothing tracked those promises anywhere, so nothing
+// could ever wait for them either. That's invisible in production (the
+// process keeps running regardless), but it bit the demo seed script
+// directly: it would print its final summary and run post-seed validation
+// while several announcements' background sends were still in flight,
+// producing interleaved/confusing logs and, worse, validation queries
+// racing real traffic against the same connection pool. This registry
+// costs production nothing (nobody calls waitForPendingAnnouncementWork()
+// outside the seed script) and lets the seed opt into "actually wait for
+// the thing I just fired" without changing the fire-and-forget contract
+// every real caller relies on.
+const pendingBackgroundWork = new Set<Promise<unknown>>()
+
+function trackBackground(p: Promise<unknown>): void {
+  pendingBackgroundWork.add(p)
+  void p.finally(() => pendingBackgroundWork.delete(p))
+}
+
+/** Waits for every notifyAudience()-and-descendants call fired so far to
+ *  settle (success or failure — failures are already logged internally,
+ *  never thrown here). Intended for scripts (the demo seed) that need a
+ *  deterministic "everything this run triggered is actually done" point
+ *  before disconnecting Prisma or reporting final results; no production
+ *  code path calls this. */
+export async function waitForPendingAnnouncementWork(): Promise<void> {
+  await Promise.allSettled(Array.from(pendingBackgroundWork))
+}
 
 export type AnnouncementStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'PUBLISHED' | 'SCHEDULED'
 
@@ -90,6 +123,8 @@ export interface CreateAnnouncementInput {
   // Appwrite file ID (FILE_PREFIX.ANNOUNCEMENT_IMAGE) — optional cover
   // image, primarily for the public News section.
   imageKey?: string
+  // [FIX] Byline — see AnnouncementSchema's authorName comment.
+  authorName?: string
   // [PRODUCTION FIX] EVENT/ADVERTISEMENT added — see AnnouncementSchema in
   // @shared/schemas/announcement and the PUBLIC_ONLY_POST_TYPES comment
   // below for the full explanation.
@@ -324,12 +359,21 @@ async function notifyAudience(announcementId: string, payload: NotifyPayload): P
 
   // [FIX] These two are independent of the internal targeting above and of
   // each other's success/failure — run outside the try/catch that guards
-  // the internal send so one failing never blocks the other.
+  // the internal send so one failing never blocks the other. Previously
+  // fired with `void` each, which meant notifyAudience()'s own returned
+  // promise resolved before either of these actually finished — anyone
+  // (i.e. the seed script, via trackBackground below) awaiting
+  // notifyAudience() itself would think all the work was done while these
+  // two were still running. Promise.allSettled here folds both into
+  // notifyAudience()'s own completion — still fully non-blocking for
+  // createAnnouncement's caller, since createAnnouncement itself still
+  // calls notifyAudience() with `void`/trackBackground, never awaits it.
   if (payload.publicWebsite) {
-    void notifyNewsletterSubscribers(announcementId, { title: payload.title, body: payload.body })
+    const extra: Promise<void>[] = [notifyNewsletterSubscribers(announcementId, { title: payload.title, body: payload.body })]
     if (!payload.targetAll) {
-      void notifyAllSystemUsers(announcementId, { title: payload.title, body: payload.body })
+      extra.push(notifyAllSystemUsers(announcementId, { title: payload.title, body: payload.body }))
     }
+    await Promise.allSettled(extra)
   }
 }
 
@@ -371,11 +415,15 @@ function resolveCreateFields(data: CreateAnnouncementInput, directPublish: boole
 export async function createAnnouncement(data: CreateAnnouncementInput, directPublish: boolean) {
   const { postType, targetAll, targetRoles, targetClassId, publicWebsite, status } =
     resolveCreateFields(data, directPublish)
+  // [FIX] body may now carry HTML from RichTextEditor.tsx — sanitize once
+  // here, the one place every create path funnels through, rather than
+  // trusting the client. See server/lib/sanitizeRichText.ts.
+  const body = sanitizeRichText(data.body)
 
   const ref = getFirestore(getAdminApp()).collection(COLLECTIONS.ANNOUNCEMENTS).doc()
   await ref.set({
     title: data.title,
-    body: data.body,
+    body,
     targetAll,
     targetRoles,
     targetClassId,
@@ -383,12 +431,25 @@ export async function createAnnouncement(data: CreateAnnouncementInput, directPu
     eventDate: data.eventDate ?? null,
     publicWebsite,
     imageKey: data.imageKey ?? null,
+    authorName: data.authorName?.trim() || null,
     postType,
     createdByUid: data.createdByUid,
     createdByRole: data.createdByRole,
     status,
     createdAt: Timestamp.now(),
     updatedAt: Timestamp.now(),
+  })
+
+  // [ALGOLIA ROLLOUT — Tier 2 item 8] Firestore-backed, so the sync call
+  // goes right here at the write site rather than a Prisma create hook.
+  void algolia.indexAnnouncement({
+    objectID:    ref.id,
+    title:       data.title,
+    status,
+    postType,
+    targetRoles: targetRoles ?? [],
+    eventDate:   data.eventDate ?? null,
+    createdAt:   new Date().toISOString(),
   })
 
   if (status === 'PUBLISHED') {
@@ -398,19 +459,19 @@ export async function createAnnouncement(data: CreateAnnouncementInput, directPu
     // must not hold the HTTP response open, especially for a large
     // targetAll audience (notifyAudience() never rejects — it has its own
     // internal try/catch).
-    void notifyAudience(ref.id, {
+    trackBackground(notifyAudience(ref.id, {
       title: data.title,
-      body: data.body,
+      body,
       targetAll,
       targetRoles,
       targetClassId,
       eventDate: data.eventDate,
       createdByUid: data.createdByUid,
       publicWebsite,
-    })
+    }))
   }
 
-  return { id: ref.id, title: data.title, body: data.body, status }
+  return { id: ref.id, title: data.title, body, status }
 }
 
 // ─── DRAFTS ─────────────────────────────────────────────────
@@ -431,6 +492,7 @@ export interface DraftInput {
   eventDate?: string
   publicWebsite?: boolean
   imageKey?: string
+  authorName?: string
   postType?: AnnouncementPostType
 }
 
@@ -439,7 +501,7 @@ export async function createDraft(data: DraftInput, createdByUid: string, create
   const ref = getFirestore(getAdminApp()).collection(COLLECTIONS.ANNOUNCEMENTS).doc()
   await ref.set({
     title: data.title ?? '',
-    body: data.body ?? '',
+    body: sanitizeRichText(data.body ?? ''),
     targetAll: data.targetAll ?? false,
     targetRoles: data.targetRoles ?? [],
     targetClassId: data.targetClassId ?? null,
@@ -447,12 +509,22 @@ export async function createDraft(data: DraftInput, createdByUid: string, create
     eventDate: data.eventDate ?? null,
     publicWebsite: data.publicWebsite ?? false,
     imageKey: data.imageKey ?? null,
+    authorName: data.authorName?.trim() || null,
     postType: data.postType ?? 'ANNOUNCEMENT',
     createdByUid,
     createdByRole,
     status: 'DRAFT' as AnnouncementStatus,
     createdAt: Timestamp.now(),
     updatedAt: Timestamp.now(),
+  })
+  void algolia.indexAnnouncement({
+    objectID:    ref.id,
+    title:       data.title ?? '',
+    status:      'DRAFT',
+    postType:    data.postType ?? 'ANNOUNCEMENT',
+    targetRoles: data.targetRoles ?? [],
+    eventDate:   data.eventDate ?? null,
+    createdAt:   new Date().toISOString(),
   })
   return { id: ref.id, status: 'DRAFT' as const }
 }
@@ -472,16 +544,29 @@ export async function updateDraft(id: string, uid: string, data: DraftInput) {
 
   const update: Record<string, unknown> = { updatedAt: Timestamp.now() }
   if (data.title !== undefined) update.title = data.title
-  if (data.body !== undefined) update.body = data.body
+  if (data.body !== undefined) update.body = sanitizeRichText(data.body)
   if (data.targetAll !== undefined) update.targetAll = data.targetAll
   if (data.targetRoles !== undefined) update.targetRoles = data.targetRoles
   if (data.targetClassId !== undefined) update.targetClassId = data.targetClassId
   if (data.eventDate !== undefined) update.eventDate = data.eventDate
   if (data.publicWebsite !== undefined) update.publicWebsite = data.publicWebsite
   if (data.imageKey !== undefined) update.imageKey = data.imageKey
+  if (data.authorName !== undefined) update.authorName = data.authorName.trim() || null
   if (data.postType !== undefined) update.postType = data.postType
 
   await ref.update(update)
+  // [ALGOLIA ROLLOUT — Tier 2 item 8] Only push the fields this index
+  // actually cares about — most DraftInput fields (body, imageKey, etc.)
+  // have no facet/searchable counterpart, no need to round-trip them.
+  if (data.title !== undefined || data.postType !== undefined || data.targetRoles !== undefined || data.eventDate !== undefined) {
+    void algolia.updateAnnouncement({
+      objectID:    id,
+      ...(data.title       !== undefined ? { title: data.title } : {}),
+      ...(data.postType    !== undefined ? { postType: data.postType } : {}),
+      ...(data.targetRoles !== undefined ? { targetRoles: data.targetRoles } : {}),
+      ...(data.eventDate   !== undefined ? { eventDate: data.eventDate } : {}),
+    })
+  }
   return { id, status: 'DRAFT' as const }
 }
 
@@ -526,10 +611,11 @@ export async function publishDraft(
 
   const { postType, targetAll, targetRoles, targetClassId, publicWebsite, status } =
     resolveCreateFields(data, directPublish)
+  const body = sanitizeRichText(data.body)
 
   await ref.update({
     title: data.title,
-    body: data.body,
+    body,
     targetAll,
     targetRoles,
     targetClassId,
@@ -537,25 +623,35 @@ export async function publishDraft(
     eventDate: data.eventDate ?? null,
     publicWebsite,
     imageKey: data.imageKey ?? null,
+    authorName: data.authorName?.trim() || null,
     postType,
     status,
     updatedAt: Timestamp.now(),
   })
 
   if (status === 'PUBLISHED') {
-    void notifyAudience(id, {
+    trackBackground(notifyAudience(id, {
       title: data.title,
-      body: data.body,
+      body,
       targetAll,
       targetRoles,
       targetClassId,
       eventDate: data.eventDate,
       createdByUid: uid,
       publicWebsite,
-    })
+    }))
   }
 
-  return { id, title: data.title, body: data.body, status }
+  void algolia.updateAnnouncement({
+    objectID:    id,
+    title:       data.title,
+    status,
+    postType,
+    targetRoles: targetRoles ?? [],
+    eventDate:   data.eventDate ?? null,
+  })
+
+  return { id, title: data.title, body, status }
 }
 
 /** Approve a PENDING_APPROVAL announcement and publish it. */
@@ -575,7 +671,7 @@ export async function publishAnnouncement(id: string, approvedByUid: string) {
   })
 
   // [BE-005] Not awaited — same reasoning as createAnnouncement() above.
-  void notifyAudience(id, {
+  trackBackground(notifyAudience(id, {
     title: existing.title as string,
     body: existing.body as string,
     targetAll: (existing.targetAll as boolean | undefined) ?? false,
@@ -584,7 +680,9 @@ export async function publishAnnouncement(id: string, approvedByUid: string) {
     eventDate: existing.eventDate as string | null | undefined,
     createdByUid: existing.createdByUid as string,
     publicWebsite: (existing.publicWebsite as boolean | undefined) ?? false,
-  })
+  }))
+
+  void algolia.updateAnnouncement({ objectID: id, status: 'PUBLISHED' })
 
   return { id, status: 'PUBLISHED' }
 }
@@ -616,6 +714,8 @@ export async function rejectAnnouncement(id: string, rejectedByUid: string, reas
     rejectedAt: Timestamp.now(),
     updatedAt: Timestamp.now(),
   })
+
+  void algolia.updateAnnouncement({ objectID: id, status: 'REJECTED' })
 
   return { id, status: 'REJECTED' }
 }
@@ -655,7 +755,7 @@ export async function promoteDueScheduled(): Promise<{ promoted: number }> {
     })
 
     // Fire-and-forget the fan-out — same posture as createAnnouncement.
-    void notifyAudience(doc.id, {
+    trackBackground(notifyAudience(doc.id, {
       title: data.title as string,
       body: data.body as string,
       targetAll: (data.targetAll as boolean | undefined) ?? false,
@@ -664,7 +764,8 @@ export async function promoteDueScheduled(): Promise<{ promoted: number }> {
       eventDate: data.eventDate as string | null | undefined,
       createdByUid: data.createdByUid as string,
       publicWebsite: (data.publicWebsite as boolean | undefined) ?? false,
-    })
+    }))
+    void algolia.updateAnnouncement({ objectID: doc.id, status: 'PUBLISHED' })
     promoted++
   }
 
@@ -697,6 +798,45 @@ export async function listAnnouncements(options?: {
   }
 }
 
+// [ALGOLIA ROLLOUT — Tier 2 item 8] Bulk seed. Firestore-backed, so this
+// pages through the collection directly rather than a Prisma findMany —
+// same idea as every other seed function, different data source. Firestore
+// Timestamp fields need converting to ISO strings; a doc with no createdAt
+// at all (shouldn't happen, but Firestore has no schema enforcement) falls
+// back to epoch rather than throwing, so one bad doc doesn't fail the batch.
+export async function seedAllAnnouncementsToAlgolia(): Promise<algolia.BulkIndexResult> {
+  const db = getFirestore(getAdminApp())
+  const PAGE_SIZE = 500
+  let lastDoc: FirebaseFirestore.QueryDocumentSnapshot | undefined
+  let totalIndexed = 0
+  for (;;) {
+    let query: Query<DocumentData> = db.collection(COLLECTIONS.ANNOUNCEMENTS).orderBy('__name__').limit(PAGE_SIZE)
+    if (lastDoc) query = query.startAfter(lastDoc)
+    const snap = await query.get()
+    if (snap.empty) break
+    const records: algolia.AlgoliaAnnouncement[] = snap.docs.map((d) => {
+      const data = d.data() as DocumentData
+      const createdAt = data.createdAt as Timestamp | undefined
+      return {
+        objectID:    d.id,
+        title:       (data.title as string) ?? '',
+        status:      (data.status as string) ?? 'DRAFT',
+        postType:    (data.postType as string) ?? 'ANNOUNCEMENT',
+        targetRoles: (data.targetRoles as string[] | undefined) ?? [],
+        eventDate:   (data.eventDate as string | null | undefined) ?? null,
+        createdAt:   createdAt ? createdAt.toDate().toISOString() : new Date(0).toISOString(),
+      }
+    })
+    const result = await algolia.bulkIndexAnnouncements(records)
+    if (!result.configured) return result
+    if (result.error) return result
+    totalIndexed += result.indexed
+    lastDoc = snap.docs[snap.docs.length - 1]
+    if (snap.docs.length < PAGE_SIZE) break
+  }
+  return { indexed: totalIndexed, configured: true }
+}
+
 // ─── SERVER-SIDE VIEWER READS (N2) ─────────────────────────
 // These replace the client's direct Firestore onSnapshot reads
 // (useAnnouncements / usePendingAnnouncements). Moving reads behind Express
@@ -717,6 +857,7 @@ export interface ViewerAnnouncement {
   eventDate: string | null
   publicWebsite: boolean
   imageKey: string | null
+  authorName: string | null
   createdByUid: string
   createdByRole: string | null
   createdAt: string | null
@@ -746,6 +887,7 @@ function mapViewer(id: string, data: DocumentData): ViewerAnnouncement {
     eventDate: (data.eventDate as string | null | undefined) ?? null,
     publicWebsite: (data.publicWebsite as boolean | undefined) ?? false,
     imageKey: (data.imageKey as string | null | undefined) ?? null,
+    authorName: (data.authorName as string | null | undefined) ?? null,
     createdByUid: (data.createdByUid as string) ?? '',
     createdByRole: (data.createdByRole as string | null | undefined) ?? null,
     createdAt: toIso(data.createdAt),
@@ -763,7 +905,14 @@ function mapViewer(id: string, data: DocumentData): ViewerAnnouncement {
  * own composite index — the same reason the old client listener filtered
  * client-side, but now done on the trusted server.
  */
-export async function listForViewer(viewer: { uid: string; role: string }): Promise<ViewerAnnouncement[]> {
+export async function listForViewer(
+  viewer: { uid: string; role: string; superUser?: boolean },
+  // [NEW] The Announcements page (and only it) opts in to seeing published
+  // NEWS / ADVERTISEMENT posts so its News and Academic Advertisements tabs
+  // can list them under "Published". Every other caller (dashboards, etc.)
+  // keeps the original behaviour of excluding public-only content.
+  opts: { includePublicPosts?: boolean } = {},
+): Promise<ViewerAnnouncement[]> {
   const snap = await getFirestore(getAdminApp())
     .collection(COLLECTIONS.ANNOUNCEMENTS)
     .where('status', '==', 'PUBLISHED')
@@ -773,17 +922,26 @@ export async function listForViewer(viewer: { uid: string; role: string }): Prom
 
   return snap.docs
     .map((d) => mapViewer(d.id, d.data()))
-    .filter(
-      (a) =>
-        // [PRODUCTION FIX] NEWS and ADVERTISEMENT are public-site-only
-        // content (PUBLIC_ONLY_POST_TYPES) — neither must ever surface in
-        // a user's internal /announcements tab, no matter what
-        // targetAll/targetRoles happen to be on the doc.
-        !PUBLIC_ONLY_POST_TYPES.includes(a.postType) &&
-        (a.targetAll ||
-          a.targetRoles.includes(viewer.role) ||
-          a.createdByUid === viewer.uid),
-    )
+    .filter((a) => {
+      // NEWS and ADVERTISEMENT are public-site-only content
+      // (PUBLIC_ONLY_POST_TYPES): they carry no internal audience
+      // (targetAll=false, targetRoles=[]), so the role-targeting rule
+      // below would hide them from everyone except their author. They are
+      // already world-readable on the public site, so when a caller opts
+      // in via includePublicPosts they are listed for every signed-in
+      // user, and only when that flag is set — the dashboards' announcement
+      // rails never receive them.
+      if (PUBLIC_ONLY_POST_TYPES.includes(a.postType)) {
+        return opts.includePublicPosts === true && a.publicWebsite
+      }
+      // alpha_admin sees every published announcement, whoever it targeted.
+      return (
+        viewer.superUser === true ||
+        a.targetAll ||
+        a.targetRoles.includes(viewer.role) ||
+        a.createdByUid === viewer.uid
+      )
+    })
 }
 
 /** PENDING_APPROVAL announcements — for approvers' Pending tab. */

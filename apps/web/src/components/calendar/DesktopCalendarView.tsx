@@ -72,12 +72,13 @@ import {
   ChevronRight,
   Search,
   Plus,
+  AlertCircle,
   Calendar as CalendarIcon,
   Layers,
   GripVertical,
 } from 'lucide-react'
 import type { CalendarEvent, CalendarEventCategory } from '@shared/types/calendar'
-import { CATEGORY_LEGEND, categoryColor } from './calendarConfig'
+import { CATEGORY_LEGEND, categoryColor, categoryLabel } from './calendarConfig'
 import { CategoryFilterDropdown } from './CategoryFilterDropdown'
 import { CalendarEventListItem } from './CalendarEventListItem'
 import { MiniMonthCalendar } from './MiniMonthCalendar'
@@ -94,6 +95,11 @@ const SIDEBAR_MIN = 240
 const SIDEBAR_MAX = 520
 const SIDEBAR_DEFAULT = 336
 const SIDEBAR_STORAGE_KEY = 'sms:calendar:sidebarWidth'
+
+/** The kinds of event on a day, in the order they first appear. */
+function dayCategories(events: ReadonlyArray<{ category: CalendarEventCategory }>): CalendarEventCategory[] {
+  return [...new Set(events.map((e) => e.category))]
+}
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value))
@@ -207,22 +213,24 @@ export function DesktopCalendarView({
   return (
     <div
       ref={containerRef}
-      className="hidden md:flex h-[calc(100vh-8.5rem)] min-h-140 w-full bg-surface border border-base rounded-2xl overflow-hidden"
+      className="hidden md:flex h-[calc(100vh-8.5rem)] min-h-140 w-full overflow-hidden"
     >
       {/* ── LEFT SIDEBAR ─────────────────────────────────────────── */}
       <aside
         style={{ width: sidebarWidth }}
-        className="shrink-0 bg-page/60 flex flex-col h-full overflow-hidden"
+        className="shrink-0 app-tint rounded-2xl flex flex-col h-full overflow-hidden"
       >
         <div className="p-4 pb-3 border-b border-base flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0">
-            <div className="w-8 h-8 rounded-lg bg-brand-teal/15 border border-brand-teal/30 flex items-center justify-center text-brand-teal shrink-0">
-              <CalendarIcon className="w-4 h-4" aria-hidden="true" />
-            </div>
+            {/* [PRODUCTION FIX] Was a boxed icon — w-8 h-8 rounded-lg with a
+               teal-tinted background and border. Per request, the icon now
+               renders plain (no background chip), just brighter/larger, so
+               it reads as an icon next to the heading rather than a button. */}
+            <CalendarIcon className="w-5 h-5 text-brand-teal shrink-0" aria-hidden="true" />
             <div className="min-w-0">
-              <h2 className="text-sm font-heading font-bold text-body truncate">Calendar Hub</h2>
+              <h2 className="text-sm font-heading font-bold text-body truncate">Events</h2>
               {academicYearLabel && (
-                <p className="text-[11px] text-muted truncate">Academic Year {academicYearLabel}</p>
+                <p className="text-xs text-muted truncate">Academic year {academicYearLabel}</p>
               )}
             </div>
           </div>
@@ -230,9 +238,9 @@ export function DesktopCalendarView({
             <button
               type="button"
               onClick={() => onOpenCreate(selectedDateKey)}
-              title="Create Event"
+              title="Create event"
               aria-label="Create event"
-              className="p-2 min-h-9 min-w-9 rounded-xl bg-brand-teal hover:bg-brand-teal-light text-white transition-colors shadow-sm flex items-center justify-center shrink-0"
+              className="p-2 min-h-11 min-w-11 rounded-xl bg-btn-brand hover:bg-btn-brand-hover text-btn-brand-fg transition-colors flex items-center justify-center shrink-0"
             >
               <Plus className="w-4 h-4" aria-hidden="true" />
             </button>
@@ -249,16 +257,13 @@ export function DesktopCalendarView({
           />
         </div>
 
-        <div className="px-5 pt-3 pb-2 border-t border-base flex items-center justify-between">
+        <div className="px-5 pt-3 pb-2 border-t border-base flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
           <div className="min-w-0">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-brand-teal">
-              Selected Date
-            </span>
-            <h3 className="text-sm font-heading font-semibold text-body truncate">
+            <h3 className="text-sm font-heading font-semibold text-body">
               {formatDisplayDate(selectedDateKey)}
             </h3>
           </div>
-          <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-page text-muted border border-base shrink-0">
+          <span className="text-xs font-semibold text-muted shrink-0">
             {selectedDayEvents.length} {selectedDayEvents.length === 1 ? 'event' : 'events'}
           </span>
         </div>
@@ -266,23 +271,23 @@ export function DesktopCalendarView({
         <div className="flex-1 overflow-y-auto px-4 py-2 space-y-2.5">
           {selectedDayEvents.length === 0 ? (
             <div className="flex flex-col items-center justify-center text-center p-6 text-muted">
-              <div className="w-12 h-12 rounded-2xl bg-page border border-base flex items-center justify-center mb-2.5">
+              <div className="w-12 h-12 rounded-2xl bg-page flex items-center justify-center mb-2.5">
                 <CalendarIcon className="w-6 h-6" aria-hidden="true" />
               </div>
               <p className="text-sm font-medium">No events scheduled</p>
               <p className="text-xs mt-1 max-w-50">
                 {canCreate
-                  ? 'Click below to add a lecture, deadline, holiday, or schedule item.'
+                  ? 'Add a lecture, deadline, holiday or schedule item.'
                   : 'Nothing on the calendar for this day yet.'}
               </p>
               {canCreate && (
                 <button
                   type="button"
                   onClick={() => onOpenCreate(selectedDateKey)}
-                  className="mt-3 px-3.5 py-2 min-h-10 rounded-lg bg-page hover:bg-base/60 text-xs font-heading font-semibold text-body border border-base flex items-center gap-1.5 transition-colors"
+                  className="mt-3 px-3.5 py-2 min-h-11 rounded-xl hover:bg-page text-sm font-heading font-semibold text-body border border-base flex items-center gap-1.5 transition-colors"
                 >
-                  <Plus className="w-3.5 h-3.5 text-brand-teal" aria-hidden="true" />
-                  Add Event for this Day
+                  <Plus className="w-3.5 h-3.5 text-tone-teal" aria-hidden="true" />
+                  Add event for this day
                 </button>
               )}
             </div>
@@ -301,7 +306,7 @@ export function DesktopCalendarView({
         <div className="p-3 border-t border-base flex items-center gap-1.5 text-xs text-muted">
           <Layers className="w-3.5 h-3.5" aria-hidden="true" />
           <span>
-            Active filters: {activeCategories.size}/{CATEGORY_LEGEND.length}
+            Showing {activeCategories.size} of {CATEGORY_LEGEND.length} categories
           </span>
         </div>
       </aside>
@@ -351,7 +356,7 @@ export function DesktopCalendarView({
               <button
                 type="button"
                 onClick={onGoToToday}
-                className="px-3 py-1.5 min-h-9 rounded-lg text-xs font-heading font-semibold text-body hover:bg-surface transition-colors"
+                className="px-3 py-1.5 min-h-9 rounded-lg text-sm font-heading font-semibold text-body hover:bg-surface transition-colors"
               >
                 Today
               </button>
@@ -365,9 +370,9 @@ export function DesktopCalendarView({
                 <ChevronRight className="w-4 h-4" aria-hidden="true" />
               </button>
             </div>
-            <h1 className="text-xl font-heading font-bold text-body ml-1">
+            <h2 className="text-xl font-heading font-bold text-body ml-1">
               {formatMonthYear(monthDate)}
-            </h1>
+            </h2>
           </div>
 
           <div className="flex items-center gap-3">
@@ -380,22 +385,26 @@ export function DesktopCalendarView({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => onSearchChange(e.target.value)}
-                placeholder="Search events..."
+                placeholder="Search events"
                 aria-label="Search events"
-                className="pl-9 pr-3 py-2 min-h-9 text-xs bg-page border border-base rounded-xl text-body placeholder-muted focus:outline-none focus:ring-2 focus:ring-brand-teal/25 w-44 lg:w-60 transition-all"
+                className="pl-9 pr-3 py-2 min-h-11 text-sm bg-page border border-base rounded-xl text-body placeholder-muted focus:outline-none focus:ring-2 focus:ring-brand-teal/25 w-44 lg:w-60 transition-all"
               />
             </div>
 
-            <div className="flex items-center bg-page border border-base rounded-xl p-1">
+            {/* [PRODUCTION FIX] Was `p-1` container + `min-h-9` buttons =
+               44px total, taller than the 36px search input beside it.
+               Trimmed to `p-0.5` + `min-h-8` buttons so the whole control
+               lines up with the search box at the same height. */}
+            <div className="flex items-center bg-page border border-base rounded-xl p-0.5">
               {(['month', 'agenda'] as CalendarViewMode[]).map((mode) => (
                 <button
                   key={mode}
                   type="button"
                   onClick={() => onViewModeChange(mode)}
                   aria-pressed={viewMode === mode}
-                  className={`px-3 py-1.5 min-h-9 rounded-lg text-xs font-heading font-medium capitalize transition-colors ${
+                  className={`px-3 py-1 min-h-10 rounded-lg text-sm font-heading font-medium capitalize transition-colors ${
                     viewMode === mode
-                      ? 'bg-brand-navy text-white font-semibold shadow-sm'
+                      ? 'bg-btn-brand text-btn-brand-fg font-semibold'
                       : 'text-muted hover:text-body'
                   }`}
                 >
@@ -422,8 +431,9 @@ export function DesktopCalendarView({
         {isError && (
           <div
             role="alert"
-            className="mx-6 mt-2 text-xs text-brand-coral bg-red-50 border border-red-200 rounded-lg px-3 py-2 shrink-0"
+            className="mx-6 mt-2 text-sm text-tone-coral app-tint rounded-xl px-3 py-2 shrink-0 flex items-center gap-2"
           >
+            <AlertCircle className="w-4 h-4 shrink-0" aria-hidden="true" />
             Couldn&apos;t load calendar events. Please try again.
           </div>
         )}
@@ -438,8 +448,8 @@ export function DesktopCalendarView({
                 </span>
               </h2>
               {filteredEvents.length === 0 ? (
-                <div className="p-8 text-center text-muted bg-page/40 rounded-2xl border border-base">
-                  No events found matching your search or filters.
+                <div className="p-8 text-center text-muted app-tint rounded-2xl">
+                  No events match your search or filters. Try a different word or choose more categories.
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -460,7 +470,7 @@ export function DesktopCalendarView({
                 {WEEK_HEADERS.map((day) => (
                   <div
                     key={day}
-                    className="text-center text-xs font-bold tracking-wider text-muted uppercase py-1"
+                    className="text-center text-sm font-medium text-muted py-1"
                   >
                     {day}
                   </div>
@@ -468,10 +478,10 @@ export function DesktopCalendarView({
               </div>
 
               <div
-                className="grid grid-cols-7 gap-2 flex-1 min-h-0"
+                className="grid grid-cols-7 gap-2.5 flex-1 min-h-0"
                 style={{ gridTemplateRows: `repeat(${days.length / 7}, minmax(0, 1fr))` }}
               >
-                {days.map((cell) => {
+                {days.map((cell, cellIndex) => {
                   const isSelected = cell.dateKey === selectedDateKey
                   const isHovered = hoveredDateKey === cell.dateKey
                   const hasEvents = cell.events.length > 0
@@ -484,24 +494,28 @@ export function DesktopCalendarView({
                       onClick={() => onSelectDate(cell.dateKey)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') onSelectDate(cell.dateKey)
+                        if (e.key === 'Escape') setHoveredDateKey(null)
                       }}
                       onMouseEnter={() => setHoveredDateKey(cell.dateKey)}
                       onMouseLeave={() => setHoveredDateKey(null)}
-                      className={`relative flex flex-col justify-between p-2 lg:p-2.5 rounded-2xl transition-colors cursor-pointer outline-none ${
+                      onFocus={() => setHoveredDateKey(cell.dateKey)}
+                      onBlur={() => setHoveredDateKey(null)}
+                      aria-describedby={isHovered && hasEvents ? `cal-tip-${cell.dateKey}` : undefined}
+                      className={`relative flex min-h-0 min-w-0 flex-col justify-between p-2 lg:p-2.5 rounded-2xl transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-brand-teal ${
                         isSelected
-                          ? 'bg-page ring-2 ring-brand-teal/80 shadow-sm'
+                          ? 'app-tint ring-2 ring-brand-teal'
                           : cell.isToday
-                            ? 'bg-page ring-1 ring-brand-teal/50'
+                            ? 'app-tint ring-1 ring-brand-teal'
                             : cell.isCurrentMonth
-                              ? 'bg-page/60 hover:bg-page'
-                              : 'bg-page/20 hover:bg-page/40 opacity-50'
+                              ? 'app-tint hover:bg-brand-teal/10'
+                            : 'hover:bg-brand-teal/5'
                       }`}
                     >
                       <div className="flex items-center justify-between">
                         <span
                           className={`text-sm lg:text-base font-semibold ${
                             isSelected || cell.isToday
-                              ? 'text-brand-teal font-bold'
+                              ? 'text-tone-teal font-bold'
                               : cell.isCurrentMonth
                                 ? 'text-body'
                                 : 'text-muted'
@@ -510,43 +524,67 @@ export function DesktopCalendarView({
                           {cell.dayNumber}
                         </span>
                         {cell.isToday && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-brand-teal" aria-hidden="true" />
-                        )}
-                      </div>
-
-                      <div className="flex flex-col gap-1 my-auto w-full px-0.5">
-                        {cell.events.slice(0, 4).map((evt) => (
-                          <div
-                            key={evt.id}
-                            className="h-1.5 lg:h-2 w-full rounded-full"
-                            style={{ backgroundColor: categoryColor(evt.category) }}
-                            title={evt.title}
-                          />
-                        ))}
-                        {cell.events.length > 4 && (
-                          <span className="text-[10px] font-bold text-muted text-center leading-none">
-                            +{cell.events.length - 4} more
+                          <span className="inline-flex items-center gap-1 text-tone-teal">
+                            <span className="w-1.5 h-1.5 rounded-full bg-brand-teal" aria-hidden="true" />
+                            <span className="sr-only">Today</span>
                           </span>
                         )}
                       </div>
 
-                      {isHovered && hasEvents && (
-                        <div className="absolute z-30 bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 p-2.5 rounded-xl bg-body text-page shadow-2xl pointer-events-none text-left">
-                          <p className="text-[11px] font-bold pb-1 border-b border-white/15">
-                            {formatDisplayDate(cell.dateKey)}
-                          </p>
-                          <div className="mt-1.5 space-y-1.5 max-h-36 overflow-hidden">
-                            {cell.events.map((e) => (
-                              <div key={e.id} className="flex items-center gap-1.5 text-xs">
-                                <span
-                                  className="w-2 h-2 rounded-full shrink-0"
-                                  style={{ backgroundColor: categoryColor(e.category) }}
-                                  aria-hidden="true"
-                                />
-                                <span className="truncate font-medium">{e.title}</span>
-                              </div>
+                      {/* Busy-ness at a glance, fixed to the foot of the day and never taller than
+                         one line: a dot for each kind of event on that day (at most three) and the
+                         total on the right. Earlier, one bar per event stacked up and spilled into
+                         the day below; this row is the same height whether the day has 1 event or 40. */}
+                      {hasEvents && (
+                        <div className="mt-1 flex min-w-0 items-center justify-between gap-2">
+                          <span className="flex min-w-0 items-center gap-0.5 2xl:gap-1" aria-hidden="true">
+                            {dayCategories(cell.events).slice(0, 3).map((category) => (
+                              <span
+                                key={category}
+                                className="h-1.5 w-1.5 shrink-0 rounded-full 2xl:h-2 2xl:w-2"
+                                style={{ backgroundColor: categoryColor(category) }}
+                              />
                             ))}
-                          </div>
+                          </span>
+                          <span className="shrink-0 text-xs font-semibold tabular-nums text-muted">
+                            {cell.events.length}
+                            <span className="sr-only"> {cell.events.length === 1 ? 'event' : 'events'}</span>
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Hover and focus tip: the date, then either the titles (three or fewer) or a count
+                         per kind of event. A day with 36 timetable lessons used to print 36 clipped lines.
+                         Cells in the outer columns anchor to their own edge so the tip is never cut off. */}
+                      {isHovered && hasEvents && (
+                        <div
+                          id={`cal-tip-${cell.dateKey}`}
+                          role="tooltip"
+                          className={`absolute z-30 w-60 ${cellIndex % 7 <= 1 ? 'left-0' : cellIndex % 7 >= 5 ? 'right-0' : 'left-1/2 -translate-x-1/2'} ${cellIndex < 7 ? 'top-full mt-2' : 'bottom-full mb-2'} pointer-events-none rounded-xl border border-base bg-surface p-3 text-left text-body shadow-lg`}
+                        >
+                          <p className="text-sm font-semibold">{formatDisplayDate(cell.dateKey)}</p>
+                          <p className="mb-2 text-xs text-muted">
+                            {cell.events.length} {cell.events.length === 1 ? 'event' : 'events'}
+                          </p>
+                          <ul className="space-y-1.5 border-t border-base pt-2">
+                            {cell.events.length <= 3
+                              ? cell.events.map((e) => (
+                                  <li key={e.id} className="flex items-start gap-2 text-sm">
+                                    <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: categoryColor(e.category) }} aria-hidden="true" />
+                                    <span className="min-w-0 [overflow-wrap:anywhere]">{e.title}</span>
+                                  </li>
+                                ))
+                              : dayCategories(cell.events).map((category) => (
+                                  <li key={category} className="flex items-center gap-2 text-sm">
+                                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: categoryColor(category) }} aria-hidden="true" />
+                                    <span className="min-w-0 flex-1 truncate">{categoryLabel(category)}</span>
+                                    <span className="shrink-0 tabular-nums text-muted">{cell.events.filter((e) => e.category === category).length}</span>
+                                  </li>
+                                ))}
+                          </ul>
+                          {cell.events.length > 3 && (
+                            <p className="mt-2 text-xs text-muted">Select the day to see them all.</p>
+                          )}
                         </div>
                       )}
                     </div>

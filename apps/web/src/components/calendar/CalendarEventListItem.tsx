@@ -48,7 +48,7 @@ export function CalendarEventListItem({
     return (
       <div className="group flex items-start gap-3 py-1.5">
         <div className="w-14 shrink-0 pt-0.5 text-right">
-          <span className="text-[11px] font-semibold text-muted tabular">
+          <span className="text-xs font-semibold text-muted tabular">
             {formatEventTimeShort(event)}
           </span>
         </div>
@@ -58,13 +58,15 @@ export function CalendarEventListItem({
           aria-hidden="true"
         />
         <div className="flex-1 min-w-0">
-          <h4 className="text-sm font-heading font-semibold text-body truncate">{event.title}</h4>
-          <p className="text-xs text-muted mt-0.5 truncate flex items-center gap-1.5">
+          <h4 className="text-sm font-heading font-semibold text-body line-clamp-2 break-words">{event.title}</h4>
+          <p className="text-xs text-muted mt-0.5 flex flex-wrap items-center gap-x-1.5">
             <span>{formatEventTimeRange(event)}</span>
+            <span aria-hidden="true">·</span>
+            <span>{categoryLabel(event.category)}</span>
             {location && (
               <>
-                <span className="opacity-50">•</span>
-                <span className="truncate">{location}</span>
+                <span aria-hidden="true">·</span>
+                <span className="min-w-0 break-words">{location}</span>
               </>
             )}
           </p>
@@ -76,7 +78,7 @@ export function CalendarEventListItem({
                 type="button"
                 onClick={() => onEdit!(event)}
                 aria-label="Edit event"
-                className="p-2 min-h-[36px] min-w-[36px] text-muted hover:text-body active:bg-page rounded-lg transition-colors"
+                className="inline-flex items-center justify-center min-h-11 min-w-11 text-muted hover:text-body active:bg-page rounded-xl transition-colors"
               >
                 <Pencil className="w-3.5 h-3.5" aria-hidden="true" />
               </button>
@@ -86,7 +88,7 @@ export function CalendarEventListItem({
                 type="button"
                 onClick={() => onDelete!(event)}
                 aria-label="Delete event"
-                className="p-2 min-h-[36px] min-w-[36px] text-muted hover:text-brand-coral active:bg-page rounded-lg transition-colors"
+                className="inline-flex items-center justify-center min-h-11 min-w-11 text-muted hover:text-tone-coral active:bg-page rounded-xl transition-colors"
               >
                 <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
               </button>
@@ -98,27 +100,29 @@ export function CalendarEventListItem({
   }
 
   return (
-    <div className="group relative flex items-start gap-3 p-3.5 rounded-xl bg-surface hover:bg-page border border-base transition-colors">
+    <div className="group relative flex items-start gap-3 p-3.5 rounded-xl app-tint hover:bg-brand-teal/10 transition-colors">
       <div
         className="w-1.5 self-stretch rounded-full shrink-0 my-0.5"
         style={{ backgroundColor: color }}
         aria-hidden="true"
       />
       <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-xs font-semibold text-muted flex items-center gap-1">
-            <Clock className="w-3 h-3" aria-hidden="true" />
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+          <span className="text-xs font-semibold text-muted flex items-center gap-1 whitespace-nowrap">
+            <Clock className="w-3 h-3 shrink-0" aria-hidden="true" />
             {formatEventTimeRange(event)}
           </span>
-          <span
-            className="text-[11px] font-medium px-2 py-0.5 rounded-md border shrink-0"
-            style={{ backgroundColor: `${color}18`, borderColor: `${color}44`, color }}
-          >
+          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-body shrink-0">
+            <span
+              className="h-2 w-2 rounded-full shrink-0"
+              style={{ backgroundColor: color }}
+              aria-hidden="true"
+            />
             {categoryLabel(event.category)}
           </span>
         </div>
 
-        <h4 className="text-sm font-heading font-semibold text-body mt-1 truncate">
+        <h4 className="text-sm font-heading font-semibold text-body mt-1 line-clamp-2 break-words">
           {event.title}
         </h4>
 
@@ -139,7 +143,7 @@ export function CalendarEventListItem({
               type="button"
               onClick={() => onEdit!(event)}
               aria-label="Edit event"
-              className="p-1.5 min-h-[32px] min-w-[32px] rounded-lg bg-page text-muted hover:text-body transition-colors"
+              className="inline-flex items-center justify-center min-h-9 min-w-9 rounded-xl text-muted hover:text-body hover:bg-page transition-colors"
             >
               <Pencil className="w-3.5 h-3.5" aria-hidden="true" />
             </button>
@@ -149,7 +153,7 @@ export function CalendarEventListItem({
               type="button"
               onClick={() => onDelete!(event)}
               aria-label="Delete event"
-              className="p-1.5 min-h-[32px] min-w-[32px] rounded-lg bg-page text-muted hover:text-brand-coral transition-colors"
+              className="inline-flex items-center justify-center min-h-9 min-w-9 rounded-xl text-muted hover:text-tone-coral hover:bg-page transition-colors"
             >
               <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
             </button>

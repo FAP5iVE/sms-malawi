@@ -35,9 +35,11 @@
  */
 import 'server-only'
 
-import { prisma }        from '@/lib/prisma'
+import { prisma, withRetry } from '@/lib/prisma'
 import { logger }        from '@/lib/logger'
 import * as auditService from '@/server/services/auditService'
+import * as settingsService from '@/server/services/settingsService'
+import { SETTING_KEYS } from '@shared/types/settings'
 import * as admin        from 'firebase-admin'
 import { getAdminApp }   from '@/lib/verifyAuth'
 import {
@@ -46,16 +48,32 @@ import {
   type Sex,
 } from '@prisma/client'
 import type { UserRole } from '@shared/types/roles'
+import type { ResidenceTypeValue, AdmissionTypeValue, ExitReasonValue } from '@shared/constants/malawi'
+import { SUPPORT_NEED_TYPES, type SupportNeedTypeValue, idNumberParts, nextIdSequence, formatIdNumber } from '@shared/constants/malawi'
+import type { ApiStudentGuardian } from '@shared/types/api'
+import type {
+  GuardianInput,
+  UpdateGuardianInput,
+  UpdateWelfareInput,
+  SupportNeedInput,
+  UpdateSupportNeedInput,
+  StudentExitInput,
+} from '@shared/schemas/student'
+import type { ApiStudentWelfare, ApiSupportNeed, ApiWelfareSummary } from '@shared/types/api'
 import * as algolia from '@/server/services/algoliaService'
+import * as guardianDirectorySync from '@/server/services/guardian/guardianDirectorySync'
+import * as riskService from '@/server/services/riskService'
 import { sendEmail } from '@/lib/email'
 import { generateTempPassword } from '@/lib/tempPassword'
 
 // ─────────────────────────────────────────────────────────
 //  REGISTRATION NUMBER GENERATOR
-//  Format: SMS-YYYY-NNNN  (e.g. SMS-2025-0042)
-//  Sequence is per academic year, zero-padded to 4 digits.
-//  Uses a Prisma aggregate to find the current year's max seq, wrapped in a
-//  bounded retry loop: two concurrent createStudent() calls can both read
+//  The layout comes from Settings → ID numbers (STUDENT_REGISTRATION_NO_FORMAT,
+//  default SMS-{YYYY}-0000 → SMS-2025-0042). The last run of zeros is the
+//  running number; {YYYY} / {YY} are the year the student is registered. Numbers
+//  already issued keep their value; only new students follow a changed format.
+//  Finds the highest running number already issued in the current layout and
+//  adds one, wrapped in a bounded retry loop: two concurrent createStudent() calls can both read
 //  the same "last" sequence before either writes, so the actual duplicate
 //  is only detectable by the registrationNo @unique constraint rejecting
 //  the second insert (P2002) — at which point we simply recompute the next
@@ -65,21 +83,23 @@ import { generateTempPassword } from '@/lib/tempPassword'
 const REGISTRATION_NO_MAX_ATTEMPTS = 5
 
 async function nextRegistrationNo(): Promise<string> {
-  const year   = new Date().getFullYear()
-  const prefix = `SMS-${year}-`
+  const format = await settingsService.get(SETTING_KEYS.STUDENT_REGISTRATION_NO_FORMAT)
+  const parts  = idNumberParts(format)
 
-  const last = await prisma.student.findFirst({
-    where:   { registrationNo: { startsWith: prefix } },
-    orderBy: { registrationNo: 'desc' },
-    select:  { registrationNo: true },
+  // Only numbers that start and end the way this layout does can set the next
+  // running number. Compared in code (not by sorting the text) so a number that
+  // grows a digit, e.g. 9999 → 10000, still counts as the highest.
+  const issued = await prisma.student.findMany({
+    where: {
+      registrationNo: {
+        startsWith: parts.prefix,
+        ...(parts.suffix ? { endsWith: parts.suffix } : {}),
+      },
+    },
+    select: { registrationNo: true },
   })
 
-  const lastSeq = last
-    ? parseInt(last.registrationNo.replace(prefix, ''), 10)
-    : 0
-
-  const nextSeq = lastSeq + 1
-  return `${prefix}${String(nextSeq).padStart(4, '0')}`
+  return formatIdNumber(format, nextIdSequence(issued.map((s) => s.registrationNo), parts))
 }
 
 function isUniqueConstraintError(err: unknown): boolean {
@@ -89,28 +109,113 @@ function isUniqueConstraintError(err: unknown): boolean {
   )
 }
 
+/** True when a P2002 is on the NRB number rather than the registration number. */
+function isNrbCollision(err: unknown): boolean {
+  if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+    const target = (err.meta as { target?: unknown } | undefined)?.target
+    const text = Array.isArray(target) ? target.join(',') : String(target ?? '')
+    return text.includes('nrbNumber')
+  }
+  return false
+}
+
+/** A form can send '' for "not recorded / clear it": store that as null. */
+function blankToNull(v: string | null | undefined): string | null {
+  if (v == null) return null
+  const t = v.trim()
+  return t === '' ? null : t
+}
+
+/**
+ * NRB numbers are unique but optional. Check up front so the caller gets a clear
+ * 409 instead of a raw constraint error (which the registration-number retry
+ * loop would otherwise mistake for a registration-number clash and retry).
+ */
+async function assertNrbAvailable(nrbNumber: string | null, excludeStudentId?: string): Promise<void> {
+  if (!nrbNumber) return
+  const clash = await prisma.student.findFirst({
+    where:  { nrbNumber, ...(excludeStudentId ? { id: { not: excludeStudentId } } : {}) },
+    select: { registrationNo: true },
+  })
+  if (clash) {
+    throw Object.assign(
+      new Error(`That NRB number is already recorded for student ${clash.registrationNo}.`),
+      { status: 409 },
+    )
+  }
+}
+
+/**
+ * A student who graduates completes their final year. The promotion run recorded
+ * that year as AWAITING_MANEB, so graduation turns that same row into GRADUATED
+ * (one row per student per year, so the year is not double-counted). A student
+ * with no recorded year, such as one who pre-dates the history table, gets a row
+ * for the current academic year. This never blocks the status change: history is
+ * best-effort here, and a failure is logged rather than thrown.
+ */
+async function recordGraduationOutcome(studentId: string): Promise<void> {
+  try {
+    const awaiting = await prisma.studentYearOutcome.findFirst({
+      where:   { studentId, outcome: 'AWAITING_MANEB' },
+      orderBy: { academicYear: 'desc' },
+      select:  { id: true },
+    })
+    if (awaiting) {
+      await prisma.studentYearOutcome.update({ where: { id: awaiting.id }, data: { outcome: 'GRADUATED' } })
+      return
+    }
+    const [academicYear, student] = await Promise.all([
+      settingsService.get(SETTING_KEYS.CURRENT_ACADEMIC_YEAR),
+      prisma.student.findUnique({ where: { id: studentId }, select: { class: { select: { form: true } } } }),
+    ])
+    await prisma.studentYearOutcome.upsert({
+      where:  { studentId_academicYear: { studentId, academicYear } },
+      create: { studentId, academicYear, form: student?.class?.form ?? 4, outcome: 'GRADUATED' },
+      update: { outcome: 'GRADUATED' },
+    })
+  } catch (err) {
+    logger.warn({ event: 'student.graduation_outcome_failed', studentId, err })
+  }
+}
+
+/** Whole-minute travel time, or null. */
+function travelOrNull(v: number | null | undefined): number | null {
+  return v == null ? null : Math.round(v)
+}
+
 // ─────────────────────────────────────────────────────────
-//  RISK LEVEL COMPUTATION
-//  Lightweight heuristic — computes a risk level string from
-//  available data without additional DB queries.
-//  Full riskService (Phase D7) will replace this with a richer model.
+//  RISK
+//  The old fee-only heuristic that lived here (computeRiskLevel — latest
+//  invoice only, a HIGH branch that could never fire) is gone. Every badge in
+//  the app — list, profile, class roster, dashboard — now comes from
+//  riskService.assessStudents(), so a student has ONE risk level for a given
+//  (academic year, term), derived from fees + results + attendance + library.
 // ─────────────────────────────────────────────────────────
 
-type RiskLevel = 'NONE' | 'LOW' | 'MEDIUM' | 'HIGH'
+type RiskLevel = riskService.RiskLevel
 
-function computeRiskLevel(
-  feeBalance:   number,
-  feeTotal:     number,
-  termAverage?: number | null
-): RiskLevel {
-  const hasHighFeeDebt  = feeTotal > 0 && (feeBalance / feeTotal) > 0.5
-  const hasPoorGrades   = termAverage != null && termAverage < 40
-  const hasModestGrades = termAverage != null && termAverage < 50
+/** The period risk is assessed for; defaults to the school's current one. */
+export interface RiskPeriodInput {
+  academicYear?: string
+  term?:         number
+}
 
-  if (hasHighFeeDebt && hasPoorGrades)   return 'HIGH'
-  if (hasHighFeeDebt || hasPoorGrades)   return 'MEDIUM'
-  if (hasModestGrades)                    return 'LOW'
-  return 'NONE'
+const resolveRiskPeriod = riskService.resolveRiskPeriod
+
+/** The risk-related fields of an API student, for a given viewer. */
+function riskFields(
+  a: riskService.RiskAssessment | undefined,
+  status: string,
+  viewer: riskService.RiskViewer,
+): Pick<ApiStudentSummary, 'riskLevel' | 'riskScore' | 'riskFactors'> & { insights: string[] } {
+  // Non-ACTIVE students (graduated/archived/awaiting MANEB) have no live risk,
+  // and a viewer without student.viewRiskStatus gets no risk at all — not even
+  // a level, so the API never carries more than the UI is allowed to show.
+  if (!a || status !== 'ACTIVE' || !viewer.canViewRisk) {
+    return { riskLevel: 'NONE', riskScore: 0, riskFactors: [], insights: [] }
+  }
+  const r = riskService.redactAssessment(a, viewer.visibility)
+  return { riskLevel: r.riskLevel, riskScore: r.riskScore, riskFactors: r.factors, insights: r.insights }
 }
 
 // ─────────────────────────────────────────────────────────
@@ -131,6 +236,9 @@ export interface ApiStudentSummary {
   photoKey:        string | null
   hasFirebaseUid:  boolean
   riskLevel:       RiskLevel
+  /** 0-100 composite from the unified engine (0 when not visible / not active). */
+  riskScore:       number
+  riskFactors:     riskService.RiskFactor[]
   feeBalance:      number
   currentBorrowings: number
   createdAt:       string
@@ -147,7 +255,25 @@ export interface ApiStudentDetail extends ApiStudentSummary {
   guardianName:    string
   guardianPhone:   string
   guardianRelation:string
+  // Demographics (profile card). Welfare data is NOT here: it is returned only
+  // by the welfare-gated endpoint (see the welfare section of this file).
+  nrbNumber:            string | null
+  traditionalAuthority: string | null
+  religion:             string | null
+  homeLanguage:         string | null
+  residenceType:        ResidenceTypeValue | null
+  travelMinutes:        number | null
+  admissionType:        AdmissionTypeValue
+  previousSchool:       string | null
+  reasonForTransfer:    string | null
+  /** Set only for archived students. The free-text exit note is NOT here: it is welfare-gated. */
+  exitReason:           ExitReasonValue | null
+  exitDate:             string | null
+  /** One row per academic year, written at promotion commit. */
+  yearOutcomes:         Array<{ academicYear: string; form: number; outcome: 'PROMOTED' | 'REPEATED' | 'GRADUATED' | 'AWAITING_MANEB' }>
   updatedAt:       string
+  /** Cross-module risk observations (profile card only). */
+  riskInsights:    string[]
 }
 
 export interface StudentListResult {
@@ -165,6 +291,9 @@ export interface StudentQueryFilters {
   sex?:        Sex
   form?:       number
   hasRisk?:    boolean
+  /** Period risk is assessed for (the global viewing period); defaults to the school's current one. */
+  academicYear?: string
+  term?:         number
   page?:       number
   pageSize?:   number
   /**
@@ -217,6 +346,15 @@ export interface CreateStudentInput {
   firebaseUid?:    string
   /** Validated by CreateStudentSchema; defaults to ACTIVE in create() when omitted. */
   status?:         StudentStatus
+  nrbNumber?:            string
+  traditionalAuthority?: string
+  religion?:             string
+  homeLanguage?:         string
+  residenceType?:        ResidenceTypeValue
+  travelMinutes?:        number | null
+  admissionType?:        AdmissionTypeValue
+  previousSchool?:       string
+  reasonForTransfer?:    string
 }
 
 export interface UpdateStudentInput {
@@ -237,6 +375,15 @@ export interface UpdateStudentInput {
   classId?:         string
   photoKey?:        string
   status?:          StudentStatus
+  nrbNumber?:            string
+  traditionalAuthority?: string
+  religion?:             string
+  homeLanguage?:         string
+  residenceType?:        ResidenceTypeValue
+  travelMinutes?:        number | null
+  admissionType?:        AdmissionTypeValue
+  previousSchool?:       string
+  reasonForTransfer?:    string
 }
 
 export interface LinkFirebaseUidInput {
@@ -315,7 +462,8 @@ const DEFAULT_PAGE_SIZE = 25
 const MAX_PAGE_SIZE     = 100
 
 export async function list(
-  filters: StudentQueryFilters
+  filters: StudentQueryFilters,
+  viewer: riskService.RiskViewer = riskService.NO_RISK_VIEWER,
 ): Promise<StudentListResult> {
   const {
     search,
@@ -382,15 +530,8 @@ export async function list(
         class: {
           select: { name: true, form: true },
         },
-        // Latest invoice for fee balance
-        invoices: {
-          orderBy:     { createdAt: 'desc' },
-          take:        1,
-          select: {
-            balance:     true,
-            totalAmount: true,
-          },
-        },
+        // Fee balance and risk both come from riskService (one source of truth);
+        // the old "latest invoice only" select is no longer needed here.
         // Active borrowings count
         borrowings: {
           where:  { status: 'ACTIVE' },
@@ -400,10 +541,13 @@ export async function list(
     }),
   ])
 
+  // ONE batched assessment for the whole page (≈7 queries, not 5 per row).
+  const period   = await resolveRiskPeriod(filters)
+  const assessed = await riskService.assessStudents(rows.map((r) => r.id), period)
+
   const students: ApiStudentSummary[] = rows.map((row) => {
-    const latestInvoice  = row.invoices[0] as { balance: Prisma.Decimal | number; totalAmount: Prisma.Decimal | number } | undefined
-    const feeBalance     = latestInvoice ? Number(latestInvoice.balance)     : 0
-    const feeTotal       = latestInvoice ? Number(latestInvoice.totalAmount)  : 0
+    const a    = assessed.get(row.id)
+    const risk = riskFields(a, row.status, viewer)
 
     return {
       id:              row.id,
@@ -418,8 +562,12 @@ export async function list(
       classForm:       row.class?.form  ?? null,
       photoKey:        row.photoKey,
       hasFirebaseUid:  Boolean(row.firebaseUid),
-      riskLevel:       computeRiskLevel(feeBalance, feeTotal),
-      feeBalance,
+      riskLevel:       risk.riskLevel,
+      riskScore:       risk.riskScore,
+      riskFactors:     risk.riskFactors,
+      // Outstanding through the viewed term — the same figure the FEE_DEBT risk
+      // factor uses, so "fees cleared" and the risk badge can't disagree.
+      feeBalance:      a?.metrics.feeBalance ?? 0,
       currentBorrowings: row.borrowings.length,
       createdAt:       row.createdAt.toISOString(),
     }
@@ -438,7 +586,11 @@ export async function list(
 //  GET BY ID
 // ─────────────────────────────────────────────────────────
 
-export async function getById(id: string): Promise<ApiStudentDetail | null> {
+export async function getById(
+  id: string,
+  period?: RiskPeriodInput,
+  viewer: riskService.RiskViewer = riskService.NO_RISK_VIEWER,
+): Promise<ApiStudentDetail | null> {
   const row = await prisma.student.findUnique({
     where:  { id },
     select: {
@@ -458,6 +610,21 @@ export async function getById(id: string): Promise<ApiStudentDetail | null> {
       guardianName:    true,
       guardianPhone:   true,
       guardianRelation:true,
+      nrbNumber:            true,
+      traditionalAuthority: true,
+      religion:             true,
+      homeLanguage:         true,
+      residenceType:        true,
+      travelMinutes:        true,
+      admissionType:        true,
+      previousSchool:       true,
+      reasonForTransfer:    true,
+      exitReason:           true,
+      exitDate:             true,
+      yearOutcomes: {
+        orderBy: { academicYear: 'asc' },
+        select:  { academicYear: true, form: true, outcome: true },
+      },
       classId:         true,
       photoKey:        true,
       firebaseUid:     true,
@@ -466,11 +633,6 @@ export async function getById(id: string): Promise<ApiStudentDetail | null> {
       updatedAt:       true,
       class: {
         select: { name: true, form: true },
-      },
-      invoices: {
-        orderBy: { createdAt: 'desc' },
-        take:    1,
-        select:  { balance: true, totalAmount: true },
       },
       borrowings: {
         where:  { status: 'ACTIVE' },
@@ -481,9 +643,8 @@ export async function getById(id: string): Promise<ApiStudentDetail | null> {
 
   if (!row) return null
 
-  const latestInvoice  = row.invoices[0] as { balance: Prisma.Decimal | number; totalAmount: Prisma.Decimal | number } | undefined
-  const feeBalance     = latestInvoice ? Number(latestInvoice.balance)    : 0
-  const feeTotal       = latestInvoice ? Number(latestInvoice.totalAmount) : 0
+  const assessment = (await riskService.assessStudents([row.id], await resolveRiskPeriod(period))).get(row.id)
+  const risk       = riskFields(assessment, row.status, viewer)
 
   return {
     id:              row.id,
@@ -502,13 +663,28 @@ export async function getById(id: string): Promise<ApiStudentDetail | null> {
     guardianName:    row.guardianName,
     guardianPhone:   row.guardianPhone,
     guardianRelation:row.guardianRelation,
+    nrbNumber:            row.nrbNumber,
+    traditionalAuthority: row.traditionalAuthority,
+    religion:             row.religion,
+    homeLanguage:         row.homeLanguage,
+    residenceType:        row.residenceType,
+    travelMinutes:        row.travelMinutes,
+    admissionType:        row.admissionType,
+    previousSchool:       row.previousSchool,
+    reasonForTransfer:    row.reasonForTransfer,
+    exitReason:           row.exitReason,
+    exitDate:             row.exitDate ? row.exitDate.toISOString() : null,
+    yearOutcomes:         row.yearOutcomes,
     classId:         row.classId,
     className:       row.class?.name  ?? null,
     classForm:       row.class?.form  ?? null,
     photoKey:        row.photoKey,
     hasFirebaseUid:  Boolean(row.firebaseUid),
-    riskLevel:       computeRiskLevel(feeBalance, feeTotal),
-    feeBalance,
+    riskLevel:       risk.riskLevel,
+    riskScore:       risk.riskScore,
+    riskFactors:     risk.riskFactors,
+    riskInsights:    risk.insights,
+    feeBalance:      assessment?.metrics.feeBalance ?? 0,
     currentBorrowings: row.borrowings.length,
     status:          row.status,
     createdAt:       row.createdAt.toISOString(),
@@ -521,14 +697,16 @@ export async function getById(id: string): Promise<ApiStudentDetail | null> {
  * This is the student-role self-lookup path — no ID needed.
  */
 export async function getByFirebaseUid(
-  firebaseUid: string
+  firebaseUid: string,
+  period?: RiskPeriodInput,
+  viewer: riskService.RiskViewer = riskService.NO_RISK_VIEWER,
 ): Promise<ApiStudentDetail | null> {
   const row = await prisma.student.findUnique({
     where:  { firebaseUid },
     select: { id: true },
   })
   if (!row) return null
-  return getById(row.id)
+  return getById(row.id, period, viewer)
 }
 
 // ─────────────────────────────────────────────────────────
@@ -654,6 +832,11 @@ export async function create(
   actorUid:    string,
   actorRole:   UserRole
 ): Promise<ApiStudentDetail> {
+  // NRB numbers are unique but optional: reject a clash BEFORE provisioning a
+  // login so a duplicate can't leave an orphaned Firebase account behind.
+  const nrbNumber = blankToNull(input.nrbNumber)
+  await assertNrbAvailable(nrbNumber)
+
   // Validate firebaseUid uniqueness before writing (provides better error message)
   if (input.firebaseUid) {
     const existing = await prisma.student.findUnique({
@@ -713,11 +896,37 @@ export async function create(
           photoKey:        input.photoKey ?? null,
           firebaseUid:     input.firebaseUid ?? null,
           status:          input.status ?? 'ACTIVE',
+          nrbNumber,
+          traditionalAuthority: blankToNull(input.traditionalAuthority),
+          religion:             blankToNull(input.religion),
+          homeLanguage:         blankToNull(input.homeLanguage),
+          residenceType:        input.residenceType ?? null,
+          travelMinutes:        travelOrNull(input.travelMinutes),
+          admissionType:        input.admissionType ?? 'NEW_INTAKE',
+          previousSchool:       blankToNull(input.previousSchool),
+          reasonForTransfer:    blankToNull(input.reasonForTransfer),
+          // The legacy guardian columns above are the denormalised primary
+          // guardian; this nested create writes the matching StudentGuardian row
+          // in the same statement, so the two can never start out of step.
+          guardians: {
+            create: {
+              fullName:           input.guardianName,
+              relation:           input.guardianRelation,
+              phone:              input.guardianPhone,
+              isPrimary:          true,
+              isEmergencyContact: true,
+            },
+          },
         },
         select: { id: true },
       })
       break
     } catch (err) {
+      // Lost a race on the NRB number after the pre-check: report it, don't retry.
+      if (isNrbCollision(err)) {
+        if (provisionedUid) await rollbackAuthAccount(provisionedUid, { where: 'create.nrb', email: input.email })
+        throw Object.assign(new Error('That NRB number is already recorded for another student.'), { status: 409 })
+      }
       if (!isUniqueConstraintError(err)) {
         // Roll back a just-provisioned Auth account on a non-retryable failure.
         if (provisionedUid) await rollbackAuthAccount(provisionedUid, { where: 'create', email: input.email })
@@ -737,6 +946,10 @@ export async function create(
       ? lastErr
       : new Error('Failed to generate a unique registration number after multiple attempts.')
   }
+
+  // [Guardian portal] The primary guardian card was written in the same statement.
+  // Propose it for portal access (PENDING, grants nothing). Best effort, never throws.
+  await guardianDirectorySync.syncAfterWrite(student.id, { uid: actorUid, role: actorRole }, 'ADMISSION')
 
   // Student row committed successfully — safe to email the credentials now.
   if (provisionedUid && tempPassword && input.email) {
@@ -760,6 +973,7 @@ export async function create(
         lastName:    input.lastName,
         classId:     input.classId,
         firebaseUid: input.firebaseUid ?? null,
+        nrbRecorded: Boolean(nrbNumber),
       },
     },
   })
@@ -782,6 +996,9 @@ logger.info(
     status:         created.status,
     sex:            created.sex,
     academicYear:   (created as ApiStudentDetail & { class?: { name: string; form: number; academicYear: string } | null }).class?.academicYear ?? null,
+    // [ALGOLIA ROLLOUT — Tier 1 item 3] previously collected on the model
+    // and returned by getById(), but never passed into this call.
+    district:       created.district ?? null,
   })
   return created
 }
@@ -802,11 +1019,23 @@ export async function update(
     select: {
       firstName: true, lastName: true, otherNames: true,
       classId: true, status: true, photoKey: true,
+      nrbNumber: true, traditionalAuthority: true, religion: true,
+      homeLanguage: true, residenceType: true, travelMinutes: true,
+      admissionType: true, previousSchool: true, reasonForTransfer: true,
     },
   })
 
   if (!before) {
     throw Object.assign(new Error('Student not found.'), { status: 404 })
+  }
+
+  // Archiving needs a recorded reason and date, which only the Archive action
+  // collects. Refuse it here rather than archive a student with no exit record.
+  if (input.status === 'ARCHIVED' && before.status !== 'ARCHIVED') {
+    throw Object.assign(
+      new Error('Use the Archive action to archive a student, so the reason for leaving is recorded.'),
+      { status: 400 },
+    )
   }
 
   const updateData: Prisma.StudentUncheckedUpdateInput = {}
@@ -827,16 +1056,65 @@ export async function update(
   if (input.classId          !== undefined) updateData.classId          = input.classId
   if (input.photoKey         !== undefined) updateData.photoKey         = input.photoKey
   if (input.status           !== undefined) updateData.status           = input.status
+  // Demographics: '' means "clear it".
+  if (input.nrbNumber            !== undefined) updateData.nrbNumber            = blankToNull(input.nrbNumber)
+  if (input.traditionalAuthority !== undefined) updateData.traditionalAuthority = blankToNull(input.traditionalAuthority)
+  if (input.religion             !== undefined) updateData.religion             = blankToNull(input.religion)
+  if (input.homeLanguage         !== undefined) updateData.homeLanguage         = blankToNull(input.homeLanguage)
+  if (input.residenceType        !== undefined) updateData.residenceType        = input.residenceType
+  if (input.travelMinutes        !== undefined) updateData.travelMinutes        = travelOrNull(input.travelMinutes)
+  if (input.admissionType        !== undefined) updateData.admissionType        = input.admissionType
+  if (input.previousSchool       !== undefined) updateData.previousSchool       = blankToNull(input.previousSchool)
+  if (input.reasonForTransfer    !== undefined) updateData.reasonForTransfer    = blankToNull(input.reasonForTransfer)
 
-  await prisma.student.update({
-    where: { id },
-    data:  updateData,
-  })
+  if (updateData.nrbNumber !== undefined) {
+    await assertNrbAvailable(updateData.nrbNumber as string | null, id)
+  }
 
-  const afterSelect = { ...before }
-  const changes     = auditService.createDiff(
-    before as Record<string, unknown>,
-    { ...before, ...input } as Record<string, unknown>
+  const guardianTouched =
+    input.guardianName !== undefined || input.guardianPhone !== undefined || input.guardianRelation !== undefined
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.student.update({
+        where: { id },
+        data:  updateData,
+      })
+      // The legacy columns ARE the primary guardian. Keep the primary row in
+      // step so an edit made on the student form shows on the guardians card.
+      if (guardianTouched) {
+        const primaryPatch: Prisma.StudentGuardianUpdateManyMutationInput = {}
+        if (input.guardianName     !== undefined) primaryPatch.fullName = input.guardianName
+        if (input.guardianPhone    !== undefined) primaryPatch.phone    = input.guardianPhone
+        if (input.guardianRelation !== undefined) primaryPatch.relation = input.guardianRelation
+        await tx.studentGuardian.updateMany({ where: { studentId: id, isPrimary: true }, data: primaryPatch })
+      }
+    })
+  } catch (err) {
+    if (isNrbCollision(err)) {
+      throw Object.assign(new Error('That NRB number is already recorded for another student.'), { status: 409 })
+    }
+    throw err
+  }
+
+  if (input.status === 'GRADUATED' && before.status !== 'GRADUATED') await recordGraduationOutcome(id)
+
+  // [Guardian portal] The legacy guardian columns were mirrored into the primary
+  // guardian card above; flag any portal link whose verified details no longer match.
+  if (guardianTouched) {
+    await guardianDirectorySync.syncAfterWrite(id, { uid: actorUid, role: actorRole }, 'STAFF')
+  }
+
+  // Diff what was actually applied (normalised), not the raw request body. The
+  // NRB number is an identity number: the audit trail records THAT it changed,
+  // never the value itself.
+  const afterApplied: Record<string, unknown> = { ...before }
+  for (const key of Object.keys(before)) {
+    if (key in updateData) afterApplied[key] = (updateData as Record<string, unknown>)[key]
+  }
+  const maskNrb = (v: unknown) => (v ? '[recorded]' : null)
+  const changes = auditService.createDiff(
+    { ...before, nrbNumber: maskNrb(before.nrbNumber) } as Record<string, unknown>,
+    { ...afterApplied, nrbNumber: maskNrb(afterApplied['nrbNumber']) },
   )
 
 await auditService.log({
@@ -845,7 +1123,10 @@ await auditService.log({
     entityId:   id,
     actorUid,
     actorRole,
-    metadata: { before: before as Record<string, unknown>, changes },
+    metadata: {
+      before: { ...before, nrbNumber: maskNrb(before.nrbNumber) } as Record<string, unknown>,
+      changes,
+    },
   })
 
   const updated = await getById(id) as ApiStudentDetail
@@ -855,6 +1136,9 @@ await auditService.log({
     lastName:  updated.lastName,
     fullName:  `${updated.firstName} ${updated.lastName}`,
     status:    updated.status,
+    // [ALGOLIA ROLLOUT — Tier 1 item 3] see the same note on indexStudent()
+    // above — district was collected but never synced.
+    district:  updated.district ?? null,
   })
   return updated
 }
@@ -869,10 +1153,20 @@ await auditService.log({
  * When called by lower_rank, this should be routed through the
  * PendingAction workflow rather than called directly.
  */
+/** Exit reason, date and note as stored on the Student row. */
+function exitColumns(exit: StudentExitInput) {
+  return {
+    exitReason: exit.exitReason,
+    exitDate:   new Date(`${exit.exitDate}T00:00:00Z`),
+    exitNote:   blankToNull(exit.exitNote),
+  }
+}
+
 export async function softDelete(
   id:        string,
   actorUid:  string,
-  actorRole: UserRole
+  actorRole: UserRole,
+  exit:      StudentExitInput,
 ): Promise<void> {
   const student = await prisma.student.findUnique({
     where:  { id },
@@ -889,7 +1183,7 @@ export async function softDelete(
 
   await prisma.student.update({
     where: { id },
-    data:  { status: 'ARCHIVED' },
+    data:  { status: 'ARCHIVED', ...exitColumns(exit) },
   })
 
 await auditService.log({
@@ -900,7 +1194,7 @@ await auditService.log({
     actorRole,
     metadata: {
       before: { status: student.status },
-      after:  { status: 'ARCHIVED' },
+      after:  { status: 'ARCHIVED', exitReason: exit.exitReason, exitDate: exit.exitDate },
       context: { registrationNo: student.registrationNo },
     },
   })
@@ -918,7 +1212,8 @@ export async function changeStatus(
   id:        string,
   newStatus: StudentStatus,
   actorUid:  string,
-  actorRole: UserRole
+  actorRole: UserRole,
+  exit?:     StudentExitInput,
 ): Promise<ApiStudentDetail> {
   const student = await prisma.student.findUnique({
     where:  { id },
@@ -929,10 +1224,25 @@ export async function changeStatus(
     throw Object.assign(new Error('Student not found.'), { status: 404 })
   }
 
+  // Archiving records why the student left. Moving a student BACK out of
+  // ARCHIVED (a returnee) clears the exit fields so "exits by reason" counts
+  // current exits only; the audit log keeps the history.
+  const archiving = newStatus === 'ARCHIVED' && student.status !== 'ARCHIVED'
+  if (archiving && !exit) {
+    throw Object.assign(new Error('An exit reason and exit date are required to archive a student.'), { status: 400 })
+  }
+  const leavingArchive = student.status === 'ARCHIVED' && newStatus !== 'ARCHIVED'
+  const graduating = newStatus === 'GRADUATED' && student.status !== 'GRADUATED'
+
   await prisma.student.update({
     where: { id },
-    data:  { status: newStatus },
+    data:  {
+      status: newStatus,
+      ...(archiving && exit ? exitColumns(exit) : {}),
+      ...(leavingArchive ? { exitReason: null, exitDate: null, exitNote: null } : {}),
+    },
   })
+  if (graduating) await recordGraduationOutcome(id)
 
   await auditService.log({
     action:     'student.status_changed',
@@ -942,7 +1252,9 @@ export async function changeStatus(
     actorRole,
     metadata: {
       before: { status: student.status },
-      after:  { status: newStatus },
+      after:  archiving && exit
+        ? { status: newStatus, exitReason: exit.exitReason, exitDate: exit.exitDate }
+        : { status: newStatus },
     },
   })
 
@@ -1046,6 +1358,33 @@ export async function linkFirebaseUid(
 //  CREATE FROM APPLICATION  (the canonical admission path)
 // ─────────────────────────────────────────────────────────
 
+/**
+ * Reads Application.supportNeeds (JSON written by buildApplicationCreateData) back
+ * into rows for student_support_needs. The column is untyped JSON, so every entry is
+ * re-checked here: anything that is not a known type is skipped, never trusted.
+ */
+function parseApplicationSupportNeeds(
+  raw: Prisma.JsonValue | null,
+): Array<{ type: SupportNeedTypeValue; accommodation: string | null; assistiveDevice: string | null }> {
+  if (!Array.isArray(raw)) return []
+  const seen = new Set<string>()
+  const rows: Array<{ type: SupportNeedTypeValue; accommodation: string | null; assistiveDevice: string | null }> = []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue
+    const rec  = item as Record<string, unknown>
+    const type = rec['type']
+    if (typeof type !== 'string' || !(SUPPORT_NEED_TYPES as readonly string[]).includes(type) || seen.has(type)) continue
+    seen.add(type)
+    const text = (v: unknown, max: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null)
+    rows.push({
+      type:            type as SupportNeedTypeValue,
+      accommodation:   text(rec['accommodation'], 300),
+      assistiveDevice: text(rec['assistiveDevice'], 200),
+    })
+  }
+  return rows
+}
+
 export interface ConvertApplicationInput {
   applicationId:   string
   classId?:        string
@@ -1108,6 +1447,29 @@ export async function createFromApplication(
     )
   }
 
+  // ── 2b. Data that rides along from the application.
+  // NRB number is unique on the student. It was typed by the applicant and no screen
+  // edits an application, so a clash must not block the admission: the student is
+  // created without it (staff can add the right one on the student record) and the
+  // audit entry says so.
+  let nrbNumber: string | null = blankToNull(app.nrbNumber)
+  let nrbSkipped = false
+  if (nrbNumber) {
+    const clash = await prisma.student.findFirst({ where: { nrbNumber }, select: { registrationNo: true } })
+    if (clash) {
+      logger.warn(
+        { event: 'studentService.application_nrb_clash', applicationId, clashesWith: clash.registrationNo },
+        '[studentService] Application NRB number already belongs to another student - admitting without it'
+      )
+      nrbNumber  = null
+      nrbSkipped = true
+    }
+  }
+  const supportNeedRows = parseApplicationSupportNeeds(app.supportNeeds)
+  const hasWelfare =
+    app.orphanStatus !== 'UNKNOWN' || app.isVulnerable || !!app.vulnerabilityNote ||
+    !!app.medicalAlert || supportNeedRows.length > 0
+
   // ── 3. Optional Firebase account creation (must happen before Prisma tx)
   let firebaseUid:  string | null = null
   let tempPassword: string | null = null
@@ -1146,24 +1508,62 @@ export async function createFromApplication(
   for (let attempt = 0; attempt < REGISTRATION_NO_MAX_ATTEMPTS; attempt++) {
     registrationNo = await nextRegistrationNo()
     try {
-      const [createdStudent] = await prisma.$transaction([
+      const [createdStudent] = await withRetry(() => prisma.$transaction([
         prisma.student.create({
           data: {
             registrationNo,
             firstName:       app.firstName,
             lastName:        app.lastName,
-            otherNames:      null,
+            // These three were written as null although the Application row
+            // holds them - the data was collected, then lost at admission.
+            otherNames:      app.otherNames,
             dateOfBirth:     app.dateOfBirth,
             sex:             app.sex,
             nationality:     app.nationality,
             district:        app.district,
             village:         app.village,
-            address:         null,
-            phone:           null,
+            address:         app.address,
+            phone:           app.phone,
             email:           app.email ?? null,
+            traditionalAuthority: app.traditionalAuthority,
+            religion:             app.religion,
+            homeLanguage:         app.homeLanguage,
+            previousSchool:       app.previousSchool,
+            reasonForTransfer:    app.reasonForTransfer,
+            nrbNumber,
+            residenceType:        app.residenceType,
+            travelMinutes:        app.travelMinutes,
+            // The applicant's own answer wins. When they left it blank: joining
+            // Form 2 or above means a learner moving in from elsewhere; Form 1
+            // is the normal intake. RETURNEE is otherwise set by staff when a
+            // learner who left is readmitted.
+            admissionType:        app.admissionType ?? (app.applyingForForm >= 2 ? 'TRANSFER_IN' : 'NEW_INTAKE'),
+            // Welfare, health and special needs captured on the application.
+            orphanStatus:         app.orphanStatus,
+            isVulnerable:         app.isVulnerable,
+            vulnerabilityNote:    app.vulnerabilityNote,
+            medicalAlert:         app.medicalAlert,
+            ...(app.isVulnerable || app.vulnerabilityNote ? { vulnerabilityReviewedAt: new Date() } : {}),
+            ...(supportNeedRows.length > 0
+              ? { supportNeeds: { create: supportNeedRows.map((n) => ({ ...n, recordedByUid: actorUid })) } }
+              : {}),
             guardianName:    app.guardianName,
             guardianPhone:   app.guardianPhone,
             guardianRelation:app.guardianRelation,
+            // guardianEmail / guardianAddress were captured on the application
+            // but had no home on the student; they now live on the primary
+            // guardian row.
+            guardians: {
+              create: {
+                fullName:           app.guardianName,
+                relation:           app.guardianRelation,
+                phone:              app.guardianPhone,
+                email:              app.guardianEmail || null,
+                address:            app.guardianAddress || null,
+                isPrimary:          true,
+                isEmergencyContact: true,
+              },
+            },
             classId:         classId ? classId : null,
             photoKey:        null,
             firebaseUid:     firebaseUid,
@@ -1181,10 +1581,16 @@ export async function createFromApplication(
           },
           select: { id: true },
         }),
-      ])
+      ]))
       student = createdStudent
       break
     } catch (err) {
+      // Lost a race on the NRB number after the pre-check above: report it, don't
+      // retry (the retry loop is for registration-number clashes only).
+      if (isNrbCollision(err)) {
+        if (firebaseUid) await rollbackAuthAccount(firebaseUid, { where: 'createFromApplication.nrb', email: app.email })
+        throw Object.assign(new Error('That NRB number is already recorded for another student.'), { status: 409 })
+      }
       if (!isUniqueConstraintError(err)) {
         // [PRODUCTION FIX] This branch previously rethrew without rolling
         // back the Firebase account provisioned above (create()'s equivalent
@@ -1208,11 +1614,24 @@ export async function createFromApplication(
       : new Error('Failed to generate a unique registration number after multiple attempts.')
   }
 
-  // Update convertedStudentId after we have the student ID
-  await prisma.application.update({
+  // Update convertedStudentId after we have the student ID.
+  // [PRODUCTION FIX] Wrapped in its own `withRetry`: the student+ADMITTED
+  // change above already committed atomically, so from here on a transient
+  // connection drop must be retried in place, not by letting the error
+  // escape this function — an outer retry around the whole call would
+  // re-run the precondition check (line ~1103) against an application
+  // that's already ADMITTED and throw a false "does not allow conversion"
+  // error (idempotent to retry: re-setting the same convertedStudentId).
+  await withRetry(() => prisma.application.update({
     where: { id: applicationId },
     data:  { convertedStudentId: student.id },
-  })
+  }))
+
+  // [Guardian portal] The primary guardian card (with the application's email and
+  // address) was written in the same statement as the student. Propose it for portal
+  // access: PENDING, grants nothing. Idempotent and best effort, so the retry note
+  // above does not matter and a failure never blocks the admission.
+  await guardianDirectorySync.syncAfterWrite(student.id, { uid: actorUid, role: actorRole }, 'ADMISSION')
 
   // Student row committed successfully — safe to email the credentials now.
   // [PRODUCTION FIX] Previously provisionStudentAuthAccount() sent this email
@@ -1227,7 +1646,14 @@ export async function createFromApplication(
   }
 
   // ── 6. Audit log
-  await auditService.log({
+  // [PRODUCTION FIX] Wrapped in `withRetry` — this is the call that was
+  // observed hitting a transient Neon connection drop and, unretried,
+  // propagating out to an outer retry wrapper that re-ran this whole
+  // function (see note above). Same idempotency reasoning: a retried
+  // audit-log insert is an accepted, existing risk class in this codebase
+  // (matches `withRetry(() => prisma.$transaction(...))` elsewhere), not a
+  // new one introduced here.
+  await withRetry(() => auditService.log({
     action:     'application.converted_to_student',
     entityType: 'Application',
     entityId:   applicationId,
@@ -1240,16 +1666,21 @@ export async function createFromApplication(
         firebaseUid:    firebaseUid,
         classId:        classId ?? null,
         firebaseCreated:Boolean(createLoginAccount),
+        // Which application fields were carried across (values are never logged).
+        nrbRecorded:         Boolean(nrbNumber),
+        nrbSkippedAsClash:   nrbSkipped,
+        welfareCarriedOver:  hasWelfare,
+        supportNeedsCarried: supportNeedRows.length,
       },
     },
-  })
+  }))
 
   logger.info(
     { studentId: student.id, applicationId, registrationNo, firebaseUid },
     '[studentService] Application converted to student'
   )
 
-  const detail = await getById(student.id) as ApiStudentDetail
+  const detail = await withRetry(() => getById(student.id)) as ApiStudentDetail
 
   return { student: detail, firebaseUid, tempPassword }
 }
@@ -1277,4 +1708,413 @@ export async function passesFeGate(
 
   if (!invoice) return true // No invoice yet — no barrier
   return Number(invoice.balance) <= 0
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// GUARDIANS
+//
+// Student.guardianName / guardianPhone / guardianRelation are the denormalised
+// PRIMARY guardian (invoices, SMS and the forms read them). Every mutation below
+// runs in one transaction and ends by mirroring the primary row back onto those
+// columns, so the two can't drift. Rules, checked inside the transaction:
+//   - exactly one primary guardian per student
+//   - at least one emergency contact per student
+// Audit entries record that a guardian changed (and which), never their phone
+// numbers or addresses.
+// ═══════════════════════════════════════════════════════════════════════════
+
+type GuardianRow = Prisma.StudentGuardianGetPayload<Record<string, never>>
+
+function toApiGuardian(g: GuardianRow): ApiStudentGuardian {
+  return {
+    id:                 g.id,
+    studentId:          g.studentId,
+    fullName:           g.fullName,
+    relation:           g.relation,
+    phone:              g.phone,
+    altPhone:           g.altPhone,
+    email:              g.email,
+    address:            g.address,
+    nrbNumber:          g.nrbNumber,
+    isPrimary:          g.isPrimary,
+    isFeePayer:         g.isFeePayer,
+    isEmergencyContact: g.isEmergencyContact,
+    livesWithStudent:   g.livesWithStudent,
+    createdAt:          g.createdAt.toISOString(),
+    updatedAt:          g.updatedAt.toISOString(),
+  }
+}
+
+function guardianError(message: string, status = 409): Error {
+  return Object.assign(new Error(message), { status })
+}
+
+/** Throws unless the student has exactly one primary and at least one emergency contact. */
+async function assertGuardianRules(tx: Prisma.TransactionClient, studentId: string): Promise<void> {
+  const rows = await tx.studentGuardian.findMany({
+    where:  { studentId },
+    select: { isPrimary: true, isEmergencyContact: true },
+  })
+  if (rows.filter((r) => r.isPrimary).length !== 1) {
+    throw guardianError('A student must have exactly one primary guardian.')
+  }
+  if (!rows.some((r) => r.isEmergencyContact)) {
+    throw guardianError('A student must have at least one emergency contact.')
+  }
+}
+
+/** Copies the primary guardian onto the legacy Student columns. */
+async function mirrorPrimaryGuardian(tx: Prisma.TransactionClient, studentId: string): Promise<void> {
+  const primary = await tx.studentGuardian.findFirst({
+    where:  { studentId, isPrimary: true },
+    select: { fullName: true, phone: true, relation: true },
+  })
+  if (!primary) return
+  await tx.student.update({
+    where: { id: studentId },
+    data:  { guardianName: primary.fullName, guardianPhone: primary.phone, guardianRelation: primary.relation },
+  })
+}
+
+async function assertStudentExists(tx: Prisma.TransactionClient, studentId: string): Promise<void> {
+  const exists = await tx.student.findUnique({ where: { id: studentId }, select: { id: true } })
+  if (!exists) throw guardianError('Student not found.', 404)
+}
+
+function cleanGuardianFields(input: UpdateGuardianInput): Prisma.StudentGuardianUncheckedUpdateInput {
+  const data: Prisma.StudentGuardianUncheckedUpdateInput = {}
+  if (input.fullName           !== undefined) data.fullName           = input.fullName
+  if (input.relation           !== undefined) data.relation           = input.relation
+  if (input.phone              !== undefined) data.phone              = input.phone
+  if (input.altPhone           !== undefined) data.altPhone           = blankToNull(input.altPhone)
+  if (input.email              !== undefined) data.email              = blankToNull(input.email)
+  if (input.address            !== undefined) data.address            = blankToNull(input.address)
+  if (input.nrbNumber          !== undefined) data.nrbNumber          = blankToNull(input.nrbNumber)
+  if (input.isFeePayer         !== undefined) data.isFeePayer         = input.isFeePayer
+  if (input.isEmergencyContact !== undefined) data.isEmergencyContact = input.isEmergencyContact
+  if (input.livesWithStudent   !== undefined) data.livesWithStudent   = input.livesWithStudent
+  return data
+}
+
+export async function listGuardians(studentId: string): Promise<ApiStudentGuardian[]> {
+  const student = await prisma.student.findUnique({ where: { id: studentId }, select: { id: true } })
+  if (!student) throw guardianError('Student not found.', 404)
+  const rows = await prisma.studentGuardian.findMany({
+    where:   { studentId },
+    orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+  })
+  return rows.map(toApiGuardian)
+}
+
+export async function addGuardian(
+  studentId: string,
+  input: GuardianInput,
+  actorUid: string,
+  actorRole: UserRole,
+): Promise<ApiStudentGuardian> {
+  const created = await prisma.$transaction(async (tx) => {
+    await assertStudentExists(tx, studentId)
+    const existing = await tx.studentGuardian.count({ where: { studentId } })
+    const makePrimary = input.isPrimary === true || existing === 0
+
+    if (makePrimary) {
+      await tx.studentGuardian.updateMany({ where: { studentId, isPrimary: true }, data: { isPrimary: false } })
+    }
+    const row = await tx.studentGuardian.create({
+      data: {
+        studentId,
+        fullName:           input.fullName,
+        relation:           input.relation,
+        phone:              input.phone,
+        altPhone:           blankToNull(input.altPhone),
+        email:              blankToNull(input.email),
+        address:            blankToNull(input.address),
+        nrbNumber:          blankToNull(input.nrbNumber),
+        isPrimary:          makePrimary,
+        isFeePayer:         input.isFeePayer ?? false,
+        isEmergencyContact: input.isEmergencyContact ?? false,
+        livesWithStudent:   input.livesWithStudent ?? null,
+      },
+    })
+    await assertGuardianRules(tx, studentId)
+    if (makePrimary) await mirrorPrimaryGuardian(tx, studentId)
+    return row
+  })
+
+  // [Guardian portal] Propose the new card for portal access (PENDING). Best effort.
+  await guardianDirectorySync.syncAfterWrite(studentId, { uid: actorUid, role: actorRole }, 'STAFF')
+
+  await auditService.log({
+    action:     'student.guardian_changed',
+    entityType: 'Student',
+    entityId:   studentId,
+    actorUid,
+    actorRole,
+    metadata:   { context: { change: 'added', guardianId: created.id, isPrimary: created.isPrimary } },
+  })
+  return toApiGuardian(created)
+}
+
+export async function updateGuardian(
+  studentId: string,
+  guardianId: string,
+  input: UpdateGuardianInput,
+  actorUid: string,
+  actorRole: UserRole,
+): Promise<ApiStudentGuardian> {
+  const updated = await prisma.$transaction(async (tx) => {
+    const current = await tx.studentGuardian.findFirst({ where: { id: guardianId, studentId } })
+    if (!current) throw guardianError('Guardian not found.', 404)
+
+    if (current.isPrimary && input.isPrimary === false) {
+      throw guardianError('Make another guardian the primary instead of un-setting this one.')
+    }
+
+    const data = cleanGuardianFields(input)
+    if (input.isPrimary === true && !current.isPrimary) {
+      await tx.studentGuardian.updateMany({ where: { studentId, isPrimary: true }, data: { isPrimary: false } })
+      data.isPrimary = true
+    }
+
+    const row = await tx.studentGuardian.update({ where: { id: guardianId }, data })
+    await assertGuardianRules(tx, studentId)
+    if (row.isPrimary) await mirrorPrimaryGuardian(tx, studentId)
+    return row
+  })
+
+  // [Guardian portal] Flag any portal link whose verified details no longer match this
+  // card (a changed name, number, email or relationship needs staff to look again).
+  await guardianDirectorySync.syncAfterWrite(studentId, { uid: actorUid, role: actorRole }, 'STAFF')
+
+  await auditService.log({
+    action:     'student.guardian_changed',
+    entityType: 'Student',
+    entityId:   studentId,
+    actorUid,
+    actorRole,
+    metadata:   { context: { change: 'updated', guardianId, fieldsChanged: Object.keys(input) } },
+  })
+  return toApiGuardian(updated)
+}
+
+export async function deleteGuardian(
+  studentId: string,
+  guardianId: string,
+  actorUid: string,
+  actorRole: UserRole,
+): Promise<void> {
+  const portalAudit = await prisma.$transaction(async (tx) => {
+    const current = await tx.studentGuardian.findFirst({ where: { id: guardianId, studentId } })
+    if (!current) throw guardianError('Guardian not found.', 404)
+    if (current.isPrimary) {
+      throw guardianError('The primary guardian cannot be removed. Make another guardian primary first.')
+    }
+    // [Guardian portal] FAIL CLOSED, before the delete: suspend the portal access made
+    // from this card. The foreign key clears the link's card reference the moment the
+    // row goes, so this cannot run afterwards. If it throws, the delete is aborted.
+    const audit = await guardianDirectorySync.guardRemovalInTx(tx, guardianId, { uid: actorUid, role: actorRole })
+    await tx.studentGuardian.delete({ where: { id: guardianId } })
+    await assertGuardianRules(tx, studentId)
+    return audit
+  })
+  await guardianDirectorySync.emitAudit(portalAudit)
+
+  await auditService.log({
+    action:     'student.guardian_changed',
+    entityType: 'Student',
+    entityId:   studentId,
+    actorUid,
+    actorRole,
+    metadata:   { context: { change: 'removed', guardianId } },
+  })
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// WELFARE (sensitive child data)
+//
+// Orphan status, vulnerability, support needs and the medical alert are served
+// ONLY from here, never from getById(): the routes gate reads on
+// student.viewWelfare and writes on student.editWelfare, so there is no student
+// payload to "strip" and nothing for a role without the permission to receive.
+//
+// These values are deliberately never an input to the risk score (riskService
+// does not read them): a family circumstance is not a problem with the child,
+// and scoring it would label children. They exist to target support and to
+// prioritise bursary review.
+//
+// Audit entries name the fields that changed, never their values.
+// ═══════════════════════════════════════════════════════════════════════════
+
+type SupportNeedRow = Prisma.StudentSupportNeedGetPayload<Record<string, never>>
+
+function toApiSupportNeed(n: SupportNeedRow): ApiSupportNeed {
+  return {
+    id:              n.id,
+    type:            n.type,
+    accommodation:   n.accommodation,
+    assistiveDevice: n.assistiveDevice,
+    identifiedAt:    n.identifiedAt ? n.identifiedAt.toISOString() : null,
+    createdAt:       n.createdAt.toISOString(),
+  }
+}
+
+async function auditWelfare(
+  studentId: string,
+  actorUid: string,
+  actorRole: UserRole,
+  context: Record<string, unknown>,
+): Promise<void> {
+  await auditService.log({
+    action:     'student.welfare_edited',
+    entityType: 'Student',
+    entityId:   studentId,
+    actorUid,
+    actorRole,
+    metadata:   { context },
+  })
+}
+
+export async function getWelfare(studentId: string): Promise<ApiStudentWelfare> {
+  const row = await prisma.student.findUnique({
+    where:  { id: studentId },
+    select: {
+      id: true, orphanStatus: true, isVulnerable: true, vulnerabilityNote: true,
+      vulnerabilityReviewedAt: true, medicalAlert: true, exitNote: true,
+      supportNeeds: { orderBy: { createdAt: 'asc' } },
+    },
+  })
+  if (!row) throw Object.assign(new Error('Student not found.'), { status: 404 })
+  return {
+    studentId:               row.id,
+    orphanStatus:            row.orphanStatus,
+    isVulnerable:            row.isVulnerable,
+    vulnerabilityNote:       row.vulnerabilityNote,
+    vulnerabilityReviewedAt: row.vulnerabilityReviewedAt ? row.vulnerabilityReviewedAt.toISOString() : null,
+    medicalAlert:            row.medicalAlert,
+    exitNote:                row.exitNote,
+    supportNeeds:            row.supportNeeds.map(toApiSupportNeed),
+  }
+}
+
+export async function updateWelfare(
+  studentId: string,
+  input: UpdateWelfareInput,
+  actorUid: string,
+  actorRole: UserRole,
+): Promise<ApiStudentWelfare> {
+  const data: Prisma.StudentUncheckedUpdateInput = {}
+  const fieldsChanged: string[] = []
+  if (input.orphanStatus !== undefined)      { data.orphanStatus = input.orphanStatus;                       fieldsChanged.push('orphanStatus') }
+  if (input.isVulnerable !== undefined)      { data.isVulnerable = input.isVulnerable;                       fieldsChanged.push('isVulnerable') }
+  if (input.vulnerabilityNote !== undefined) { data.vulnerabilityNote = blankToNull(input.vulnerabilityNote); fieldsChanged.push('vulnerabilityNote') }
+  if (input.medicalAlert !== undefined)      { data.medicalAlert = blankToNull(input.medicalAlert);          fieldsChanged.push('medicalAlert') }
+  if (fieldsChanged.length === 0) return getWelfare(studentId)
+
+  // Touching the vulnerability flag or its note counts as a review, so the
+  // "last reviewed" date on the card means something.
+  if (input.isVulnerable !== undefined || input.vulnerabilityNote !== undefined) {
+    data.vulnerabilityReviewedAt = new Date()
+  }
+
+  try {
+    await prisma.student.update({ where: { id: studentId }, data })
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
+      throw Object.assign(new Error('Student not found.'), { status: 404 })
+    }
+    throw err
+  }
+  await auditWelfare(studentId, actorUid, actorRole, { fieldsChanged })
+  return getWelfare(studentId)
+}
+
+export async function addSupportNeed(
+  studentId: string,
+  input: SupportNeedInput,
+  actorUid: string,
+  actorRole: UserRole,
+): Promise<ApiSupportNeed> {
+  const exists = await prisma.student.findUnique({ where: { id: studentId }, select: { id: true } })
+  if (!exists) throw Object.assign(new Error('Student not found.'), { status: 404 })
+
+  const row = await prisma.studentSupportNeed.create({
+    data: {
+      studentId,
+      type:            input.type,
+      accommodation:   blankToNull(input.accommodation),
+      assistiveDevice: blankToNull(input.assistiveDevice),
+      identifiedAt:    input.identifiedAt ? new Date(input.identifiedAt) : null,
+      recordedByUid:   actorUid,
+    },
+  })
+  await auditWelfare(studentId, actorUid, actorRole, { change: 'supportNeedAdded', supportNeedId: row.id, type: row.type })
+  return toApiSupportNeed(row)
+}
+
+export async function updateSupportNeed(
+  studentId: string,
+  needId: string,
+  input: UpdateSupportNeedInput,
+  actorUid: string,
+  actorRole: UserRole,
+): Promise<ApiSupportNeed> {
+  const current = await prisma.studentSupportNeed.findFirst({ where: { id: needId, studentId } })
+  if (!current) throw Object.assign(new Error('Support need not found.'), { status: 404 })
+
+  const data: Prisma.StudentSupportNeedUncheckedUpdateInput = {}
+  if (input.type            !== undefined) data.type            = input.type
+  if (input.accommodation   !== undefined) data.accommodation   = blankToNull(input.accommodation)
+  if (input.assistiveDevice !== undefined) data.assistiveDevice = blankToNull(input.assistiveDevice)
+  if (input.identifiedAt    !== undefined) data.identifiedAt    = input.identifiedAt ? new Date(input.identifiedAt) : null
+
+  const row = await prisma.studentSupportNeed.update({ where: { id: needId }, data })
+  await auditWelfare(studentId, actorUid, actorRole, { change: 'supportNeedUpdated', supportNeedId: needId, fieldsChanged: Object.keys(input) })
+  return toApiSupportNeed(row)
+}
+
+export async function deleteSupportNeed(
+  studentId: string,
+  needId: string,
+  actorUid: string,
+  actorRole: UserRole,
+): Promise<void> {
+  const current = await prisma.studentSupportNeed.findFirst({ where: { id: needId, studentId } })
+  if (!current) throw Object.assign(new Error('Support need not found.'), { status: 404 })
+  await prisma.studentSupportNeed.delete({ where: { id: needId } })
+  await auditWelfare(studentId, actorUid, actorRole, { change: 'supportNeedRemoved', supportNeedId: needId, type: current.type })
+}
+
+/**
+ * Welfare COUNTS for dashboards: totals only, never names. Active students only
+ * (graduated and archived learners aren't a current caseload).
+ */
+export async function getWelfareSummary(): Promise<ApiWelfareSummary> {
+  const active = { status: 'ACTIVE' as const }
+  const [activeStudents, byOrphan, vulnerable, needsByType, studentsWithNeeds] = await Promise.all([
+    prisma.student.count({ where: active }),
+    prisma.student.groupBy({ by: ['orphanStatus'], where: active, _count: { _all: true } }),
+    prisma.student.count({ where: { ...active, isVulnerable: true } }),
+    prisma.studentSupportNeed.groupBy({
+      by: ['type'],
+      where: { student: active },
+      _count: { _all: true },
+    }),
+    prisma.student.count({ where: { ...active, supportNeeds: { some: {} } } }),
+  ])
+
+  const orphanCount = (s: string) => byOrphan.find((r) => r.orphanStatus === s)?._count._all ?? 0
+  const father = orphanCount('FATHER_DECEASED')
+  const mother = orphanCount('MOTHER_DECEASED')
+  const both   = orphanCount('BOTH_DECEASED')
+
+  return {
+    activeStudents,
+    orphans: { total: father + mother + both, father, mother, both },
+    vulnerable,
+    withSupportNeeds: studentsWithNeeds,
+    supportNeedsByType: needsByType
+      .map((r) => ({ type: r.type, count: r._count._all }))
+      .sort((a, b) => b.count - a.count),
+    orphanStatusUnrecorded: orphanCount('UNKNOWN'),
+  }
 }

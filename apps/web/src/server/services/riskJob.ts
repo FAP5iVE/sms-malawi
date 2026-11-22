@@ -28,6 +28,21 @@
  *   path back in — e.g. a dedicated `RiskAssessment` table — remains out
  *   of scope.
  *
+ * [CHANGE TYPE]: TARGETED EDIT [ALGOLIA ROLLOUT — Tier 1 item 3]
+ *   R5's "persistence path back in remains out of scope" note above no
+ *   longer applies. Persisting weekly-computed riskLevel back to Postgres
+ *   was the wrong call (see R5's own reasoning — nothing kept a column in
+ *   sync, hence removing it), but that reasoning doesn't apply to Algolia:
+ *   this job already recomputes riskLevel for every active student every
+ *   Monday regardless of whether anything reads it, so pushing that same
+ *   value into the students index via partialUpdateObject is free
+ *   (already-computed data, one more await per student in the same batch)
+ *   and turns riskLevel into a genuinely useful instant facet
+ *   ("show me all HIGH-risk students") without recreating the Postgres
+ *   integrity trap R5 removed — Algolia is explicitly a cache/derived-data
+ *   store here, not a system of record, so a value that's "correct as of
+ *   last Monday" is the expected shape, not a bug.
+ *
  * Weekly cron job that computes risk levels for all active students.
  *
  * Triggered by:
@@ -40,10 +55,21 @@
 import 'server-only'
 import { prisma }            from '@/lib/prisma'
 import { logger }            from '@/lib/logger'
-import { assessStudentRisk } from '@/server/services/riskService'
+import { assessStudents, invalidateRiskOverview } from '@/server/services/riskService'
+import * as algolia          from '@/server/services/algoliaService'
 
-const CONCURRENT_LIMIT = 10
+/** Students assessed per batch — riskService runs ~7 queries per batch, not per student. */
+const BATCH_SIZE = 200
 
+/**
+ * Re-assess every ACTIVE student with the unified risk engine (fees + results +
+ * attendance + library) and push level + score to Algolia. Uses the same
+ * assessStudents() as the Students list, profile and class roster, so the weekly
+ * Algolia facet can never disagree with what staff see on screen.
+ *
+ * [CHANGE TYPE]: batched — previously 10 students at a time, each running its
+ * own set of queries; now one batched assessment per BATCH_SIZE students.
+ */
 export async function runRiskAssessmentJob(
   academicTerm: number,
   academicYear: string,
@@ -56,21 +82,33 @@ export async function runRiskAssessmentJob(
   let processed = 0
   let errors    = 0
 
-  for (let i = 0; i < students.length; i += CONCURRENT_LIMIT) {
-    const chunk = students.slice(i, i + CONCURRENT_LIMIT)
-    await Promise.allSettled(
-      chunk.map(async (s) => {
-        try {
-          const { riskLevel } = await assessStudentRisk(s.id, academicTerm, academicYear)
-          logger.info({ event: 'risk-job.student-assessed', studentId: s.id, riskLevel })
+  for (let i = 0; i < students.length; i += BATCH_SIZE) {
+    const batch = students.slice(i, i + BATCH_SIZE)
+    try {
+      const assessed = await assessStudents(batch.map((s) => s.id), { academicYear, term: academicTerm })
+      await Promise.allSettled(
+        batch.map(async (s) => {
+          const a = assessed.get(s.id)
+          if (!a) { errors++; return }
+          logger.info({
+            event: 'risk-job.student-assessed',
+            studentId: s.id, riskLevel: a.riskLevel, riskScore: a.riskScore, domains: a.domains,
+          })
+          // Algolia is a derived-data cache here, not a system of record (see
+          // header): fire-and-forget, a failed push only leaves one student's
+          // facet stale until the next run.
+          void algolia.updateStudent({ objectID: s.id, riskLevel: a.riskLevel, riskScore: a.riskScore })
           processed++
-        } catch (err) {
-          logger.error({ event: 'risk-job.student-error', studentId: s.id, err })
-          errors++
-        }
-      }),
-    )
+        }),
+      )
+    } catch (err) {
+      logger.error({ event: 'risk-job.batch-error', offset: i, size: batch.length, err })
+      errors += batch.length
+    }
   }
+
+  // Dashboards read a short-lived aggregate; drop it so they reflect this run.
+  invalidateRiskOverview()
 
   logger.info(
     { event: 'risk-job.complete', processed, errors, academicTerm, academicYear },

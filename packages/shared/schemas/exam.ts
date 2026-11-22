@@ -39,6 +39,14 @@ export const EXAM_MARKS_ENTERABLE_STATUSES = ExamStatusSchema.extract([
   'MARKS_DRAFT',
 ]).options
 
+// Statuses during which an exam may still be EDITED or DELETED by its owner:
+// everything up to the moment the teacher confirms (finalizes) the marks.
+// From MARKS_FINAL onward approval/release build on those marks, so the exam
+// is locked. Same set as EXAM_MARKS_ENTERABLE_STATUSES on purpose - one
+// moment ends both "marks can still be typed in" and "exam can still be
+// changed" - but named separately so each rule reads for what it means.
+export const EXAM_MODIFIABLE_STATUSES = EXAM_MARKS_ENTERABLE_STATUSES
+
 export const CreateExamSchema = z.object({
   type:          z.enum(['WEEKLY_TEST','ASSIGNMENT','QUIZ','MIDTERM','END_TERM','MANEB_JCE','MANEB_MSCE']),
   subject:       z.string().min(1),
@@ -50,6 +58,11 @@ export const CreateExamSchema = z.object({
   venue:         z.string().min(1),
   maxMark:       z.number().positive().max(1000).default(100),
   weightPercent: z.number().min(1).max(100).default(100),
+  // Which continuous-assessment slot (CA 1, CA 2, ...) this exam fills. Required
+  // by examService for WEEKLY_TEST/ASSIGNMENT/QUIZ/MIDTERM exams while CA
+  // aggregation is on; must be empty for END_TERM. Range-checked there against
+  // the configured CA count (this schema cannot know it).
+  caSlot:        z.number().int().min(1).max(10).nullable().optional(),
   academicYear:  z.string().min(1),
   term:          z.number().int().min(1).max(3),
 })
@@ -70,6 +83,13 @@ export const MarkEntrySchema = z.object({
 export const BulkMarkEntrySchema = z.object({
   entries: z.array(MarkEntrySchema).min(1),
   isDraft: z.boolean().default(true),
+})
+
+// POST /exams/:id/finalize. `entries` is the sheet as the teacher sees it, so
+// saving the marks and confirming them happen in one atomic step; omit it to
+// finalize whatever is already saved.
+export const FinalizeMarksSchema = z.object({
+  entries: z.array(MarkEntrySchema).min(1).optional(),
 })
 
 export const TeacherCommentSchema = z.object({
@@ -101,6 +121,7 @@ export const PromotionRulesSchema = z.object({
 export type CreateExamInput       = z.input<typeof CreateExamSchema>
 export type UpdateExamInput        = z.infer<typeof UpdateExamSchema>
 export type BulkMarkEntryInput     = z.infer<typeof BulkMarkEntrySchema>
+export type FinalizeMarksInput     = z.infer<typeof FinalizeMarksSchema>
 export type CreateManebRecordInput = z.infer<typeof CreateManebRecordSchema>
 export type PromotionRulesInput    = z.infer<typeof PromotionRulesSchema>
 export type ExamStatus             = z.infer<typeof ExamStatusSchema>

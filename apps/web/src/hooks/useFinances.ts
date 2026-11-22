@@ -25,7 +25,9 @@ import type {
   AddInvoiceLineItemInput, CreateStudentFeeCommitmentInput,
   UpdateStudentFeeCommitmentInput, BulkGenerateInvoicesInput,
 } from '@shared/schemas/finance'
-import { apiFetch, queryKeys } from '@/lib/api-client'
+import { toast } from 'sonner'
+import { apiFetch, ApiError, newIdempotencyKey, queryKeys } from '@/lib/api-client'
+import { openPdfPreview, PdfPreviewError } from '@/lib/pdfPreview'
 
 export function useFinanceSummary(academicYear: string, term: number) {
   return useQuery({
@@ -40,6 +42,18 @@ export function useFinanceSummary(academicYear: string, term: number) {
   })
 }
 
+// [ALGOLIA ROLLOUT — Tier 2 item 7, stopgap] GET /finances/invoices used to
+// return an unbounded-by-consumer-expectation raw array capped at a
+// hardcoded `take: 100` server-side — the same silent-truncation bug class
+// as the original User Management item. The route now paginates properly
+// (real total/page/pages), so this hook loops every page and concatenates,
+// preserving its existing `ApiInvoice[]` contract for both callers
+// (StudentFeeStructure.tsx, InvoicesTab.tsx) rather than pushing a
+// pagination-envelope shape change out to them. Same stopgap-not-endgame
+// note as useUsers() in useAdmin.ts: once InvoicesTab's search/filter/sort
+// move to querying the `invoices` Algolia index directly, this should go
+// back to fetching one page at a time and let Algolia own pagination.
+interface ApiInvoicePage { invoices: ApiInvoice[]; total: number; page: number; pages: number }
 export function useInvoices(
   filters: { academicYear?: string; term?: number; status?: string; studentId?: string } = {},
   enabled = true
@@ -50,7 +64,20 @@ export function useInvoices(
   })
   return useQuery({
     queryKey: queryKeys.finances.invoices(filters),
-    queryFn: () => apiFetch<ApiInvoice[]>(`/finances/invoices?${params}`),
+    queryFn: async () => {
+      const allInvoices: ApiInvoice[] = []
+      let page = 1
+      for (;;) {
+        const query = new URLSearchParams(params)
+        query.set('page', String(page))
+        query.set('pageSize', '200')
+        const result = await apiFetch<ApiInvoicePage>(`/finances/invoices?${query}`)
+        allInvoices.push(...result.invoices)
+        if (page >= result.pages) break
+        page++
+      }
+      return allInvoices
+    },
     enabled,
   })
 }
@@ -99,14 +126,23 @@ export function useStudentBalance(studentId: string, academicYear: string, enabl
 export function useRecordPayment() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Payment recorded', failureTitle: 'Could not record payment', affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
     mutationFn: (data: RecordPaymentInput) =>
       apiFetch<{ payment: unknown; invoice: ApiInvoice }>('/finances/payments', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    onSuccess: (_result, variables) => {
-      qc.invalidateQueries({ queryKey: queryKeys.finances.all() })
-      qc.invalidateQueries({ queryKey: queryKeys.finances.invoice(variables.invoiceId) })
+    // [FIXED 2026-10-22] These invalidations used to be fire-and-forget, so
+    // mutateAsync() resolved while the invoice refetch was still in flight and
+    // Invoice Entry & Allocation rebuilt its ledger from the PRE-payment
+    // invoice (red balance until a manual refresh -> invitation to record the
+    // same payment twice). Returning the promise keeps the mutation pending --
+    // and the form locked -- until the fresh balances have actually landed.
+    onSuccess: async (_result, variables) => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.finances.all() }),
+        qc.invalidateQueries({ queryKey: queryKeys.finances.invoice(variables.invoiceId) }),
+      ])
     },
   })
 }
@@ -117,12 +153,17 @@ export function useRecordPayment() {
 export function useGenerateInvoice() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Invoice generated', failureTitle: 'Could not generate invoice', affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
     mutationFn: (data: GenerateInvoiceInput) =>
       apiFetch<ApiInvoice>('/finances/invoices/generate', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.finances.all() }),
+    // Awaited -- see useRecordPayment: the caller continues straight on to
+    // record a payment against this invoice and must see it in the cache.
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: queryKeys.finances.all() })
+    },
   })
 }
 
@@ -147,6 +188,7 @@ export function useExpenses(filters: { academicYear?: string; term?: number } = 
 export function useCreateExpense() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Expense created', failureTitle: 'Could not create expense' },
     mutationFn: (data: CreateExpenseInput) =>
       apiFetch<ApiExpense>('/finances/expenses', {
         method: 'POST',
@@ -159,6 +201,7 @@ export function useCreateExpense() {
 export function useUploadExpenseReceipt() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Expense receipt uploaded', failureTitle: 'Could not upload expense receipt' },
     mutationFn: ({ expenseId, file }: { expenseId: string; file: File }) => {
       const formData = new FormData()
       formData.append('file', file)
@@ -171,13 +214,27 @@ export function useUploadExpenseReceipt() {
   })
 }
 
+// [PDF PREVIEW] Receipt openers. The API returns the file's /api/files/<id>
+// proxy URL; openPdfPreview() opens it in the browser's own PDF viewer (new
+// tab) with the caller's ID token attached — a bare window.open(url) could not
+// authenticate, so the proxy answered 401. The tab has to be opened inside the
+// click, so the opening lives in the mutationFn (not onSuccess, which runs
+// after the round-trip). Failures are toasted: before, they were silent.
+function openReceiptPreview(path: string): Promise<void> {
+  return openPdfPreview(async () => (await apiFetch<{ url: string }>(path)).url)
+}
+
+function receiptErrorMessage(err: unknown): string {
+  return err instanceof ApiError || err instanceof PdfPreviewError
+    ? err.message
+    : 'Could not open this receipt.'
+}
+
 export function useViewExpenseReceipt() {
   return useMutation({
-    mutationFn: (expenseId: string) =>
-      apiFetch<{ url: string }>(`/finances/expenses/${expenseId}/receipt`),
-    onSuccess: (data) => {
-      window.open(data.url, '_blank', 'noopener,noreferrer')
-    },
+    meta: { feedback: 'manual' },
+    mutationFn: (expenseId: string) => openReceiptPreview(`/finances/expenses/${expenseId}/receipt`),
+    onError: (err) => toast.error(receiptErrorMessage(err)),
   })
 }
 
@@ -187,6 +244,7 @@ export function useViewExpenseReceipt() {
 export function useApproveExpense() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Expense approved', failureTitle: 'Could not approve expense' },
     mutationFn: ({ expenseId, paidImmediately = true }: { expenseId: string; paidImmediately?: boolean }) =>
       apiFetch<ApiExpense>(`/finances/expenses/${expenseId}/approve`, {
         method: 'PATCH',
@@ -203,6 +261,7 @@ export function useApproveExpense() {
 export function useMarkExpensePaid() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Expense marked as paid', failureTitle: 'Could not mark the expense as paid' },
     mutationFn: (expenseId: string) =>
       apiFetch<ApiExpense>(`/finances/expenses/${expenseId}/mark-paid`, { method: 'PATCH' }),
     onSuccess: () => {
@@ -222,24 +281,39 @@ export function useDebts() {
 export function useRejectExpense() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Expense rejected', failureTitle: 'Could not reject expense' },
     mutationFn: (expenseId: string) =>
       apiFetch<ApiExpense>(`/finances/expenses/${expenseId}/reject`, { method: 'PATCH' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.finances.all() }),
   })
 }
 
-// Budget vs Actual — returns array of {department, category, allocated, spent, remaining}
-export function useBudgetVsActual(academicYear: string) {
+export interface BudgetLine {
+  id: string
+  department: string
+  category: string
+  /** null = a full-year budget, which applies to every term. */
+  term: number | null
+  budgetWindowId: string | null
+  description: string | null
+  allocated: number
+  spent: number
+  /** Promised to open requisitions/POs but not yet spent. */
+  committed: number
+  remaining: number
+  /** allocated − committed − spent: what a new requisition can still draw on. */
+  available: number
+}
+
+// Budget vs Actual for the viewing year/term. A term includes the full-year budgets too.
+export function useBudgetVsActual(academicYear: string, term?: number, enabled = true) {
   return useQuery({
-    queryKey: queryKeys.finances.budget(academicYear, undefined),
+    queryKey: queryKeys.finances.budget(academicYear, term),
     queryFn: () =>
-      apiFetch<Array<{
-        department: string
-        category: string
-        allocated: number
-        spent: number
-        remaining: number
-      }>>(`/finances/budget?academicYear=${academicYear}`),
+      apiFetch<BudgetLine[]>(
+        `/finances/budget?academicYear=${encodeURIComponent(academicYear)}${term ? `&term=${term}` : ''}`,
+      ),
+    enabled: enabled && !!academicYear,
   })
 }
 
@@ -249,6 +323,7 @@ export function useBudgetVsActual(academicYear: string) {
 export function useCreateBudget() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Budget created', failureTitle: 'Could not create budget' },
     mutationFn: (data: CreateBudgetInput) =>
       apiFetch('/finances/budget', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.finances.all() }),
@@ -300,6 +375,7 @@ export function useStudentCredits(studentId: string, enabled = true) {
 export function useCreateFeeStructure() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Fee structure created', failureTitle: 'Could not create fee structure' },
     mutationFn: (data: CreateFeeStructureInput) =>
       apiFetch('/finances/fee-structures', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['finances', 'fee-structures'] }),
@@ -315,12 +391,16 @@ export function useScholarships() {
 // [NEW] "Generate Receipt" / "View Receipt" — FinanceDashboard's own
 // quick action linked here already but nothing in this tab ever called
 // GET /finances/payments/:id/receipt; this closes that gap. Returns a
-// signed, short-lived view URL for the receipt generated at payment time
-// (see receiptService.generateReceipt()) — the caller opens it directly
-// rather than this hook caching a URL that would go stale.
+// view URL for the receipt generated at payment time (see
+// receiptService.generateReceipt()). [PDF PREVIEW] The hook now also opens it:
+// the receipt PDF opens in the browser's own viewer (new tab) so the user can
+// review it, then download or print from there. Callers just call
+// .mutate(paymentId) from a click; nothing is cached, so no URL goes stale.
 export function useFetchReceipt() {
   return useMutation({
-    mutationFn: (paymentId: string) => apiFetch<{ url: string }>(`/finances/payments/${paymentId}/receipt`),
+    meta: { feedback: 'manual' },
+    mutationFn: (paymentId: string) => openReceiptPreview(`/finances/payments/${paymentId}/receipt`),
+    onError: (err) => toast.error(receiptErrorMessage(err)),
   })
 }
 
@@ -329,6 +409,7 @@ export function useFetchReceipt() {
 export function useUpdateFeeStructure() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Fee structure updated', failureTitle: 'Could not update fee structure' },
     mutationFn: ({ id, data }: { id: string; data: UpdateFeeStructureInput }) =>
       apiFetch<ApiFeeStructure>(`/finances/fee-structures/${id}`, {
         method: 'PATCH',
@@ -357,6 +438,7 @@ export function useFeeCommitments(studentId: string, academicYear: string, enabl
 export function useUpsertFeeCommitment() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Fee commitment saved', failureTitle: 'Could not save the fee commitment' },
     mutationFn: (data: CreateStudentFeeCommitmentInput) =>
       apiFetch<ApiStudentFeeCommitment>('/finances/fee-commitments', {
         method: 'POST',
@@ -376,6 +458,7 @@ export function useUpsertFeeCommitment() {
 export function useUpdateFeeCommitmentStatus() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Fee commitment status updated', failureTitle: 'Could not update fee commitment status' },
     mutationFn: ({ id, data }: { id: string; data: UpdateStudentFeeCommitmentInput }) =>
       apiFetch<ApiStudentFeeCommitment>(`/finances/fee-commitments/${id}`, {
         method: 'PATCH',
@@ -390,14 +473,18 @@ export function useUpdateFeeCommitmentStatus() {
 export function useAddInvoiceLineItem() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Invoice line item added', failureTitle: 'Could not add invoice line item', affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
     mutationFn: ({ invoiceId, feeStructureId }: AddInvoiceLineItemInput) =>
       apiFetch<ApiInvoice>(`/finances/invoices/${invoiceId}/line-items`, {
         method: 'POST',
         body: JSON.stringify({ feeStructureId }),
       }),
-    onSuccess: (_result, variables) => {
-      qc.invalidateQueries({ queryKey: queryKeys.finances.invoice(variables.invoiceId) })
-      qc.invalidateQueries({ queryKey: queryKeys.finances.all() })
+    // Awaited -- see useRecordPayment.
+    onSuccess: async (_result, variables) => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.finances.invoice(variables.invoiceId) }),
+        qc.invalidateQueries({ queryKey: queryKeys.finances.all() }),
+      ])
     },
   })
 }
@@ -413,9 +500,12 @@ export function useAddInvoiceLineItem() {
 export function useBulkGenerateInvoices() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { feedback: 'manual', affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
     mutationFn: (data: BulkGenerateInvoicesInput) =>
       apiFetch<ApiBulkInvoiceResult>('/finances/invoices/bulk-generate', {
         method: 'POST',
+        // [Issue 6] One key per click: a retry of the same run replays the original result.
+        headers: data.dryRun ? undefined : { 'Idempotency-Key': newIdempotencyKey() },
         body: JSON.stringify(data),
       }),
     onSuccess: (_result, variables) => {

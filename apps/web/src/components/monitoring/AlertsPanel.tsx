@@ -29,8 +29,8 @@ export function AlertsPanel({ canManage }: Props) {
           disabled={!canManage || toggle.isPending}
           onClick={() => toggle.mutate({ id: row.sentryAlertId, enabled: !row.enabled })}
           aria-pressed={row.enabled}
-          className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors disabled:opacity-50 ${
-            row.enabled ? 'bg-brand-teal/15 text-brand-teal' : 'bg-page text-muted'
+          className={`px-3 py-1 rounded-lg border text-xs font-semibold transition-colors disabled:opacity-50 ${
+            row.enabled ? 'border-status-success/60 text-status-success hover:bg-status-success/10' : 'border-base text-muted hover:bg-page'
           }`}
         >
           {row.enabled ? 'Enabled' : 'Disabled'}
@@ -38,7 +38,7 @@ export function AlertsPanel({ canManage }: Props) {
       ),
     },
     {
-      key: 'lastTriggeredAt', label: 'Last Triggered', priority: 'important',
+      key: 'lastTriggeredAt', label: 'Last triggered', priority: 'important',
       render: (row) => row.lastTriggeredAt ? new Date(row.lastTriggeredAt).toLocaleString() : 'Never',
     },
   ]
@@ -54,6 +54,7 @@ export function AlertsPanel({ canManage }: Props) {
         rowKey="id"
         columns={columns}
         emptyMessage="No alerts configured yet."
+        bordered={false}
       />
     </div>
   )

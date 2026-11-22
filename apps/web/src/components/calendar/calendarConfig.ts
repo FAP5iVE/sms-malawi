@@ -38,11 +38,11 @@ export interface CategoryLegendItem {
 }
 
 export const CATEGORY_LEGEND: CategoryLegendItem[] = [
-  { category: 'term', label: 'Term Dates' },
-  { category: 'holiday', label: 'Public Holidays' },
+  { category: 'term', label: 'Term dates' },
+  { category: 'holiday', label: 'Public holidays' },
   { category: 'exam', label: 'Exams' },
   { category: 'timetable', label: 'Timetable' },
-  { category: 'lab_booking', label: 'Lab Bookings' },
+  { category: 'lab_booking', label: 'Lab bookings' },
   { category: 'leave', label: 'Leave' },
   { category: 'announcement', label: 'Announcements' },
   { category: 'assignment', label: 'Assignments' },

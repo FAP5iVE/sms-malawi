@@ -41,19 +41,25 @@
 
 import Link               from 'next/link'
 import { useRouter }       from 'next/navigation'
-import { useState }        from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   MoreHorizontal,
   X,
   LogOut,
   ChevronRight,
+  MessageSquareWarning,
 } from 'lucide-react'
 import { logout }              from '@/components/providers/AuthProvider'
 import { useAuthStore }        from '@/store/authStore'
 import { useNavigation }       from '@/hooks/useNavigation'
 import { useMotionEnabled }    from '@/store/motionStore'
 import { ModeToggle }          from '@/components/shared/ModeToggle'
+import { AttentionBadge }      from '@/components/shared/AttentionBadge'
+import { attentionNoun }       from '@/lib/hills/attention'
+import { PeriodSwitcher }      from '@/components/shared/PeriodSwitcher'
+import { getMoreSheetOpen, setMoreSheetOpen, subscribeMoreSheet } from '@/lib/hills/moreSheet'
+import { ReportProblemModal }  from '@/components/shared/ReportProblemModal'
 import {
   reducedMotionVariants,
   reducedMotionTransition,
@@ -77,6 +83,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
   hr:           'HR Staff',
   exam_officer: 'Exam Officer',
   student:      'Student',
+  parent:       'Parent / Guardian',
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -127,7 +134,13 @@ export function MobileBottomNav() {
   const { primaryItems, moreItems, ready } = useNavigation()
   const motionEnabled              = useMotionEnabled()
 
-  const [moreOpen, setMoreOpen]    = useState(false)
+  // The open flag is shared with the avatar in the phone header (R5.4), so both
+  // open the same sheet. See lib/hills/moreSheet.ts.
+  const moreOpen = useSyncExternalStore(subscribeMoreSheet, getMoreSheetOpen, () => false)
+  const setMoreOpen = setMoreSheetOpen
+  // "Report a problem" dialog — open to every role. State lives out here (not
+  // inside the More sheet) so the dialog survives the sheet closing.
+  const [reportOpen, setReportOpen] = useState(false)
 
   // Wait for auth + navigation to resolve before rendering nav items
   if (!role || !ready) return null
@@ -196,42 +209,37 @@ export function MobileBottomNav() {
               href={item.href}
               aria-current={item.active ? 'page' : undefined}
               className={[
-                'relative flex-1 flex flex-col items-center justify-center',
-                'gap-0.5 pt-2 pb-1.5 min-h-15',
+                'relative flex-1 min-w-0 flex flex-col items-center justify-center',
+                'gap-1 pt-2 pb-2 min-h-16',
                 'transition-colors duration-150',
-                item.active ? 'text-brand-teal' : 'text-muted hover:text-body',
+                item.active ? 'text-tone-teal' : 'text-muted hover:text-body',
               ].join(' ')}
             >
-              {/* Active top indicator bar */}
-              {item.active && (
-                <span
-                  className="absolute top-0 left-1/2 -translate-x-1/2 w-6 h-0.5 rounded-full bg-brand-teal"
-                  aria-hidden
-                />
-              )}
-
-              {/* Icon with optional badge dot */}
-              <span className="relative shrink-0">
+              {/* Icon on the light tint pill when this is the page you are on (R5.2) */}
+              <span
+                className={[
+                  'relative flex h-8 w-14 shrink-0 items-center justify-center rounded-full transition-colors duration-150',
+                  item.active ? 'app-tint' : '',
+                ].join(' ')}
+              >
                 <Icon className="w-5 h-5" aria-hidden />
 
                 {item.badgeCount !== undefined && (
-                  <span
-                    className="
-                      absolute -top-1 -right-1.5
-                      min-w-3.5 h-3.5
-                      bg-brand-coral rounded-full
-                      text-white text-[8px] font-heading font-bold
-                      flex items-center justify-center px-0.5 leading-none
-                    "
-                    aria-label={`${item.badgeCount} pending`}
-                  >
-                    {item.badgeCount > 99 ? '99+' : item.badgeCount}
-                  </span>
+                  <AttentionBadge
+                    count={item.badgeCount}
+                    noun={attentionNoun('approvalsAwaitingMe')}
+                    className="absolute -top-0.5 right-0.5"
+                  />
                 )}
               </span>
 
-              {/* Short mobile label */}
-              <span className="text-[10px] font-medium leading-none truncate max-w-14 text-center">
+              {/* Short mobile label, 12px (R5.1) */}
+              <span
+                className={[
+                  'max-w-full truncate px-0.5 text-center text-xs leading-none',
+                  item.active ? 'font-semibold' : 'font-medium',
+                ].join(' ')}
+              >
                 {item.mobileLabel}
               </span>
             </Link>
@@ -246,20 +254,21 @@ export function MobileBottomNav() {
           aria-expanded={moreOpen}
           aria-controls="mobile-more-sheet"
           className={[
-            'relative flex-1 flex flex-col items-center justify-center',
-            'gap-0.5 pt-2 pb-1.5 min-h-15',
+            'relative flex-1 min-w-0 flex flex-col items-center justify-center',
+            'gap-1 pt-2 pb-2 min-h-16',
             'transition-colors duration-150',
-            moreOpen ? 'text-brand-teal' : 'text-muted hover:text-body',
+            moreOpen ? 'text-tone-teal' : 'text-muted hover:text-body',
           ].join(' ')}
         >
-          {moreOpen && (
-            <span
-              className="absolute top-0 left-1/2 -translate-x-1/2 w-6 h-0.5 rounded-full bg-brand-teal"
-              aria-hidden
-            />
-          )}
-          <MoreHorizontal className="w-5 h-5 shrink-0" aria-hidden />
-          <span className="text-[10px] font-medium leading-none">More</span>
+          <span
+            className={[
+              'relative flex h-8 w-14 shrink-0 items-center justify-center rounded-full transition-colors duration-150',
+              moreOpen ? 'app-tint' : '',
+            ].join(' ')}
+          >
+            <MoreHorizontal className="w-5 h-5 shrink-0" aria-hidden />
+          </span>
+          <span className={['text-xs leading-none', moreOpen ? 'font-semibold' : 'font-medium'].join(' ')}>More</span>
         </button>
       </nav>
 
@@ -332,6 +341,12 @@ export function MobileBottomNav() {
                 </button>
               </div>
 
+              {/* Viewing period: moved here from the phone header (R5.4). The strip under
+                  the header still warns on every page when you are not on the live period. */}
+              <div className="shrink-0 border-b border-base">
+                <PeriodSwitcher variant="sheet" />
+              </div>
+
               {/* Overflow navigation items — scrollable */}
               {moreItems.length > 0 && (
                 <div className="overflow-y-auto py-2 shrink min-h-0">
@@ -347,7 +362,7 @@ export function MobileBottomNav() {
                           'flex items-center gap-3.5 px-5 py-3',
                           'transition-colors duration-150',
                           item.active
-                            ? 'bg-brand-teal/8 text-brand-teal'
+                            ? 'bg-brand-teal/8 text-tone-teal'
                             : 'text-muted hover:bg-page hover:text-body',
                         ].join(' ')}
                       >
@@ -355,18 +370,11 @@ export function MobileBottomNav() {
                         <span className="relative shrink-0">
                           <Icon className="w-5 h-5" aria-hidden />
                           {item.badgeCount !== undefined && (
-                            <span
-                              className="
-                                absolute -top-1 -right-1.5
-                                min-w-3.5 h-3.5
-                                bg-brand-coral rounded-full
-                                text-white text-[8px] font-heading font-bold
-                                flex items-center justify-center px-0.5 leading-none
-                              "
-                              aria-label={`${item.badgeCount} pending`}
-                            >
-                              {item.badgeCount > 99 ? '99+' : item.badgeCount}
-                            </span>
+                            <AttentionBadge
+                              count={item.badgeCount}
+                              noun={attentionNoun('approvalsAwaitingMe')}
+                              className="absolute -top-2 -right-2.5"
+                            />
                           )}
                         </span>
 
@@ -389,6 +397,22 @@ export function MobileBottomNav() {
               {/* Separator */}
               <div className="shrink-0 border-t border-base" />
 
+              {/* Report a problem — every role (incl. those without Monitoring) */}
+              <button
+                type="button"
+                onClick={() => {
+                  closeMore()
+                  setReportOpen(true)
+                }}
+                className="shrink-0 flex items-center gap-3.5 px-5 py-3 text-muted hover:bg-page hover:text-body transition-colors duration-150"
+              >
+                <MessageSquareWarning className="w-5 h-5 shrink-0" aria-hidden />
+                <span className="flex-1 text-left text-sm font-medium">Report a problem</span>
+                <ChevronRight className="w-4 h-4 shrink-0 opacity-35" aria-hidden />
+              </button>
+
+              <div className="shrink-0 border-t border-base" />
+
               {/* User section + theme + logout */}
               <div className="shrink-0 flex items-center justify-between gap-3 px-5 py-4">
                 {/* Avatar + display name + role */}
@@ -396,7 +420,7 @@ export function MobileBottomNav() {
                   {/* Avatar */}
                   <div className="
                     w-9 h-9 rounded-xl shrink-0
-                    bg-brand-navy
+                    bg-brand-deep
                     flex items-center justify-center
                   ">
                     <span className="text-white text-xs font-bold font-heading">
@@ -409,7 +433,7 @@ export function MobileBottomNav() {
                     <p className="text-sm font-semibold font-heading text-body truncate leading-tight">
                       {displayName}
                     </p>
-                    <p className="text-[11px] text-muted truncate leading-tight mt-0.5">
+                    <p className="text-xs text-muted truncate leading-tight mt-0.5">
                       {ROLE_LABELS[role]}
                     </p>
                   </div>
@@ -440,6 +464,8 @@ export function MobileBottomNav() {
           </>
         )}
       </AnimatePresence>
+
+      {reportOpen && <ReportProblemModal onClose={() => setReportOpen(false)} />}
     </>
   )
 }

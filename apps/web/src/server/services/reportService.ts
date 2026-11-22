@@ -35,6 +35,7 @@ import { prisma }  from '@/lib/prisma'
 import type { Prisma } from '@prisma/client'
 import { SETTING_KEYS } from '@shared/types/settings'
 import * as settingsService from '@/server/services/settingsService'
+import { summariseInvoices } from '@/server/services/analytics/financeLogic'
 
 // ─── ADMIN REPORTS ────────────────────────────────────────
 export async function getAdminSystemReport() {
@@ -99,11 +100,21 @@ export async function getFeeCollectionReport(academicYear: string, term?: number
       take: 12,
     }),
   ])
-  const collected   = invoices.reduce((s, i) => s + Number(i.paidAmount), 0)
-  const outstanding = invoices.reduce((s, i) => s + Number(i.balance), 0)
-  const target      = invoices.reduce((s, i) => s + Number(i.totalAmount), 0)
-  const collectionPct = target > 0 ? Math.round((collected / target) * 100) : 0
-  return { collected, outstanding, target, collectionPct, invoices, expenses, payrollRuns }
+  // Shared with the dashboards and the finance reports (financeLogic) so every
+  // surface shows the same collected / outstanding / rate for the same scope.
+  const summary = summariseInvoices(
+    invoices.map((i) => ({ totalAmount: Number(i.totalAmount), paidAmount: Number(i.paidAmount), balance: Number(i.balance) })),
+  )
+  return {
+    collected: summary.collected,
+    outstanding: summary.outstanding,
+    target: summary.billed,
+    // null — not 0 — when nothing has been billed for the scope.
+    collectionPct: summary.collectionRate,
+    invoices,
+    expenses,
+    payrollRuns,
+  }
 }
 
 // ─── LIBRARY REPORTS ─────────────────────────────────────
@@ -122,7 +133,7 @@ export async function getLibraryReport() {
       orderBy: { _count: { bookId: 'desc' } },
       take: 10,
     }),
-    prisma.digitalResource.count({ where: { approved: false } }),
+    prisma.digitalResource.count({ where: { approved: false, rejectedAt: null } }),
   ])
   return { stats, overdueBorrowings, topBooks, pendingApprovals }
 }
@@ -196,8 +207,9 @@ export async function getAcademicReport(teacherUid: string, academicYear: string
         className: c.name,
         form: c.form,
         total: results.length,
-        passRate: results.length > 0 ? Math.round((results.filter((r) => r.passStatus).length / results.length) * 100) : 0,
-        avg: results.length > 0 ? Math.round(results.reduce((s, r) => s + Number(r.average), 0) / results.length * 10) / 10 : 0,
+        // null (not 0) when the class has no computed results — "not computed" is not "0% passed".
+        passRate: results.length > 0 ? Math.round((results.filter((r) => r.passStatus).length / results.length) * 100) : null,
+        avg: results.length > 0 ? Math.round(results.reduce((s, r) => s + Number(r.average), 0) / results.length * 10) / 10 : null,
       }
     })
   )
@@ -244,5 +256,42 @@ export async function getAuditLogs(filters: {
     prisma.auditLog.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (page - 1) * limit, take: limit }),
     prisma.auditLog.count({ where }),
   ])
-  return { logs, total, page, pages: Math.ceil(total / limit) }
-}
+
+  // [PRODUCTION FIX] The audit table showed only a raw Firebase UID for
+  // "who did this" — no name, no employee/registration number, so
+  // identifying an actor meant manually cross-referencing UIDs elsewhere.
+  // Resolve each page's distinct actorUids against StaffProfile (by `uid`)
+  // and Student (by `firebaseUid`) in two batched queries — not one
+  // lookup per row — and attach whichever matches. An actor can be neither
+  // (a deleted account, or a system/cron actor) — those rows simply carry
+  // no name/identifier, same as before.
+  const actorUids = Array.from(new Set(logs.map((l) => l.actorUid)))
+  const [staffMatches, studentMatches] = actorUids.length > 0
+    ? await prisma.$transaction([
+        prisma.staffProfile.findMany({
+          where:  { uid: { in: actorUids } },
+          select: { uid: true, employeeNo: true, firstName: true, lastName: true },
+        }),
+        prisma.student.findMany({
+          where:  { firebaseUid: { in: actorUids } },
+          select: { firebaseUid: true, registrationNo: true, firstName: true, lastName: true },
+        }),
+      ])
+    : [[], []]
+
+  const staffByUid   = new Map(staffMatches.map((s) => [s.uid, s]))
+  const studentByUid = new Map(studentMatches.map((s) => [s.firebaseUid as string, s]))
+
+  const enrichedLogs = logs.map((log) => {
+    const staff   = staffByUid.get(log.actorUid)
+    const student = studentByUid.get(log.actorUid)
+    return {
+      ...log,
+      actorName:           staff ? `${staff.firstName} ${staff.lastName}` : student ? `${student.firstName} ${student.lastName}` : null,
+      actorEmployeeNo:     staff?.employeeNo ?? null,
+      actorRegistrationNo: student?.registrationNo ?? null,
+    }
+  })
+
+  return { logs: enrichedLogs, total, page, pages: Math.ceil(total / limit) }
+}

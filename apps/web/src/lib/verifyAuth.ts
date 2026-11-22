@@ -13,8 +13,10 @@
 import type { Request, Response, NextFunction } from 'express'
 import * as admin from 'firebase-admin'
 import type { App } from 'firebase-admin/app'
-import type { UserRole } from '@shared/types/roles'
+import { isValidRole, type UserRole } from '@shared/types/roles'
 import { type NextRequest } from 'next/server'
+import { isSuperUserClaim } from '@shared/constants/superUser'
+import { isParentRequestAllowedFor, PARENT_FENCE_DENY_BODY } from '@/lib/parentFence'
 
 let adminApp: App | undefined
 
@@ -36,25 +38,68 @@ export function getAdminApp(): App {
 }
 
 export async function verifyAuth(req: Request, res: Response, next: NextFunction) {
+  // [Issue 6] A mount-level verifyAuth (api-app.ts runs it ahead of the
+  // per-user report-read limiter so the limiter can key on the verified uid)
+  // has already verified this request; the routers beneath repeat verifyAuth
+  // in their own gates. req.user is only ever set by this function, never
+  // from client input, so reuse it instead of paying a second Firebase
+  // verifyIdToken(checkRevoked) network round-trip.
+  if (req.user) return next()
+
   const authHeader = req.headers.authorization
   if (!authHeader?.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'No token provided' })
   }
   const token = authHeader.slice(7)
   try {
-    const decoded = await admin.auth(getAdminApp()).verifyIdToken(token)
-    const role = decoded['role'] as UserRole | undefined
-    if (!role) return res.status(403).json({ error: 'No role assigned to user' })
-    req.user = { uid: decoded.uid, role, email: decoded.email ?? '' }
+    // [Sessions tab, Reports > Admin] checkRevoked=true (the second
+    // argument) is what makes force-logout (sessionService.forceLogout →
+    // revokeRefreshTokens(uid)) actually end a session promptly, rather
+    // than only after the token's own natural ~1hr expiry. Without it,
+    // verifyIdToken() only checks the token's signature/expiry — a
+    // revoked-but-not-yet-expired token still passes. This does cost one
+    // extra network round trip per request (Firebase looks up the user's
+    // tokensValidAfterTime), which is the documented tradeoff for prompt
+    // revocation detection; acceptable here given this app's bounded
+    // school-sized user base and existing per-request Firestore/Neon calls
+    // on most routes anyway.
+    const decoded = await admin.auth(getAdminApp()).verifyIdToken(token, true)
+    // Custom claims are `unknown` at runtime. A missing OR unrecognised role is
+    // refused here: it is never defaulted, and it never reaches a router.
+    const rawRole = decoded['role']
+    if (!isValidRole(rawRole)) return res.status(403).json({ error: 'No role assigned to user' })
+    const role: UserRole = rawRole
+    // [Guardian portal] DEFAULT-DENY FENCE. A parent token is confined to an
+    // explicit allowlist (see lib/parentFence.ts) at this single choke point, so
+    // no staff/student router can be reached by a parent whatever that router
+    // checks (or forgets to check). Evaluated on every request, including the
+    // mount-level run, before req.user is set.
+    if (role === 'parent' && !isParentRequestAllowedFor(req)) {
+      return res.status(403).json(PARENT_FENCE_DENY_BODY)
+    }
+    // alpha_admin: the `superUser` custom claim (Admin-SDK-only, so it cannot
+    // be self-granted) lets this request through every role/permission gate.
+    // It is never honoured for the parent role, whatever the claim says.
+    const superUser = role !== 'parent' && isSuperUserClaim(decoded['superUser'])
+    req.user = { uid: decoded.uid, role, email: decoded.email ?? '', ...(superUser ? { superUser: true } : {}) }
     next()
-  } catch {
+  } catch (err: unknown) {
+    const code = (err as { code?: string } | undefined)?.code
+    if (code === 'auth/id-token-revoked') {
+      return res.status(401).json({ error: 'Session has been revoked. Please sign in again.' })
+    }
     res.status(401).json({ error: 'Invalid or expired token' })
   }
 }
 
 export function requireRole(allowed: UserRole[]) {
   return (req: Request, res: Response, next: NextFunction) => {
-    if (!req.user || !allowed.includes(req.user.role)) {
+    if (!req.user) {
+      return res.status(403).json({ error: 'Access denied for your role' })
+    }
+    // alpha_admin passes every role gate, whatever the allowed list says.
+    if (req.user.superUser === true) return next()
+    if (!allowed.includes(req.user.role)) {
       return res.status(403).json({ error: 'Access denied for your role' })
     }
     next()
@@ -92,7 +137,9 @@ export async function getIdTokenFromRequest(
   if (!token) return null
   try {
     const { getAuth } = await import('firebase-admin/auth')
-    return await getAuth().verifyIdToken(token)
+    // [Issue 7] checkRevoked=true — same as verifyAuth() — so force-logout /
+    // revokeRefreshTokens also cuts off file downloads, not just API calls.
+    return await getAuth().verifyIdToken(token, true)
   } catch {
     return null
   }

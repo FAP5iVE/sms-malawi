@@ -24,6 +24,12 @@
  *   This is intentionally a small, dependency-free string builder — no browser
  *   APIs, no React — so it is safe to call from a Vercel serverless function
  *   during PDF generation.
+ *
+ *   LABELLING: like the live renderers, every chart drawn here labels itself —
+ *   a key naming each series/slice (with its value for pies), the value on
+ *   every bar and line point, and name + share beside every pie slice — so a
+ *   printed report card is readable without hovering. Series names default to
+ *   their data key; pass `seriesLabels` for human-readable ones.
  * [DEPENDS ON]:
  *   - @/lib/chartPalette (R16 CHART_PALETTE / chartColorAt)
  *   - @/components/shared/chart/types (R17 ChartType/ChartDataPoint contract)
@@ -32,7 +38,55 @@
 import { chartColorAt } from '@/lib/chartPalette'
 import type { ChartDataPoint, ChartType } from '@/components/shared/chart/types'
 
-const PADDING = { top: 16, right: 16, bottom: 28, left: 40 } as const
+const PADDING = { right: 16, bottom: 28, left: 40 } as const
+/** Gap between the key and the plot, leaving room for the top bar's value label. */
+const LABEL_HEADROOM = 18
+const LEGEND_ROW_HEIGHT = 16
+const TEXT_COLOR = '#374151'
+
+/** Compact on-chart number: 1200 → "1.2K", 3400000 → "3.4M", 7.5 → "7.5". */
+function fmtValue(n: number): string {
+  const abs = Math.abs(n)
+  if (abs >= 1_000_000) return `${+(n / 1_000_000).toFixed(1)}M`
+  if (abs >= 10_000) return `${+(n / 1_000).toFixed(1)}K`
+  return String(+n.toFixed(abs < 100 ? 1 : 0))
+}
+
+interface KeyItem {
+  color: string
+  text: string
+}
+
+/**
+ * The key: a swatch + name per entry, wrapped onto as many rows as the width
+ * needs. Returns the markup and the height it occupies so the plot can start
+ * below it.
+ */
+function renderKey(items: KeyItem[], width: number): { svg: string; height: number } {
+  if (items.length === 0) return { svg: '', height: 0 }
+  const parts: string[] = []
+  let x = 12
+  let row = 0
+  for (const item of items) {
+    const itemWidth = 18 + item.text.length * 5.6 + 14
+    if (x + itemWidth > width - 8 && x > 12) {
+      x = 12
+      row += 1
+    }
+    const y = 4 + row * LEGEND_ROW_HEIGHT
+    parts.push(
+      `<rect x="${x}" y="${y}" width="10" height="10" rx="2" fill="${item.color}" />` +
+        `<text x="${x + 15}" y="${y + 9}" font-size="10" fill="${TEXT_COLOR}">${esc(item.text)}</text>`,
+    )
+    x += itemWidth
+  }
+  return { svg: parts.join(''), height: (row + 1) * LEGEND_ROW_HEIGHT + 4 }
+}
+
+/** A value label centred at (x, y). */
+function valueText(x: number, y: number, text: string, fill = TEXT_COLOR): string {
+  return `<text x="${x}" y="${y}" text-anchor="middle" font-size="9" fill="${fill}">${esc(text)}</text>`
+}
 
 /** Escape a value for safe inclusion in SVG text/attributes. */
 function esc(value: string | number): string {
@@ -87,9 +141,10 @@ function renderBars(
   width: number,
   height: number,
   stacked: boolean,
+  top: number,
 ): string {
   const plotW = width - PADDING.left - PADDING.right
-  const plotH = height - PADDING.top - PADDING.bottom
+  const plotH = height - top - PADDING.bottom
   const groupCount = data.length
   const groupWidth = plotW / Math.max(groupCount, 1)
   const max = stacked
@@ -103,7 +158,7 @@ function renderBars(
   data.forEach((point, gi) => {
     const groupX = PADDING.left + gi * groupWidth
     if (stacked) {
-      let cursorY = PADDING.top + plotH
+      let cursorY = top + plotH
       keys.forEach((key, si) => {
         const v = numValue(point, key)
         const barH = (v / max) * plotH
@@ -112,6 +167,10 @@ function renderBars(
           `<rect x="${groupX + groupWidth * 0.15}" y="${cursorY}" ` +
             `width="${groupWidth * 0.7}" height="${barH}" fill="${chartColorAt(si)}" />`,
         )
+        // Each segment carries its value (skipped only when too thin to hold text).
+        if (v > 0 && barH >= 11) {
+          bars.push(valueText(groupX + groupWidth / 2, cursorY + barH / 2 + 3, fmtValue(v), '#ffffff'))
+        }
       })
     } else {
       const barSlot = (groupWidth * 0.7) / Math.max(keys.length, 1)
@@ -120,9 +179,11 @@ function renderBars(
         const barH = (v / max) * plotH
         const x = groupX + groupWidth * 0.15 + si * barSlot
         bars.push(
-          `<rect x="${x}" y="${PADDING.top + plotH - barH}" ` +
+          `<rect x="${x}" y="${top + plotH - barH}" ` +
             `width="${barSlot * 0.9}" height="${barH}" fill="${chartColorAt(si)}" />`,
         )
+        // The bar's value, just above it.
+        bars.push(valueText(x + (barSlot * 0.9) / 2, top + plotH - barH - 4, fmtValue(v)))
       })
     }
     bars.push(
@@ -139,9 +200,10 @@ function renderLinesOrArea(
   width: number,
   height: number,
   area: boolean,
+  top: number,
 ): string {
   const plotW = width - PADDING.left - PADDING.right
-  const plotH = height - PADDING.top - PADDING.bottom
+  const plotH = height - top - PADDING.bottom
   const max = maxAcross(data, keys)
   const stepX = data.length > 1 ? plotW / (data.length - 1) : plotW
 
@@ -150,7 +212,7 @@ function renderLinesOrArea(
     const color = chartColorAt(si)
     const points = data.map((point, i) => {
       const x = PADDING.left + i * stepX
-      const y = PADDING.top + plotH - (numValue(point, key) / max) * plotH
+      const y = top + plotH - (numValue(point, key) / max) * plotH
       return `${x},${y}`
     })
     if (area && points.length > 0) {
@@ -158,7 +220,7 @@ function renderLinesOrArea(
       const last = points[points.length - 1] ?? ''
       const firstX = first.split(',')[0] ?? String(PADDING.left)
       const lastX = last.split(',')[0] ?? String(PADDING.left + plotW)
-      const baseY = PADDING.top + plotH
+      const baseY = top + plotH
       parts.push(
         `<polygon points="${firstX},${baseY} ${points.join(' ')} ${lastX},${baseY}" ` +
           `fill="${color}" fill-opacity="0.15" />`,
@@ -167,6 +229,13 @@ function renderLinesOrArea(
     parts.push(
       `<polyline points="${points.join(' ')}" fill="none" stroke="${color}" stroke-width="2" />`,
     )
+    // Every point is marked and carries its value.
+    data.forEach((point, i) => {
+      const x = PADDING.left + i * stepX
+      const y = top + plotH - (numValue(point, key) / max) * plotH
+      parts.push(`<circle cx="${x}" cy="${y}" r="2.5" fill="${color}" />`)
+      parts.push(valueText(x, y - 6, fmtValue(numValue(point, key))))
+    })
   })
   data.forEach((point, i) => {
     const x = PADDING.left + i * stepX
@@ -184,19 +253,23 @@ function renderPie(
   width: number,
   height: number,
   donut: boolean,
+  top: number,
 ): string {
   const key = keys[0]
   if (!key) return ''
   const cx = width / 2
-  const cy = height / 2
-  const radius = Math.min(width, height) / 2 - 12
+  // Centre the pie in the space below the key; leave a margin for slice labels.
+  const cy = top + (height - top) / 2
+  const radius = Math.max(8, Math.min(width / 2, (height - top) / 2) - 34)
   const inner = donut ? radius * 0.6 : 0
   const total = data.reduce((sum, p) => sum + numValue(p, key), 0) || 1
 
   let angle = -Math.PI / 2
   const slices: string[] = []
+  const labels: string[] = []
   data.forEach((point, i) => {
-    const fraction = numValue(point, key) / total
+    const value = numValue(point, key)
+    const fraction = value / total
     const next = angle + fraction * Math.PI * 2
     const x1 = cx + radius * Math.cos(angle)
     const y1 = cy + radius * Math.sin(angle)
@@ -219,12 +292,36 @@ function renderPie(
           `fill="${chartColorAt(i)}" />`,
       )
     }
+    // Every slice is named, with its share, just outside it.
+    if (value > 0) {
+      const mid = angle + (next - angle) / 2
+      const lx = cx + (radius + 8) * Math.cos(mid)
+      const ly = cy + (radius + 8) * Math.sin(mid)
+      const anchor = Math.cos(mid) >= 0 ? 'start' : 'end'
+      const name = String(point.x)
+      const shown = name.length > 14 ? `${name.slice(0, 13)}…` : name
+      labels.push(
+        `<text x="${lx}" y="${ly}" text-anchor="${anchor}" dominant-baseline="middle" ` +
+          `font-size="10" fill="${TEXT_COLOR}">${esc(`${shown} ${Math.round(fraction * 100)}%`)}</text>`,
+      )
+    }
     angle = next
   })
-  return slices.join('')
+  const centre = donut
+    ? `<text x="${cx}" y="${cy - 2}" text-anchor="middle" font-size="16" font-weight="600" ` +
+      `fill="#111827">${esc(fmtValue(total))}</text>` +
+      `<text x="${cx}" y="${cy + 12}" text-anchor="middle" font-size="10" fill="#6b7280">Total</text>`
+    : ''
+  return slices.join('') + labels.join('') + centre
 }
 
-function renderRadial(data: ChartDataPoint[], keys: string[], width: number, height: number): string {
+function renderRadial(
+  data: ChartDataPoint[],
+  keys: string[],
+  width: number,
+  height: number,
+  label: string,
+): string {
   const key = keys[0]
   const point = data[0]
   if (!key || !point) return ''
@@ -240,49 +337,67 @@ function renderRadial(data: ChartDataPoint[], keys: string[], width: number, hei
     `stroke-width="12" stroke-linecap="round" stroke-dasharray="${dash} ${circumference}" ` +
     `transform="rotate(-90 ${cx} ${cy})" />` +
     `<text x="${cx}" y="${cy + 5}" text-anchor="middle" font-size="18" font-weight="600" ` +
-    `fill="#111827">${Math.round(value)}%</text>`
+    `fill="#111827">${Math.round(value)}%</text>` +
+    // What the gauge measures, under its value.
+    `<text x="${cx}" y="${cy + 22}" text-anchor="middle" font-size="10" fill="#6b7280">${esc(label)}</text>`
   )
 }
 
 /**
  * Render a chart to a standalone SVG markup string at a fixed pixel size.
- * Series keys are derived from the data (every key except `x`).
+ * Series keys are derived from the data (every key except `x`); pass
+ * `seriesLabels` ({ revenue: 'Fees collected' }) to name them in the key.
  */
 export function renderStaticChartSVG(
   data: ChartDataPoint[],
   type: ChartType,
   width: number,
   height: number,
+  seriesLabels: Record<string, string> = {},
 ): string {
   if (data.length === 0) return emptySvg(width, height)
   const keys = deriveSeriesKeys(data)
   if (keys.length === 0) return emptySvg(width, height)
 
+  const nameOf = (key: string): string => seriesLabels[key] ?? key
+  const isPie = type === 'pie' || type === 'donut'
+
+  // The key: slices (by category, with value) for a pie; series for everything else.
+  const keyItems: KeyItem[] = isPie
+    ? data.map((point, i) => ({
+        color: chartColorAt(i),
+        text: `${String(point.x)} — ${fmtValue(numValue(point, keys[0] ?? ''))}`,
+      }))
+    : keys.map((key, i) => ({ color: chartColorAt(i), text: nameOf(key) }))
+  // A radial gauge names itself in its centre, so it needs no separate key.
+  const key = type === 'radial' ? { svg: '', height: 0 } : renderKey(keyItems, width)
+  const top = key.height + LABEL_HEADROOM
+
   let inner: string
   switch (type) {
     case 'bar':
     case 'combo':
-      inner = renderBars(data, keys, width, height, false)
+      inner = renderBars(data, keys, width, height, false, top)
       break
     case 'stackedBar':
-      inner = renderBars(data, keys, width, height, true)
+      inner = renderBars(data, keys, width, height, true, top)
       break
     case 'line':
     case 'timeSeries':
-      inner = renderLinesOrArea(data, keys, width, height, false)
+      inner = renderLinesOrArea(data, keys, width, height, false, top)
       break
     case 'area':
-      inner = renderLinesOrArea(data, keys, width, height, true)
+      inner = renderLinesOrArea(data, keys, width, height, true, top)
       break
     case 'pie':
-      inner = renderPie(data, keys, width, height, false)
+      inner = renderPie(data, keys, width, height, false, top)
       break
     case 'donut':
-      inner = renderPie(data, keys, width, height, true)
+      inner = renderPie(data, keys, width, height, true, top)
       break
     case 'radial':
-      inner = renderRadial(data, keys, width, height)
+      inner = renderRadial(data, keys, width, height, nameOf(keys[0] ?? ''))
       break
   }
-  return svgWrap(width, height, inner)
+  return svgWrap(width, height, key.svg + inner)
 }

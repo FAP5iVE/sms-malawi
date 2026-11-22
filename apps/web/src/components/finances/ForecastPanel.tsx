@@ -46,20 +46,15 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
+  LabelList,
   ResponsiveContainer,
 }                               from 'recharts'
+import { BAR_LABEL_PROPS, valueFormatter } from '@/components/shared/chart/chartLabels'
 import { TrendingUp, Loader2, AlertTriangle, RefreshCw } from 'lucide-react'
 import { apiFetch }             from '@/lib/api-client'
 import { formatMWK }            from '@shared/constants/malawi'
-import { AcademicYearSelect }   from '@/components/shared/AcademicYearSelect'
+import { useEffectiveViewingPeriod } from '@/hooks/useViewingPeriod'
 import type { ForecastReport, MonthlyDataPoint } from '@/server/services/forecastService'
-
-// Seeds the mount-effect's eager first fetch (below) synchronously, before
-// usePublicSchoolInfo() has had a chance to resolve — matches the same
-// fallback-while-loading convention used elsewhere (apps/web/src/hooks/
-// usePublic.ts, exams/page.tsx). The <AcademicYearSelect> field itself
-// always offers the real, live current year regardless of this seed.
-const FALLBACK_YEAR = '2025/2026'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CHART DATA TRANSFORM
@@ -133,15 +128,15 @@ function SummaryCard({
   color:    string
 }) {
   return (
-    <div className="bg-surface border border-base rounded-xl p-4">
-      <p className="text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-2">{label}</p>
+    <div className="app-tint rounded-xl p-4">
+      <p className="text-xs font-heading font-semibold text-muted mb-2">{label}</p>
       <div className="space-y-1">
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted">Actual YTD</span>
           <span className="font-bold font-heading tabular text-body">{formatMWK(actual)}</span>
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-xs text-muted">Forecast Remaining</span>
+          <span className="text-xs text-muted">Forecast remaining</span>
           <span className="font-semibold font-heading tabular" style={{ color }}>{formatMWK(forecast)}</span>
         </div>
       </div>
@@ -158,7 +153,11 @@ function buildForecastUrl(academicYear: string, forwardMonths: number): string {
 }
 
 export function ForecastPanel() {
-  const [academicYear, setAcademicYear] = useState(FALLBACK_YEAR)
+  // The year is the GLOBAL viewing year. This panel used to hold its own year
+  // select; it duplicated the header filter, and the finances page already
+  // re-mounts this panel (key=YEAR-TERM) whenever the period changes, so the
+  // mount-only fetch below always runs for the right year.
+  const { academicYear } = useEffectiveViewingPeriod()
   const [forwardMonths, setForwardMonths] = useState(3)
   const [report,   setReport]   = useState<ForecastReport | null>(null)
   // R19 — starts `true`, not `false`: the mount effect below always kicks
@@ -214,7 +213,7 @@ export function ForecastPanel() {
         <div>
           <h2 className="font-heading font-bold text-xl text-brand-navy flex items-center gap-2">
             <TrendingUp className="w-5 h-5" aria-hidden />
-            Finance Forecast
+            Finance forecast
           </h2>
           <p className="text-sm text-muted mt-0.5">
             Actual vs projected fee revenue and cash flow.
@@ -223,28 +222,24 @@ export function ForecastPanel() {
 
         <div className="flex items-end gap-3 flex-wrap">
           <div>
-            <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">
-              Academic Year
-            </label>
-            <AcademicYearSelect
-              value={academicYear}
-              onChange={(e) => setAcademicYear(e.target.value)}
-              className="min-h-[44px] border border-base rounded-xl px-3 text-sm bg-page text-body w-32 focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
-            />
+            <p className="block text-xs font-heading font-semibold text-muted mb-1.5">
+              Academic year
+            </p>
+            <p className="min-h-11 flex items-center text-sm text-body">{academicYear}</p>
           </div>
           <div>
-            <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">
-              Forecast Months
+            <label className="block text-xs font-heading font-semibold text-muted mb-1.5">
+              Forecast months
             </label>
             <select value={forwardMonths} onChange={(e) => setForwardMonths(Number(e.target.value))}
-              className="min-h-[44px] border border-base rounded-xl px-3 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25">
+              className="min-h-11 border border-base rounded-xl px-3 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25">
               <option value={1}>+1 month</option>
               <option value={3}>+3 months</option>
               <option value={6}>+6 months</option>
             </select>
           </div>
           <button type="button" onClick={loadForecast} disabled={loading}
-            className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors disabled:opacity-60 flex items-center gap-2">
+            className="min-h-11 px-5 rounded-xl text-sm font-heading font-semibold bg-brand-deep text-white hover:brightness-110 transition-colors disabled:opacity-60 flex items-center gap-2">
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
             {loading ? 'Loading…' : 'Refresh'}
           </button>
@@ -252,7 +247,7 @@ export function ForecastPanel() {
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 bg-brand-coral/8 border border-brand-coral/25 rounded-xl px-4 py-3 text-sm text-brand-coral">
+        <div className="flex items-center gap-2 bg-brand-coral/8 border border-brand-coral/25 rounded-xl px-4 py-3 text-sm text-tone-coral">
           <AlertTriangle className="w-4 h-4 shrink-0" />
           {error}
         </div>
@@ -262,7 +257,7 @@ export function ForecastPanel() {
       {report && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <SummaryCard
-            label="Fee Revenue"
+            label="Fee revenue"
             actual={report.totalActualRev}
             forecast={report.totalForecastRev}
             color="var(--color-brand-teal, #0d9488)"
@@ -273,14 +268,14 @@ export function ForecastPanel() {
             forecast={report.totalForecastExp}
             color="var(--color-brand-coral, #f97316)"
           />
-          <div className="bg-surface border border-base rounded-xl p-4">
-            <p className="text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-2">
-              Net Surplus Forecast
+          <div className="app-tint rounded-xl p-4">
+            <p className="text-xs font-heading font-semibold text-muted mb-2">
+              Net surplus forecast
             </p>
             <p className={`text-xl font-bold font-heading tabular ${
               (report.totalActualRev + report.totalForecastRev - report.totalActualExp - report.totalForecastExp) >= 0
                 ? 'text-emerald-600'
-                : 'text-brand-coral'
+                : 'text-tone-coral'
             }`}>
               {formatMWK(
                 report.totalActualRev + report.totalForecastRev
@@ -294,22 +289,22 @@ export function ForecastPanel() {
 
       {/* Chart */}
       {report && chartData.length > 0 && (
-        <div className="bg-surface border border-base rounded-2xl p-5">
-          <p className="text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-4">
-            Monthly Cash Flow — Actual (solid) vs Forecast (light)
+        <div>
+          <p className="text-xs font-heading font-semibold text-muted mb-4">
+            Monthly Cash Flow: Actual (solid) vs Forecast (light)
           </p>
           <ResponsiveContainer width="100%" height={320}>
-            <ComposedChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 10 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-base, #e5e7eb)" />
+            <ComposedChart data={chartData} margin={{ top: 22, right: 20, bottom: 5, left: 10 }}>
+              <CartesianGrid strokeDasharray="none" stroke="var(--color-border)" vertical={false} />
               <XAxis
                 dataKey="label"
-                tick={{ fontSize: 11, fill: 'var(--color-muted, #9ca3af)' }}
+                tick={{ fontSize: 11, fill: 'var(--color-muted-foreground, #64748b)' }}
                 axisLine={false}
                 tickLine={false}
               />
               <YAxis
                 tickFormatter={yFormatter}
-                tick={{ fontSize: 11, fill: 'var(--color-muted, #9ca3af)' }}
+                tick={{ fontSize: 11, fill: 'var(--color-muted-foreground, #64748b)' }}
                 axisLine={false}
                 tickLine={false}
               />
@@ -317,8 +312,12 @@ export function ForecastPanel() {
               <Legend
                 wrapperStyle={{ fontSize: '12px', paddingTop: '16px' }}
               />
-              <Bar dataKey="actual"   name="Actual Revenue" fill="var(--color-brand-teal, #0d9488)" radius={[4,4,0,0]} maxBarSize={32} />
-              <Bar dataKey="forecast" name="Forecast Revenue" fill="var(--color-brand-amber, #f59e0b)" radius={[4,4,0,0]} maxBarSize={32} opacity={0.65} />
+              <Bar dataKey="actual"   name="Actual Revenue" fill="var(--color-brand-teal, #0d9488)" radius={[4,4,0,0]} maxBarSize={32}>
+                <LabelList dataKey="actual" {...BAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('mwk')} />
+              </Bar>
+              <Bar dataKey="forecast" name="Forecast Revenue" fill="var(--color-brand-amber, #f59e0b)" radius={[4,4,0,0]} maxBarSize={32} opacity={0.65}>
+                <LabelList dataKey="forecast" {...BAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('mwk')} />
+              </Bar>
               <Line
                 type="monotone"
                 dataKey="netFlow"
@@ -327,7 +326,9 @@ export function ForecastPanel() {
                 strokeWidth={2}
                 dot={{ fill: 'var(--color-brand-navy, #1e3a5f)', r: 3 }}
                 strokeDasharray="4 2"
-              />
+              >
+                <LabelList dataKey="netFlow" position="bottom" fontSize={9} className="fill-current text-body" formatter={valueFormatter('mwk')} />
+              </Line>
             </ComposedChart>
           </ResponsiveContainer>
         </div>
@@ -335,9 +336,9 @@ export function ForecastPanel() {
 
       {!report && !loading && (
         <div className="text-center py-16 text-muted text-sm border border-dashed border-base rounded-xl">
-          Click Refresh to generate the forecast.
+          Choose Refresh to generate the forecast.
         </div>
       )}
     </div>
   )
-}
+}

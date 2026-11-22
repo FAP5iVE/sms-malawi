@@ -65,6 +65,7 @@ import 'server-only'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import * as auditService from '@/server/services/auditService'
+import { assertNotSelfReview } from '@/server/lib/selfReview'
 import { createJournalEntry, postEntry, voidEntry } from '@/server/services/accountingService'
 import type { UserRole } from '@shared/types/roles'
 import type { PayrollRun, PayrollStatus } from '@prisma/client'
@@ -127,6 +128,8 @@ export async function approve(
 ): Promise<PayrollRun> {
   const run = await prisma.payrollRun.findUniqueOrThrow({ where: { id: runId } })
   assertStatus(run, 'PENDING_APPROVAL', 'approve')
+  // [Issue 7] The person who submitted the run may not approve it.
+  assertNotSelfReview(run.submittedByUid, actorUid, 'payroll run')
 
   const updated = await prisma.payrollRun.update({
     where: { id: runId },
@@ -142,6 +145,45 @@ export async function approve(
     metadata:   { before: { status: run.status }, after: { status: 'APPROVED' } },
   })
   logger.info({ event: 'payroll.approved', runId, actorUid })
+  return updated
+}
+
+/**
+ * [NEW — Approvals Hub] high_rank sends a submitted run back to Finance.
+ * The workflow had no way to decline a submission — a reviewer who spotted a
+ * wrong figure could only approve it or leave it sitting in PENDING_APPROVAL.
+ * The run returns to COMPLETED (the state Finance submits from), the
+ * submitter stamp is cleared so it reads as un-submitted, and the reason is
+ * kept in the audit trail.
+ */
+export async function returnToFinance(
+  runId:      string,
+  reason:     string,
+  actorUid:   string,
+  actorRole:  UserRole,
+): Promise<PayrollRun> {
+  const run = await prisma.payrollRun.findUniqueOrThrow({ where: { id: runId } })
+  assertStatus(run, 'PENDING_APPROVAL', 'return')
+  assertNotSelfReview(run.submittedByUid, actorUid, 'payroll run')
+
+  const updated = await prisma.payrollRun.update({
+    where: { id: runId },
+    data:  { status: 'COMPLETED', submittedByUid: null },
+  })
+
+  await auditService.log({
+    action:     'finance.payroll_returned',
+    entityType: 'PayrollRun',
+    entityId:   runId,
+    actorUid,
+    actorRole,
+    metadata:   {
+      before:  { status: run.status, submittedByUid: run.submittedByUid },
+      after:   { status: 'COMPLETED' },
+      context: { reason },
+    },
+  })
+  logger.info({ event: 'payroll.returned', runId, actorUid })
   return updated
 }
 

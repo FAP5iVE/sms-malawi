@@ -138,6 +138,7 @@ export function useCreatePendingAction() {
   const queryClient = useQueryClient()
 
   return useMutation({
+    meta: { successMessage: 'Pending action created', failureTitle: 'Could not create pending action' },
     mutationFn: (vars: CreatePendingActionVars) =>
       apiFetch<PendingActionRow>('/pending-actions', {
         method: 'POST',
@@ -157,6 +158,7 @@ export function useApprovePendingAction() {
   const queryClient = useQueryClient()
 
   return useMutation({
+    meta: { successMessage: 'Pending action approved', failureTitle: 'Could not approve pending action' },
     mutationFn: ({ id, notes }: { id: string; notes?: string }) =>
       apiFetch<PendingActionRow>(`/pending-actions/${id}/approve`, {
         method: 'PATCH',
@@ -176,6 +178,7 @@ export function useRejectPendingAction() {
   const queryClient = useQueryClient()
 
   return useMutation({
+    meta: { successMessage: 'Pending action rejected', failureTitle: 'Could not reject pending action' },
     mutationFn: ({ id, notes }: { id: string; notes?: string }) =>
       apiFetch<PendingActionRow>(`/pending-actions/${id}/reject`, {
         method: 'PATCH',
@@ -195,6 +198,7 @@ export function useCancelPendingAction() {
   const queryClient = useQueryClient()
 
   return useMutation({
+    meta: { successMessage: 'Pending action cancelled', failureTitle: 'Could not cancel pending action' },
     mutationFn: (id: string) =>
       apiFetch<PendingActionRow>(`/pending-actions/${id}/cancel`, {
         method: 'PATCH',

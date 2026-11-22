@@ -64,7 +64,7 @@ export interface UsePermissionsReturn {
  *   }
  */
 export function usePermissions(): UsePermissionsReturn {
-  const { role, initialized } = useAuthStore()
+  const { role, initialized, superUser } = useAuthStore()
 
   // Memoize each checker so callers can safely include them in
   // useEffect / useMemo dependency arrays without triggering re-renders
@@ -73,29 +73,29 @@ export function usePermissions(): UsePermissionsReturn {
   const can = useCallback(
     (permission: Permission): boolean => {
       if (!initialized || !role) return false
-      return hasPermission(role, permission)
+      return hasPermission(role, permission, superUser)
     },
-    [role, initialized]
+    [role, initialized, superUser]
   )
 
   const canAll = useCallback(
     (permissions: readonly Permission[]): boolean => {
       if (!initialized || !role) return false
-      return hasAllPermissions(role, permissions)
+      return hasAllPermissions(role, permissions, superUser)
     },
-    [role, initialized]
+    [role, initialized, superUser]
   )
 
   const canAny = useCallback(
     (permissions: readonly Permission[]): boolean => {
       if (!initialized || !role) return false
-      return hasAnyPermission(role, permissions)
+      return hasAnyPermission(role, permissions, superUser)
     },
-    [role, initialized]
+    [role, initialized, superUser]
   )
 
   const allPermissions: Permission[] =
-    initialized && role ? getPermissionsForRole(role) : []
+    initialized && role ? getPermissionsForRole(role, superUser) : []
 
   return {
     can,
