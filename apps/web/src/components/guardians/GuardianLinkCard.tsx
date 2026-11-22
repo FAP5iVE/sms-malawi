@@ -44,8 +44,8 @@ const STATUS_TONE: Record<GuardianLinkStatusValue, StatusTone> = {
 const MATCH_LABELS: Record<string, string> = {
   NATIONAL_ID_NAME: 'the same national ID and a similar name',
   NATIONAL_ID: 'the same national ID but a different name',
-  EMAIL_NAME: 'the same e-mail and a similar name',
-  EMAIL: 'the same e-mail',
+  EMAIL_NAME: 'the same email and a similar name',
+  EMAIL: 'the same email',
   PHONE_NAME: 'the same phone number and a similar name',
   PHONE_SHARED: 'the same phone number but a different name',
 }
@@ -189,7 +189,7 @@ export function GuardianLinkCard({ link, showStudent = false, profileNames }: {
               <p>The ID is the same, so check the name before deciding: a married name, a nickname or a spelling difference can explain it.</p>
             )}
             {link.suggestion.idConflict && (
-              <p>Their national IDs are <strong>different</strong>, so these may be two people who share a phone or e-mail.</p>
+              <p>Their national IDs are <strong>different</strong>, so these may be two people who share a phone or email.</p>
             )}
             {link.suggestion.students && link.suggestion.students.length > 0 && (
               <RelatedStudents

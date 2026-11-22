@@ -183,7 +183,7 @@ export function GuardianOnboardingTab() {
 
           <dl className="grid gap-2 sm:grid-cols-2">
             {GUARDIAN_ONBOARDING_ACTIONS.map((a) => (
-              <div key={a} className="flex items-center justify-between rounded-xl border border-base px-3 py-2.5">
+              <div key={a} className="app-tint flex items-center justify-between rounded-xl px-3 py-2.5">
                 <dt className="text-sm text-body">{GUARDIAN_ONBOARDING_ACTION_LABELS[a]}</dt>
                 <dd className="font-heading font-semibold text-body tabular-nums">{summary.byAction[a]}</dd>
               </div>
@@ -261,7 +261,7 @@ export function GuardianOnboardingTab() {
                 ['National IDs shared by more than one guardian', nationalIds.data.sharedIds],
                 [nationalIds.data.applied ? 'Entries flagged as possible duplicates' : 'Entries to flag as possible duplicates', nationalIds.data.entriesFlagged],
               ].map(([label, n]) => (
-                <div key={String(label)} className="flex items-center justify-between rounded-xl border border-base px-3 py-2.5">
+                <div key={String(label)} className="app-tint flex items-center justify-between rounded-xl px-3 py-2.5">
                   <dt className="text-sm text-body">{label}</dt>
                   <dd className="font-heading font-semibold text-body tabular-nums">{n}</dd>
                 </div>
@@ -280,7 +280,7 @@ export function GuardianOnboardingTab() {
             {!nationalIds.data.applied && (nationalIds.data.idsFilled > 0 || nationalIds.data.entriesFlagged > 0) && (
               <button type="button" disabled={nationalIds.isPending} onClick={() => setConfirm('nationalIds')}
                 className={`${BTN} bg-btn-brand text-btn-brand-fg hover:bg-btn-brand-hover`}>
-                <Play className="w-4 h-4" aria-hidden />Apply
+                <Play className="w-4 h-4" aria-hidden />Apply national IDs
               </button>
             )}
             {!nationalIds.data.applied && nationalIds.data.idsFilled === 0 && nationalIds.data.entriesFlagged === 0 && (
@@ -293,7 +293,7 @@ export function GuardianOnboardingTab() {
       <ConfirmDialog
         open={confirm === 'nationalIds'} title="Match guardians by national ID?"
         description={`This gives ${nationalIds.data?.idsFilled ?? 0} guardian${nationalIds.data?.idsFilled === 1 ? '' : 's'} their national ID and flags ${nationalIds.data?.entriesFlagged ?? 0} waiting entr${nationalIds.data?.entriesFlagged === 1 ? 'y' : 'ies'} as possible duplicates. Nobody is merged and nobody gets access.`}
-        confirmLabel="Apply" confirming={nationalIds.isPending} confirmingLabel="Applying…"
+        confirmLabel="Match guardians" confirming={nationalIds.isPending} confirmingLabel="Matching…"
         onCancel={() => setConfirm(null)}
         onConfirm={() => nationalIds.mutate({ apply: true }, { onSuccess: () => setConfirm(null), onError: () => setConfirm(null) })}
       />

@@ -543,14 +543,9 @@
   ]
  },
  "src/app/(auth)/attendance/page.tsx": {
-  "digest": "633c5fa2cc8dd85a71c1793b87d517f0f30dfe58",
-  "tokens": 69,
+  "digest": "329521255edd2305cd82292fb37d7e420bd4421e",
+  "tokens": 65,
   "items": [
-   {
-    "k": "handler",
-    "n": "onClick",
-    "h": "0df6f3ba"
-   },
    {
     "k": "handler",
     "n": "onClick",
@@ -564,8 +559,8 @@
   ]
  },
  "src/app/(auth)/calendar/page.tsx": {
-  "digest": "f7a7baa0f481a164b95505e357b70431d88bd620",
-  "tokens": 137,
+  "digest": "72b3b9f93ce70d952ed6b3bad6fdf9fb657571ef",
+  "tokens": 140,
   "items": [
    {
     "k": "handler",
@@ -1077,7 +1072,7 @@
   ]
  },
  "src/app/(auth)/hr/[id]/page.tsx": {
-  "digest": "69369dec36b215e23f1c344c8570f25625d29fdd",
+  "digest": "f015535ebc9da35b0faf28729c9c5e0018f68b3b",
   "tokens": 110,
   "items": [
    {
@@ -1103,8 +1098,8 @@
   ]
  },
  "src/app/(auth)/hr/page.tsx": {
-  "digest": "d49bec5082389cc32e3f08c90c4288055134bf79",
-  "tokens": 442,
+  "digest": "8645546028e5b98013f3ce630aa71c28ff17699e",
+  "tokens": 487,
   "items": [
    {
     "k": "handler",
@@ -2205,8 +2200,8 @@
   ]
  },
  "src/app/(auth)/settings/page.tsx": {
-  "digest": "da9324b4b7bf74377d9a93c0acbf2fa49992968c",
-  "tokens": 42,
+  "digest": "a0b42fd81cb2f3c81c8f6b28960dc834004a4277",
+  "tokens": 43,
   "items": [
    {
     "k": "handler",
@@ -3905,8 +3900,8 @@
   "items": []
  },
  "src/components/calendar/CalendarEventFormDialog.tsx": {
-  "digest": "e849188c220ade2bdf88ebb05f69e8c5aa751ba6",
-  "tokens": 154,
+  "digest": "20d0d9447d17a5b7b44ce8a118d0f4afeceb9255",
+  "tokens": 155,
   "items": [
    {
     "k": "effect",
@@ -3962,6 +3957,11 @@
     "k": "handler",
     "n": "onClick",
     "h": "9146e7ae"
+   },
+   {
+    "k": "handler",
+    "n": "onClose",
+    "h": "0171b538"
    },
    {
     "k": "handler",
@@ -4905,8 +4905,8 @@
   "items": []
  },
  "src/components/dashboards/HRDashboard.tsx": {
-  "digest": "5f9c876a63d44436d31a51941bf8bd726617e2b5",
-  "tokens": 71,
+  "digest": "6661c04b5fdef797881ff53d407c0a988cd6ada2",
+  "tokens": 65,
   "items": [
    {
     "k": "handler",
@@ -6580,8 +6580,8 @@
   ]
  },
  "src/components/finances/payroll/MyPayTab.tsx": {
-  "digest": "53b45d3a516bcaf96c732a566bb86b8b3580219e",
-  "tokens": 100,
+  "digest": "71f33485b863c75a03bdddd533cf379a8c65832a",
+  "tokens": 104,
   "items": [
    {
     "k": "handler",
@@ -6612,8 +6612,8 @@
   ]
  },
  "src/components/finances/payroll/PayrollRunsTab.tsx": {
-  "digest": "5915e021d3124bd8c8997f8b09890b5a6155228d",
-  "tokens": 282,
+  "digest": "3097f8d9e54cf3f1fb1a612a61a17b38ee07a3d5",
+  "tokens": 284,
   "items": [
    {
     "k": "handler",
@@ -6951,8 +6951,8 @@
   "items": []
  },
  "src/components/guardians/GuardianAccessLogTab.tsx": {
-  "digest": "b244d173478d3af2ad705e454bceb283e831b262",
-  "tokens": 51,
+  "digest": "bd2adf44c1cd3fc66bcbca2e6635a1115e76828a",
+  "tokens": 85,
   "items": [
    {
     "k": "handler",
@@ -6963,6 +6963,21 @@
     "k": "handler",
     "n": "onClick",
     "h": "13e2264b"
+   },
+   {
+    "k": "handler",
+    "n": "onClick",
+    "h": "1fd8e622"
+   },
+   {
+    "k": "handler",
+    "n": "onClick",
+    "h": "cc4cbc38"
+   },
+   {
+    "k": "handler",
+    "n": "onOpen",
+    "h": "e3036cd2"
    },
    {
     "k": "handler",
@@ -7013,8 +7028,8 @@
   ]
  },
  "src/components/guardians/GuardianLinkCard.tsx": {
-  "digest": "1d579ca7d516de73a298f6b322c7481ad3e789ea",
-  "tokens": 189,
+  "digest": "8aeb1be27371da46e407ca8edc5160160b32e35e",
+  "tokens": 222,
   "items": [
    {
     "k": "handler",
@@ -7144,7 +7159,7 @@
   ]
  },
  "src/components/guardians/GuardianLinkDialogs.tsx": {
-  "digest": "ec86f9619cb495e5d3eb9c4fa2c67df06efac375",
+  "digest": "7b7d98641ae1dc8a9e08615026bbc84c7b54c794",
   "tokens": 256,
   "items": [
    {
@@ -7290,13 +7305,18 @@
   ]
  },
  "src/components/guardians/GuardianOnboardingTab.tsx": {
-  "digest": "f8ae42957eba9833e1e3673f5c982330e0424bb3",
-  "tokens": 178,
+  "digest": "d64dfd11448e1a923c768ac235a8b1ca4707be24",
+  "tokens": 211,
   "items": [
    {
     "k": "effect",
     "n": "useEffect",
     "h": "c4b73b9a"
+   },
+   {
+    "k": "handler",
+    "n": "onCancel",
+    "h": "fe812021"
    },
    {
     "k": "handler",
@@ -7331,6 +7351,11 @@
    {
     "k": "handler",
     "n": "onClick",
+    "h": "185b1249"
+   },
+   {
+    "k": "handler",
+    "n": "onClick",
     "h": "188197b6"
    },
    {
@@ -7355,6 +7380,16 @@
    },
    {
     "k": "handler",
+    "n": "onClick",
+    "h": "f5eb4844"
+   },
+   {
+    "k": "handler",
+    "n": "onConfirm",
+    "h": "2c8cbb54"
+   },
+   {
+    "k": "handler",
     "n": "onConfirm",
     "h": "700ae08a"
    },
@@ -7366,9 +7401,14 @@
   ]
  },
  "src/components/guardians/GuardianQueueTab.tsx": {
-  "digest": "2b8860df5a50c9dd4e4d91d3292b6fdb0655c0bb",
-  "tokens": 66,
+  "digest": "925679430543f1d24e99706871b35e775802100f",
+  "tokens": 87,
   "items": [
+   {
+    "k": "handler",
+    "n": "onChange",
+    "h": "6e871ac5"
+   },
    {
     "k": "handler",
     "n": "onClick",
@@ -7392,7 +7432,79 @@
    {
     "k": "handler",
     "n": "onClick",
+    "h": "99bcd6af"
+   },
+   {
+    "k": "handler",
+    "n": "onClick",
+    "h": "99bcd6af"
+   },
+   {
+    "k": "handler",
+    "n": "onClick",
     "h": "dfa96db4"
+   }
+  ]
+ },
+ "src/components/guardians/GuardianSearchBox.tsx": {
+  "digest": "bd9e408cde8d9ded88baf5871586eeaa906a8d43",
+  "tokens": 24,
+  "items": [
+   {
+    "k": "effect",
+    "n": "useEffect",
+    "h": "af19e437"
+   },
+   {
+    "k": "handler",
+    "n": "onChange",
+    "h": "d54c097e"
+   },
+   {
+    "k": "handler",
+    "n": "onClick",
+    "h": "c5a2d88a"
+   }
+  ]
+ },
+ "src/components/guardians/GuardianStudentBrowser.tsx": {
+  "digest": "df65c5910b6a18037f3fbbba9dff4a2c55b3bc13",
+  "tokens": 90,
+  "items": [
+   {
+    "k": "handler",
+    "n": "onChange",
+    "h": "09c94ef5"
+   },
+   {
+    "k": "handler",
+    "n": "onClick",
+    "h": "60cfa280"
+   },
+   {
+    "k": "handler",
+    "n": "onClick",
+    "h": "78682037"
+   },
+   {
+    "k": "handler",
+    "n": "onClick",
+    "h": "7bac4b32"
+   },
+   {
+    "k": "handler",
+    "n": "onClick",
+    "h": "7c49bd47"
+   },
+   {
+    "k": "handler",
+    "n": "onClick",
+    "h": "9664b3bd"
+   },
+   {
+    "k": "handler",
+    "n": "onClick",
+    "h": "f9806d2c"
    }
   ]
  },
@@ -7423,8 +7535,8 @@
   ]
  },
  "src/components/guardians/GuardianStudentTab.tsx": {
-  "digest": "36bb2dc5cfc5b3400214f643b3ca2e95f6a77d22",
-  "tokens": 62,
+  "digest": "e50d0cf17c18b030b989b33d95d35284647d163b",
+  "tokens": 67,
   "items": [
    {
     "k": "handler",
@@ -7445,6 +7557,11 @@
     "k": "handler",
     "n": "onSelect",
     "h": "0ff7006e"
+   },
+   {
+    "k": "handler",
+    "n": "onSelect",
+    "h": "0ff7006e"
    }
   ]
  },
@@ -7460,8 +7577,8 @@
   ]
  },
  "src/components/hr/StaffForm.tsx": {
-  "digest": "d91bd1d1572add33cd7f24e901e2f1721967fac5",
-  "tokens": 511,
+  "digest": "04ba9eee00eecbbe1444c2d98da117f38d38d03b",
+  "tokens": 506,
   "items": [
    {
     "k": "call",
@@ -7918,14 +8035,9 @@
   "items": []
  },
  "src/components/parent/ParentPanels.tsx": {
-  "digest": "5988e1b8f6eff1c1b89e0c36cdc6ad76d00d7519",
-  "tokens": 254,
+  "digest": "8f513ea7fe58497943846152595ef2582cfb967d",
+  "tokens": 250,
   "items": [
-   {
-    "k": "handler",
-    "n": "onClick",
-    "h": "02ad590e"
-   },
    {
     "k": "handler",
     "n": "onClick",
@@ -9682,13 +9794,18 @@
   ]
  },
  "src/components/settings/HRDepartmentsSettings.tsx": {
-  "digest": "eb1617188f2ebbca5181e236f1947019fd4b8212",
-  "tokens": 126,
+  "digest": "dbe14321231916dc599aecf14b78f68b01d074ca",
+  "tokens": 192,
   "items": [
    {
     "k": "call",
     "n": "apiFetch",
     "h": "8375e47a"
+   },
+   {
+    "k": "call",
+    "n": "apiFetch",
+    "h": "dd6220bd"
    },
    {
     "k": "call",
@@ -9713,12 +9830,27 @@
    {
     "k": "handler",
     "n": "onChange",
+    "h": "c7622fa2"
+   },
+   {
+    "k": "handler",
+    "n": "onChange",
     "h": "cb7f250d"
+   },
+   {
+    "k": "handler",
+    "n": "onChange",
+    "h": "ed4b636b"
    },
    {
     "k": "handler",
     "n": "onClick",
     "h": "126be1bf"
+   },
+   {
+    "k": "handler",
+    "n": "onClick",
+    "h": "38172798"
    },
    {
     "k": "handler",
@@ -9754,6 +9886,52 @@
     "k": "handler",
     "n": "onKeyDown",
     "h": "134ace85"
+   }
+  ]
+ },
+ "src/components/settings/IdNumberSettings.tsx": {
+  "digest": "5a32c2f468cf1d6802c2c249aab3fc8d7bf0bc14",
+  "tokens": 88,
+  "items": [
+   {
+    "k": "call",
+    "n": "apiFetch",
+    "h": "36b8da6d"
+   },
+   {
+    "k": "effect",
+    "n": "useEffect",
+    "h": "223d8da8"
+   },
+   {
+    "k": "handler",
+    "n": "onChange",
+    "h": "55437f32"
+   },
+   {
+    "k": "handler",
+    "n": "onChange",
+    "h": "9b53016c"
+   },
+   {
+    "k": "handler",
+    "n": "onChange",
+    "h": "d54c097e"
+   },
+   {
+    "k": "handler",
+    "n": "onClick",
+    "h": "4638783b"
+   },
+   {
+    "k": "handler",
+    "n": "onSave",
+    "h": "26ae934d"
+   },
+   {
+    "k": "handler",
+    "n": "onSave",
+    "h": "a10eb86c"
    }
   ]
  },
@@ -10210,8 +10388,8 @@
   ]
  },
  "src/components/shared/AuthShell.tsx": {
-  "digest": "6073fbde999b4661e4c0556fbd0132da83d8c1aa",
-  "tokens": 40,
+  "digest": "586dc14a1f1b45b3ca0cbb95277f1a78d35b3f77",
+  "tokens": 32,
   "items": []
  },
  "src/components/shared/AuthShellSkeleton.tsx": {
@@ -11744,8 +11922,8 @@
   "items": []
  },
  "src/components/students/StudentForm.tsx": {
-  "digest": "76973982ca64c2c8b938fed35e3883931d3a73c3",
-  "tokens": 280,
+  "digest": "7e31ffdf4802f59500bcd9ba0fe8a8cec8bd10c4",
+  "tokens": 322,
   "items": [
    {
     "k": "call",
@@ -11766,6 +11944,16 @@
     "k": "call",
     "n": "handleSubmit",
     "h": "bd69055b"
+   },
+   {
+    "k": "effect",
+    "n": "useEffect",
+    "h": "9227e1bb"
+   },
+   {
+    "k": "effect",
+    "n": "useEffect",
+    "h": "c3087899"
    },
    {
     "k": "effect",
@@ -11815,25 +12003,35 @@
    {
     "k": "handler",
     "n": "onClick",
-    "h": "41a06467"
-   },
-   {
-    "k": "handler",
-    "n": "onClick",
-    "h": "41a06467"
-   },
-   {
-    "k": "handler",
-    "n": "onClick",
-    "h": "41a06467"
-   },
-   {
-    "k": "handler",
-    "n": "onClick",
     "h": "8e950ad8"
    },
    {
     "k": "handler",
+    "n": "onClick",
+    "h": "95724af2"
+   },
+   {
+    "k": "handler",
+    "n": "onClick",
+    "h": "95724af2"
+   },
+   {
+    "k": "handler",
+    "n": "onClick",
+    "h": "95724af2"
+   },
+   {
+    "k": "handler",
+    "n": "onClick",
+    "h": "95724af2"
+   },
+   {
+    "k": "handler",
+    "n": "onClick",
+    "h": "e69f21b4"
+   },
+   {
+    "k": "handler",
     "n": "onExitComplete",
     "h": "04791da0"
    },
@@ -11841,6 +12039,16 @@
     "k": "handler",
     "n": "onExitComplete",
     "h": "04791da0"
+   },
+   {
+    "k": "handler",
+    "n": "onInput",
+    "h": "3eb2770e"
+   },
+   {
+    "k": "handler",
+    "n": "onInput",
+    "h": "3eb2770e"
    },
    {
     "k": "handler",
@@ -12642,13 +12850,13 @@
   ]
  },
  "src/hooks/useGuardians.ts": {
-  "digest": "c4753f71ac07c129978a667681d4fdb62f1301b6",
-  "tokens": 72,
+  "digest": "894c56df40a435ec5df0f8ebe7e096415c9b136a",
+  "tokens": 91,
   "items": []
  },
  "src/hooks/useHR.ts": {
-  "digest": "b0736a903496831f041814ce514d8b64913892bb",
-  "tokens": 103,
+  "digest": "859e387893f3f331d75f54602a61a94419342d6a",
+  "tokens": 109,
   "items": [
    {
     "k": "call",
@@ -12664,6 +12872,11 @@
     "k": "call",
     "n": "apiFetch",
     "h": "39fe84b3"
+   },
+   {
+    "k": "call",
+    "n": "apiFetch",
+    "h": "440f70d1"
    },
    {
     "k": "call",
@@ -12703,11 +12916,6 @@
    {
     "k": "call",
     "n": "apiFetch",
-    "h": "c8a1a428"
-   },
-   {
-    "k": "call",
-    "n": "apiFetch",
     "h": "d7621ded"
    },
    {
@@ -12733,9 +12941,14 @@
   "items": []
  },
  "src/hooks/useInactivityTimer.ts": {
-  "digest": "5ff696a6587771912ca467100378c31bf87167ae",
-  "tokens": 38,
+  "digest": "66d1a11decb2b65953ed0436cc8c9bbf7e592a39",
+  "tokens": 50,
   "items": [
+   {
+    "k": "effect",
+    "n": "useEffect",
+    "h": "279e2f13"
+   },
    {
     "k": "effect",
     "n": "useEffect",
@@ -12931,7 +13144,7 @@
   "items": []
  },
  "src/hooks/useNotificationFeed.ts": {
-  "digest": "a015ab10e32f34ff3657f9d876db8018f4be5f9d",
+  "digest": "eb9650c9b2df135f84c91812317a3d3716ef6072",
   "tokens": 27,
   "items": [
    {
@@ -13030,8 +13243,8 @@
   ]
  },
  "src/hooks/useSessionHeartbeat.ts": {
-  "digest": "94d8e9e3616ea6a73bd49a773f3001328710cea0",
-  "tokens": 15,
+  "digest": "24c4468e445c7916b26327b0aa2b80217e375eb6",
+  "tokens": 30,
   "items": [
    {
     "k": "effect",

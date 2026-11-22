@@ -181,7 +181,7 @@ export function StaffForm({ onClose, staffId }: Props) {
         {
           onSuccess: () => onClose(),
           onError: (err) => {
-            setSubmitError(err instanceof Error ? err.message : 'Failed to save changes. Please try again.')
+            setSubmitError(err instanceof Error ? err.message : 'Could not save the changes. Try again.')
           },
         },
       )
@@ -202,7 +202,7 @@ export function StaffForm({ onClose, staffId }: Props) {
         }
       },
       onError: (err) => {
-        setSubmitError(err instanceof Error ? err.message : 'Failed to create staff member. Please try again.')
+        setSubmitError(err instanceof Error ? err.message : 'Could not create the account. Try again.')
       },
     })
   }
@@ -226,7 +226,7 @@ export function StaffForm({ onClose, staffId }: Props) {
 
   return (
     <Modal
-      title={created ? 'Staff Account Created' : isEdit ? 'Edit Staff Member' : 'Add Staff Member'}
+      title={created ? 'Staff account created' : isEdit ? 'Edit staff member' : 'Add staff member'}
       onClose={onClose}
       size="l"
       onSubmit={created ? undefined : handleSubmit(onSubmit)}
@@ -255,7 +255,7 @@ export function StaffForm({ onClose, staffId }: Props) {
               className={MODAL_BTN_PRIMARY}
             >
               {(createStaff.isPending || updateStaff.isPending) && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              {isEdit ? 'Save Changes' : 'Create Staff & Send Login'}
+              {isEdit ? 'Save changes' : 'Create account and send login'}
             </button>
           </>
         )
@@ -268,7 +268,7 @@ export function StaffForm({ onClose, staffId }: Props) {
             <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" aria-hidden />
             <span>
               {created.name}&apos;s account was created. A welcome email with these login
-              details has been sent to <strong>{created.email}</strong>. If it doesn&apos;t
+              details has been sent to <strong>{created.email}</strong>. If it does not
               arrive, share the temporary password below directly.
             </span>
           </div>
@@ -288,7 +288,7 @@ export function StaffForm({ onClose, staffId }: Props) {
               </button>
             </div>
             <p className="text-xs text-muted mt-1.5">
-              The staff member will be asked to change this on first login.
+              The staff member will be asked to change this at first login.
             </p>
           </div>
         </div>
@@ -329,7 +329,7 @@ export function StaffForm({ onClose, staffId }: Props) {
             </div>
             {!isEdit && (
               <div>
-                <span className={lbl}>Employee no.</span>
+                <span className={lbl}>Employee number</span>
                 <p className="text-sm text-muted min-h-[44px] flex items-center">Assigned automatically when you save.</p>
               </div>
             )}
@@ -441,12 +441,12 @@ export function StaffForm({ onClose, staffId }: Props) {
                   </select>
                 </div>
                 <div>
-                  <label className={lbl} htmlFor="sf-nrbNumber">NRB national ID no.</label>
+                  <label className={lbl} htmlFor="sf-nrbNumber">National ID number</label>
                   <input id="sf-nrbNumber" {...register('nrbNumber')} className={ic} autoComplete="off" />
                   {errors.nrbNumber && <p className="text-xs text-tone-coral mt-1" role="alert">{errors.nrbNumber.message}</p>}
                 </div>
                 <div>
-                  <label className={lbl} htmlFor="sf-tpin">MRA TPIN</label>
+                  <label className={lbl} htmlFor="sf-tpin">Tax number (TPIN)</label>
                   <input id="sf-tpin" {...register('tpin')} className={ic} autoComplete="off" />
                   {errors.tpin && <p className="text-xs text-tone-coral mt-1" role="alert">{errors.tpin.message}</p>}
                 </div>
@@ -487,7 +487,7 @@ export function StaffForm({ onClose, staffId }: Props) {
                   </select>
                 </div>
                 <div>
-                  <label className={lbl} htmlFor="sf-payrollNo">Payroll / IPPE number</label>
+                  <label className={lbl} htmlFor="sf-payrollNo">Payroll number (IPPE)</label>
                   <input id="sf-payrollNo" {...register('payrollNo')} className={ic} autoComplete="off" />
                 </div>
                 <div>
@@ -529,16 +529,16 @@ export function StaffForm({ onClose, staffId }: Props) {
                 {isTeaching && (
                   <>
                     <div>
-                      <label className={lbl} htmlFor="sf-tcmReg">TCM registration no.</label>
+                      <label className={lbl} htmlFor="sf-tcmReg">Teaching Council registration number</label>
                       <input id="sf-tcmReg" {...register('tcmRegistrationNo')} className={ic} />
                     </div>
                     <div>
-                      <label className={lbl} htmlFor="sf-tcmLic">TCM licence no.</label>
+                      <label className={lbl} htmlFor="sf-tcmLic">Teaching Council licence number</label>
                       <input id="sf-tcmLic" {...register('tcmLicenceNo')} className={ic} />
                       {errors.tcmLicenceNo && <p className="text-xs text-tone-coral mt-1" role="alert">{errors.tcmLicenceNo.message}</p>}
                     </div>
                     <div>
-                      <label className={lbl} htmlFor="sf-tcmExp">TCM licence expiry</label>
+                      <label className={lbl} htmlFor="sf-tcmExp">Teaching Council licence expiry</label>
                       <input id="sf-tcmExp" type="date" {...register('tcmLicenceExpiry')} className={ic} />
                       {errors.tcmLicenceExpiry && <p className="text-xs text-tone-coral mt-1" role="alert">{errors.tcmLicenceExpiry.message}</p>}
                     </div>
@@ -665,7 +665,7 @@ function SalarySection({ staffId }: { staffId: string }) {
           setShowAddAllowance(false)
           setAllowAmount(''); setAllowNotes(''); setAllowRecurring(true)
         },
-        onError: (err) => setAllowError(err instanceof Error ? err.message : 'Failed to add allowance.'),
+        onError: (err) => setAllowError(err instanceof Error ? err.message : 'Could not add the allowance. Try again.'),
       },
     )
   }
@@ -693,13 +693,13 @@ function SalarySection({ staffId }: { staffId: string }) {
         <>
           {!salary && (
             <p className="text-xs text-muted">
-              No salary set up for this staff member yet. Payroll can&apos;t generate a payslip for them until this is filled in.
+              No salary set up for this staff member yet. Payroll cannot generate a payslip for them until this is filled in.
             </p>
           )}
 
           {/* Base salary */}
           <div>
-            <label className={lbl} htmlFor="sf-baseSalary">Base salary (MWK / month)</label>
+            <label className={lbl} htmlFor="sf-baseSalary">Base salary (MK a month)</label>
             <div className="flex items-end gap-2">
               <input
                 id="sf-baseSalary"
@@ -723,7 +723,7 @@ function SalarySection({ staffId }: { staffId: string }) {
             {baseSaved && <p className="text-xs text-tone-teal mt-1">Saved.</p>}
             {updateSalary.error && (
               <p className="text-xs text-tone-coral mt-1">
-                {updateSalary.error instanceof Error ? updateSalary.error.message : 'Failed to save.'}
+                {updateSalary.error instanceof Error ? updateSalary.error.message : 'Could not save the salary. Try again.'}
               </p>
             )}
           </div>
@@ -751,7 +751,7 @@ function SalarySection({ staffId }: { staffId: string }) {
                   <li key={a.id} className="flex items-center justify-between gap-3 py-2.5 first:pt-0">
                     <div className="min-w-0">
                       <p className="text-sm text-body font-medium truncate">
-                        {a.type} <span className="text-muted font-normal">MWK {Number(a.amount).toLocaleString()}</span>
+                        {a.type} <span className="text-muted font-normal">MK {Number(a.amount).toLocaleString()}</span>
                       </p>
                       <p className="text-xs text-muted">
                         {a.recurring
@@ -786,7 +786,7 @@ function SalarySection({ staffId }: { staffId: string }) {
                     </select>
                   </div>
                   <div>
-                    <label className={lbl} htmlFor="sf-allow-amount">Amount (MWK)</label>
+                    <label className={lbl} htmlFor="sf-allow-amount">Amount (MK)</label>
                     <input
                       id="sf-allow-amount"
                       type="number"
@@ -862,17 +862,17 @@ function SalarySection({ staffId }: { staffId: string }) {
             <div className="border-t border-base pt-3 text-sm space-y-1">
               <div className="flex justify-between text-muted">
                 <span>Base salary</span>
-                <span>MWK {(Number(baseSalary) || 0).toLocaleString()}</span>
+                <span>MK {(Number(baseSalary) || 0).toLocaleString()}</span>
               </div>
               {recurringAllowances.map((a) => (
                 <div key={a.id} className="flex justify-between text-muted">
                   <span>{a.type} (recurring)</span>
-                  <span>MWK {Number(a.amount).toLocaleString()}</span>
+                  <span>MK {Number(a.amount).toLocaleString()}</span>
                 </div>
               ))}
               <div className="flex justify-between font-heading font-semibold text-body pt-1 border-t border-base mt-1">
                 <span>Monthly gross</span>
-                <span>MWK {monthlyGross.toLocaleString()}</span>
+                <span>MK {monthlyGross.toLocaleString()}</span>
               </div>
               {oneTimeAllowances.length > 0 && (
                 <p className="text-xs text-muted pt-1">

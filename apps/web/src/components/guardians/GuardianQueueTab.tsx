@@ -46,7 +46,7 @@ export function GuardianQueueTab() {
     <div className="space-y-4">
       <GuardianSearchBox
         id="guardian-queue-search" label="Search guardians" value={text} onChange={changeSearch}
-        placeholder="Guardian name, phone, e-mail or national ID, or a student"
+        placeholder="Name, phone, email or ID"
       />
       <div className="flex flex-wrap gap-2" role="group" aria-label="Filter guardians">
         <button type="button" aria-pressed={!reverify && status === null} onClick={() => pick(null)}

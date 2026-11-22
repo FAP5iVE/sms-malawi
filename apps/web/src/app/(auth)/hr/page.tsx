@@ -105,7 +105,9 @@ import {
 import Link                 from 'next/link'
 import { ModuleTabs }       from '@/components/shared/ModuleTabs'
 import { formatMWK }        from '@shared/constants/malawi'
-import { statusWord }       from '@/lib/hills/statusWord'
+import { statusWord, statusTone } from '@/lib/hills/statusWord'
+import { StatusText }       from '@/components/shared/StatusText'
+import { formatDate }       from '@/lib/reportFormat'
 import { PayrollWorkspace } from '@/components/finances/payroll/PayrollWorkspace'
 import type { ApiStaffProfile, ApiLeaveRequest, ApiContractAlert, ApiStaffLoan } from '@shared/types/api'
 import { Modal } from '@/components/shared/Modal'
@@ -497,7 +499,7 @@ function HRContent() {
                 onClick={() => setShowLeaveForm((v) => !v)}
                 className="inline-flex items-center gap-1.5 bg-btn-brand text-btn-brand-fg rounded-lg px-3.5 py-2 text-sm font-semibold hover:bg-brand-teal-light min-h-11"
               >
-                {showLeaveForm ? 'Cancel' : 'Request Leave'}
+                {showLeaveForm ? 'Cancel' : 'Request leave'}
               </button>
             </div>
 
@@ -576,22 +578,16 @@ function HRContent() {
             )}
 
             {(myLeaveRequests as ApiLeaveRequest[]).length === 0 ? (
-              <p className="text-sm text-muted">You haven&apos;t requested any leave yet.</p>
+              <p className="text-sm text-muted">You have not requested any leave yet.</p>
             ) : (
               <div className="space-y-2">
                 {(myLeaveRequests as ApiLeaveRequest[]).map((req) => (
                   <div key={req.id} className="flex items-center justify-between border-b border-base py-2.5 last:border-b-0">
                     <div>
                       <p className="text-sm font-medium text-body">{LEAVE_TYPE_LABELS[req.leaveType as LeaveTypeKey] ?? req.leaveType} · {req.days} working day{req.days === 1 ? '' : 's'}</p>
-                      <p className="text-xs text-muted">{new Date(req.startDate).toLocaleDateString()} – {new Date(req.endDate).toLocaleDateString()}{req.payNote ? ` · ${req.payNote}` : ''}</p>
+                      <p className="text-xs text-muted">{formatDate(req.startDate)} to {formatDate(req.endDate)}{req.payNote ? ` · ${req.payNote}` : ''}</p>
                     </div>
-                    <span className={`text-xs font-semibold ${
-                      req.status === 'APPROVED' ? 'text-status-success'
-                        : req.status === 'REJECTED' ? 'text-status-danger'
-                        : 'text-status-warning'
-                    }`}>
-                      {req.status}
-                    </span>
+                    <StatusText tone={statusTone(req.status)}>{statusWord(req.status)}</StatusText>
                   </div>
                 ))}
               </div>
@@ -620,9 +616,9 @@ function HRContent() {
                       </p>
                     </div>
                     <p className="text-xs text-muted text-right">
-                      Until {new Date(p.endDate).toLocaleDateString()}
+                      Until {formatDate(p.endDate)}
                       <br />
-                      Back {new Date(p.returnDate).toLocaleDateString()} · {p.daysLeft} working day{p.daysLeft === 1 ? '' : 's'} left
+                      Back {formatDate(p.returnDate)} · {p.daysLeft} working day{p.daysLeft === 1 ? '' : 's'} left
                     </p>
                   </div>
                 ))}
@@ -658,8 +654,7 @@ function HRContent() {
                 </p>
                 <p className="text-sm text-muted">
                   {LEAVE_TYPE_LABELS[req.leaveType as LeaveTypeKey] ?? req.leaveType} · {req.days} working day{req.days === 1 ? '' : 's'} ·{' '}
-                  {new Date(req.startDate).toLocaleDateString()} –{' '}
-                  {new Date(req.endDate).toLocaleDateString()}
+                  {formatDate(req.startDate)} to {formatDate(req.endDate)}
                 </p>
                 {req.payNote && <p className="text-xs text-muted mt-0.5">Pay: {req.payNote}</p>}
                 <p className="text-xs text-muted mt-1">{req.reason}</p>
@@ -684,13 +679,7 @@ function HRContent() {
                   </button>
                 </div>
               ) : (
-                <span className={`text-xs font-semibold shrink-0 ${
-                  req.status === 'APPROVED'
-                    ? 'text-status-success'
-                    : 'text-status-danger'
-                }`}>
-                  {req.status}
-                </span>
+                <StatusText tone={statusTone(req.status)} className="shrink-0">{statusWord(req.status)}</StatusText>
               )}
             </div>
           ))}

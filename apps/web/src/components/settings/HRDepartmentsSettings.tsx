@@ -49,7 +49,7 @@ const LEAVE_DAY_FIELDS: Array<{ key: keyof Omit<LeaveConfig, 'payPercent'>; labe
   { key: 'maternityDays',    label: 'Maternity leave (days per request)',  hint: 'Statutory minimum is 8 weeks (40 days) on full pay.', max: 365 },
   { key: 'paternityDays',    label: 'Paternity leave (days per request)',  hint: 'Statutory minimum is 2 weeks (10 days).', max: 60 },
   { key: 'studyDays',        label: 'Study leave (days per request)',      hint: 'Longest single request.', max: 180 },
-  { key: 'maxConcurrentPct', label: 'Most staff away at once (%)',         hint: 'Per department. Warns HR when approving would go over.', max: 100 },
+  { key: 'maxConcurrentPct', label: 'Most staff away at once (percent)',         hint: 'Per department. Warns HR when approving would go over.', max: 100 },
 ]
 const inputCls =
   'w-full min-h-[44px] border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body ' +
@@ -143,7 +143,7 @@ export function HRDepartmentsSettings() {
       await apiFetch('/settings/hr', { method: 'PATCH', body: JSON.stringify({ leave }) })
       setLeaveSaved(true); setTimeout(() => setLeaveSaved(false), 3000)
     } catch (err) {
-      setLeaveError(err instanceof Error ? err.message : 'Save failed')
+      setLeaveError(err instanceof Error ? err.message : 'Could not save the leave rules. Try again.')
     } finally {
       setLeaveSaving(false)
     }
@@ -184,21 +184,23 @@ export function HRDepartmentsSettings() {
       {/* Leave: how many days, and how each type is paid. HR / high_rank decide
           each request; these are the allowances and the pay rule payroll applies. */}
       {leave && (
-        <div className="bg-surface rounded-xl p-5 space-y-5 max-w-3xl">
+        <div className="app-tint rounded-xl p-5 space-y-5 max-w-3xl">
           <div>
             <h2 className="font-heading font-bold text-lg text-brand-navy">Leave days and pay</h2>
             <p className="text-sm text-muted mt-0.5">
-              Days are working days, Monday to Friday, public holidays not counted. Annual, sick and
-              emergency leave are yearly allowances that start fresh each January (nothing carries
-              over). Saving updates everyone&apos;s balance for this year straight away.
+              Days are working days (Monday to Friday, public holidays excluded). Annual, sick and
+              emergency leave start fresh each January and do not carry over. Saving updates
+              everyone&apos;s balance for this year.
             </p>
           </div>
 
           <div className="grid sm:grid-cols-2 gap-4">
             {LEAVE_DAY_FIELDS.map((f) => (
               <div key={f.key}>
-                <label className="block text-xs font-heading font-semibold text-muted mb-1.5">{f.label}</label>
+                <label htmlFor={`leave-${f.key}`} className="block text-xs font-heading font-semibold text-muted mb-1.5">{f.label}</label>
                 <input
+                  id={`leave-${f.key}`}
+                  aria-describedby={`leave-${f.key}-hint`}
                   type="number"
                   inputMode="numeric"
                   min={f.key === 'sickHalfDays' || f.key === 'maxConcurrentPct' ? 0 : 1}
@@ -207,7 +209,7 @@ export function HRDepartmentsSettings() {
                   onChange={(e) => setLeave({ ...leave, [f.key]: e.target.value === '' ? 0 : Number(e.target.value) })}
                   className={inputCls}
                 />
-                <p className="text-xs text-muted mt-1">{f.hint}</p>
+                <p id={`leave-${f.key}-hint`} className="text-xs text-muted mt-1">{f.hint}</p>
               </div>
             ))}
           </div>
@@ -215,9 +217,9 @@ export function HRDepartmentsSettings() {
           <div>
             <h3 className="font-heading font-semibold text-sm text-body">Pay while on leave</h3>
             <p className="text-xs text-muted mt-0.5 mb-3">
-              Payroll applies this to the month the leave falls in: half-paid and unpaid days are
-              deducted from that month&apos;s pay, and PAYE and pension are worked out on the reduced
-              pay. For sick leave this is the pay on the full-pay days; the half-pay days are always
+              Payroll applies this in the month the leave falls in. Half-paid and unpaid days are
+              taken off that month&apos;s pay, and PAYE and pension are worked out on the reduced
+              pay. For sick leave, this choice covers the full-pay days; half-pay days are always
               paid at half.
             </p>
             <div className="grid sm:grid-cols-2 gap-3">
@@ -246,7 +248,7 @@ export function HRDepartmentsSettings() {
               type="button"
               onClick={handleSaveLeave}
               disabled={leaveSaving}
-              className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors disabled:opacity-60 flex items-center gap-2"
+              className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold bg-btn-brand text-btn-brand-fg hover:bg-btn-brand-hover transition-colors disabled:opacity-60 flex items-center gap-2"
             >
               {leaveSaving ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</> : <><Save className="w-4 h-4" /> Save leave rules</>}
             </button>
@@ -257,7 +259,7 @@ export function HRDepartmentsSettings() {
 
       {/* Retirement age — drives the retirement date shown on each staff profile
           (date of birth + this value) and the "retiring soon" list for HR. */}
-      <div className="bg-surface rounded-xl p-5 space-y-3 max-w-xl">
+      <div className="app-tint rounded-xl p-5 space-y-3 max-w-xl">
         <div>
           <h2 className="font-heading font-bold text-lg text-brand-navy">Retirement age</h2>
           <p className="text-sm text-muted mt-0.5">

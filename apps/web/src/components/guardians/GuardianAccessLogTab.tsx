@@ -55,13 +55,13 @@ function RecentAccess({ onOpen }: { onOpen: (s: PickedStudent) => void }) {
         <div className="app-tint rounded-xl p-10 text-center">
           <ScrollText className="w-8 h-8 mx-auto text-muted mb-2" aria-hidden />
           <p className="font-medium text-body">No activity yet</p>
-          <p className="text-sm text-muted mt-1">Nobody has opened a child’s information through the parent portal.</p>
+          <p className="text-sm text-muted mt-1">No guardian has opened a child’s information yet.</p>
         </div>
       )}
 
       {rows.length > 0 && (
         <>
-          <ul className="rounded-xl border border-base bg-surface divide-y divide-[var(--border-base,rgba(0,0,0,0.08))] overflow-hidden">
+          <ul className="app-tint rounded-xl divide-y divide-[var(--border-base,rgba(0,0,0,0.08))] overflow-hidden">
             {paging.visible.map((r) => (
               <li key={r.student.id}>
                 <button

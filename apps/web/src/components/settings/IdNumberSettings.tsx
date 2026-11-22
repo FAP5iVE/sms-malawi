@@ -47,7 +47,7 @@ function FormatCard({ title, description, inputId, placeholder, value, onChange,
   const preview = problem ? null : [1, 2, 3].map((n) => formatIdNumber(value.trim(), n, now))
 
   return (
-    <div className="bg-surface rounded-xl p-5 space-y-3 max-w-xl">
+    <div className="app-tint rounded-xl p-5 space-y-3 max-w-xl">
       <div>
         <h2 className="font-heading font-bold text-lg text-brand-navy">{title}</h2>
         <p className="text-sm text-muted mt-0.5">{description}</p>
@@ -71,9 +71,9 @@ function FormatCard({ title, description, inputId, placeholder, value, onChange,
           type="button"
           onClick={onSave}
           disabled={saving || !!problem}
-          className="min-h-[44px] px-4 rounded-xl bg-brand-deep text-white text-sm font-semibold disabled:opacity-40 flex items-center gap-1.5"
+          className="min-h-[44px] px-4 rounded-xl bg-btn-brand text-btn-brand-fg hover:bg-btn-brand-hover transition-colors text-sm font-semibold disabled:opacity-40 flex items-center gap-1.5"
         >
-          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Save
+          {saving ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <Save className="w-4 h-4" aria-hidden />} Save format
         </button>
         {saved && <span className="text-sm text-tone-teal pb-3">Saved</span>}
       </div>
@@ -110,7 +110,7 @@ export function IdNumberSettings() {
         if (d.employeeNoFormat) setEmployeeFormat(d.employeeNoFormat)
         if (d.studentRegistrationNoFormat) setStudentFormat(d.studentRegistrationNoFormat)
       })
-      .catch((e) => setLoadError(e instanceof Error ? e.message : 'Failed to load'))
+      .catch((e) => setLoadError(e instanceof Error ? e.message : 'Could not load the current layouts. Refresh the page to try again.'))
       .finally(() => setLoading(false))
   }, [])
 
@@ -123,7 +123,7 @@ export function IdNumberSettings() {
       await apiFetch('/settings/id-numbers', { method: 'PATCH', body: JSON.stringify(body) })
       set.saved(true); setTimeout(() => set.saved(false), 3000)
     } catch (err) {
-      set.error(err instanceof Error ? err.message : 'Save failed')
+      set.error(err instanceof Error ? err.message : 'Could not save the layout. Try again.')
     } finally {
       set.saving(false)
     }
@@ -142,18 +142,17 @@ export function IdNumberSettings() {
       <div>
         <h2 className="font-heading font-bold text-lg text-brand-navy">ID numbers</h2>
         <p className="text-sm text-muted mt-0.5 max-w-xl">
-          Employee numbers and student registration numbers are created by the system and count up on
-          their own. Write the layout you want, with zeros where the running number goes. The last run of
-          zeros is the running number, and {'{YYYY}'} or {'{YY}'} is replaced by the year, so the count
-          starts again at 1 each new year. Only numbers created from now on follow a new layout; existing
-          numbers do not change.
+          The system creates employee numbers and student registration numbers and counts up on its own.
+          Write the layout you want, with zeros where the running number goes. {'{YYYY}'} or {'{YY}'} becomes
+          the year, and the count starts again at 1 each year. A new layout applies only to numbers created
+          from now on; existing numbers do not change.
         </p>
         {loadError && <p className="text-sm text-tone-coral mt-2" role="alert">{loadError}</p>}
       </div>
 
       <FormatCard
         title="Employee number"
-        description="Used for every new member of staff. For example EMP-{YYYY}-000 gives EMP-2026-001, EMP-2026-002."
+        description="Used for every new member of staff. EMP-{YYYY}-000 gives EMP-2026-001, then EMP-2026-002."
         inputId="idn-employee"
         placeholder="EMP-{YYYY}-000"
         value={employeeFormat}
@@ -166,7 +165,7 @@ export function IdNumberSettings() {
 
       <FormatCard
         title="Student registration number"
-        description="Used for every new student. For example SCH-ML-{YYYY}-0000 gives SCH-ML-2026-0001, SCH-ML-2026-0002."
+        description="Used for every new student. SMS-{YYYY}-0000 gives SMS-2026-0001, then SMS-2026-0002."
         inputId="idn-student"
         placeholder="SMS-{YYYY}-0000"
         value={studentFormat}

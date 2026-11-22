@@ -189,7 +189,7 @@ export function InviteDialog({ link, onClose }: { link: GuardianLinkDto; onClose
       { linkId: link.id, channel, ...(channel === 'EMAIL' && contactId ? { contactId } : {}) },
       {
         onSuccess: (res) => {
-          if (res.channel === 'EMAIL') { toast.success('Invitation e-mailed'); onClose(); return }
+          if (res.channel === 'EMAIL') { toast.success('Invitation emailed'); onClose(); return }
           setIssued(res)
         },
       },
@@ -245,7 +245,7 @@ export function InviteDialog({ link, onClose }: { link: GuardianLinkDto; onClose
         <>
           <button type="button" onClick={onClose} disabled={issue.isPending} className={MODAL_BTN_SECONDARY}>Cancel</button>
           <button type="submit" disabled={issue.isPending || Boolean(blocker) || (channel === 'EMAIL' && !contactId)} className={MODAL_BTN_PRIMARY}>
-            {issue.isPending ? 'Issuing…' : channel === 'EMAIL' ? 'Send e-mail' : 'Create slip'}
+            {issue.isPending ? 'Issuing…' : channel === 'EMAIL' ? 'Send email' : 'Create slip'}
           </button>
         </>
       }
@@ -260,7 +260,7 @@ export function InviteDialog({ link, onClose }: { link: GuardianLinkDto; onClose
               <input type="radio" name="inv-channel" checked={channel === 'EMAIL'} disabled={emails.length === 0} onChange={() => setChannel('EMAIL')} className="mt-0.5 accent-brand-teal" />
               <span>
                 <span className="block text-sm font-medium text-body">E-mail</span>
-                <span className="block text-xs text-muted">{emails.length ? 'Sends a link and a code.' : 'No e-mail address on file for this guardian.'}</span>
+                <span className="block text-xs text-muted">{emails.length ? 'Sends a link and a code.' : 'No email address on file for this guardian.'}</span>
               </span>
             </label>
             <label className="flex items-start gap-3 rounded-xl app-tint px-3 py-2.5 min-h-11 cursor-pointer hover:bg-brand-teal/10">

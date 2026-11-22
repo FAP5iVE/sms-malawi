@@ -81,7 +81,7 @@ export function GuardianStudentBrowser({ onSelect, inputId = 'guardian-student-s
       )}
 
       {items.length > 0 && (
-        <ul className="rounded-xl border border-base bg-surface divide-y divide-[var(--border-base,rgba(0,0,0,0.08))] overflow-hidden">
+        <ul className="app-tint rounded-xl divide-y divide-[var(--border-base,rgba(0,0,0,0.08))] overflow-hidden">
           {items.map((s) => (
             <li key={s.id}>
               <button
