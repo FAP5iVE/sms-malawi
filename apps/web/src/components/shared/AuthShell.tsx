@@ -46,6 +46,10 @@ import { PublicAmbientBackground } from '@/components/shared/PublicAmbientBackgr
 import { SchoolMark } from '@/components/shared/SchoolMark'
 import { HillsSigningScene } from '@/components/shared/HillsSigningScene'
 import { useTypingRipple } from '@/lib/hills/useTypingRipple'
+import { CANVAS, LIT_RING_COUNT, PEAK, RING_SPACING, ringPath } from '@/lib/hills/ripple'
+
+/** The innermost contour lines, drawn once. They sit exactly on the background's own lines and light up as the form fills in. */
+const LIT_RINGS = Array.from({ length: LIT_RING_COUNT }, (_, i) => ringPath(PEAK.x, PEAK.y, (i + 1) * RING_SPACING))
 
 /** Phrase and supporting line for each sky (mockup wording). */
 const SKY_WORDS = [
@@ -67,16 +71,31 @@ interface AuthShellProps {
 
 export function AuthShell({ children, footer, skeletonOnBusy = false }: AuthShellProps) {
   const mainRef = useRef<HTMLElement>(null)
-  const ringsRef = useRef<HTMLDivElement>(null)
-  useTypingRipple(mainRef, ringsRef)
+  const ringsRef = useRef<SVGSVGElement>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
+  useTypingRipple(mainRef, ringsRef, rootRef)
 
   return (
-    <div className="hills hills-auth relative flex flex-1 flex-col font-sans" data-scene={skeletonOnBusy ? '' : undefined}>
+    <div ref={rootRef} className="hills hills-auth relative flex flex-1 flex-col font-sans" data-scene={skeletonOnBusy ? '' : undefined}>
       <PublicAmbientBackground vivid />
 
-      {/* Typing ripple layer (decorative): behind the content, above the sky. */}
+      {/* Typing response (decorative): behind the content, above the sky. Same 3:2 box and
+          artwork canvas as the background's contour lines, so it lines up at every size. */}
       <div className="hills-ripple" aria-hidden="true">
-        <div ref={ringsRef} className="hills-ripple__cover" />
+        <svg
+          ref={ringsRef}
+          className="hills-ripple__cover"
+          viewBox={`0 0 ${CANVAS.w} ${CANVAS.h}`}
+          preserveAspectRatio="none"
+          focusable="false"
+        >
+          <g>
+            {LIT_RINGS.map((d, i) => (
+              <path key={i} data-lit-ring className="hills-ripple__lit" d={d} />
+            ))}
+          </g>
+          <g transform={`translate(${PEAK.x} ${PEAK.y})`} data-ripple-waves />
+        </svg>
       </div>
 
       <main ref={mainRef} className="hills-auth__main">

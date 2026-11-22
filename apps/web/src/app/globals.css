@@ -1683,17 +1683,6 @@ span[data-math] .katex-display {
 @keyframes hills-rise {
   from { opacity: 0; transform: translateY(14px); }
 }
-/* The wave front travels from the peak to the edge of the screen. It is a soft
-   ring of light that grows and fades; the contour mask on the layer means it is
-   only ever visible ON the contour lines, so it reads as a ripple running
-   through the hills and not as circles floating over them. */
-@keyframes hills-ripple {
-  0%   { transform: translate(-50%, -50%) scale(0.02); opacity: 0; }
-  10%  { opacity: 1; }
-  70%  { opacity: 0.7; }
-  100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
-}
-
 /* Per-sky switches for the crossfading words and the crest. Same selectors as
    the palettes above, so a local `.hills[data-sky]` (Storybook) wins here too. */
 .hills {
@@ -2102,12 +2091,15 @@ span[data-math] .katex-display {
 .hills-alert--danger { --c-x: var(--c-danger); }
 .hills-alert--warn { --c-x: var(--c-warn); }
 
-/* ── Typing ripple: a wave that runs along the contour lines ─────────────────
-   The layer fills the screen and is masked by the SAME contour artwork, with the
-   same stretch, as the faint lines in the background (.hills-bg__map), so each
-   wave lights up the real lines. Every keystroke (at most one per 140ms) adds a
-   ring of light centred on the peak (71.7% / 36.3% of the artwork) that spreads
-   to the screen edge and fades. */
+/* ── Typing response (Phase 10e) ─────────────────────────────────────────────
+   Follows the approved sign-in mockup. Every keystroke sends one contour-shaped
+   ring out from the peak; the innermost contour lines light up as the form fills
+   in; the sun's glow swells with the password.
+   The layer is the SAME 3:2 cover box as the background's contour lines
+   (.hills-bg__cover) holding an svg on the same 1200 x 800 canvas, so the lit
+   lines sit exactly on the real ones at any screen size.
+   Cheap on purpose (this ran badly on phones before): no mask, no filter, no
+   large gradient. The ring is ONE thin path whose scale and opacity change. */
 
 .hills-ripple {
   position: fixed;
@@ -2119,33 +2111,38 @@ span[data-math] .katex-display {
 }
 .hills-ripple__cover {
   position: absolute;
-  inset: 0;
-  -webkit-mask: url('/hills/contours.svg') center / 100% 100% no-repeat;
-  mask: url('/hills/contours.svg') center / 100% 100% no-repeat;
-  filter: drop-shadow(0 0 2px color-mix(in srgb, var(--hills-accent) 70%, transparent));
+  left: 50%;
+  top: 50%;
+  width: max(100cqw, 150cqh);
+  height: max(66.667cqw, 100cqh);
+  transform: translate(-50%, -50%);
+  overflow: visible;
 }
-.hills-ripple__ring {
-  position: absolute;
-  left: 71.7%;
-  top: 36.3%;
-  /* At full size the front (96% of the radius) just clears the farthest corner,
-     so the wave is on screen for its whole life. */
-  width: calc(max(100cqw, 100cqh) * 2.1);
-  aspect-ratio: 1;
-  border-radius: 50%;
-  /* A bright front with a soft trail behind it, so the light seems to flow. */
-  background: radial-gradient(
-    circle closest-side,
-    transparent 0%,
-    transparent 62%,
-    color-mix(in srgb, var(--hills-accent) 38%, transparent) 84%,
-    var(--hills-accent) 96%,
-    transparent 100%
-  );
+.hills-ripple__lit {
+  fill: none;
+  stroke: var(--hills-accent);
+  stroke-width: 1.5;
   opacity: 0;
-  transform: translate(-50%, -50%) scale(0.02);
-  will-change: transform, opacity;
-  animation: hills-ripple 2.6s cubic-bezier(0.33, 0.45, 0.55, 1) forwards;
+  transition: opacity 0.8s ease;
+}
+.hills-ripple__lit.is-lit { opacity: 0.6; }
+.hills-ripple__ring {
+  fill: none;
+  stroke: var(--hills-accent);
+  stroke-width: 1.6;
+  vector-effect: non-scaling-stroke;
+  opacity: 0;
+  animation: hills-ripple 1.9s cubic-bezier(0.2, 0.6, 0.3, 1) forwards;
+}
+/* The ring starts inside the first lit contours and spreads past the screen edge, fading as it goes. */
+@keyframes hills-ripple {
+  from { transform: scale(0.2); opacity: 0.6; }
+  to   { transform: scale(3.4); opacity: 0; }
+}
+/* The sun's glow swells with the password (--hills-pw is 0..1, set by useTypingRipple). */
+.hills-bg__sun::before {
+  transform: scale(calc(1 + var(--hills-pw, 0) * 0.35));
+  transition: transform 0.7s ease;
 }
 
 /* ── "Signing in" scene: a dashboard-shaped skeleton replaces the headline ── */
@@ -2221,7 +2218,9 @@ span[data-math] .katex-display {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hills-ripple { display: none; }
+  .hills-ripple__ring { display: none; }
+  .hills-ripple__lit { transition: none; }
+  .hills-bg__sun::before { transition: none; }
   .hills-auth__statement,
   .hills-auth__card,
   .hills-auth__notice { animation: none; }

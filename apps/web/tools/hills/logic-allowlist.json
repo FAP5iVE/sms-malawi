@@ -20626,6 +20626,594 @@
       "kind": "selector",
       "pattern": "^type=\"button\"$",
       "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/components/shared/AuthShell.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ ringsRef\\ =\\ useRef\\ <\\ HTMLDivElement\\ >\\ \\(\\ null\\ \\)$",
+      "reason": "Phase 10e: the typing-response layer is now a small svg (lit contour lines plus a group for rings) and the shell passes two refs to the hook. No form, handler, request or route is touched."
+    },
+    {
+      "file": "src/components/shared/AuthShell.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^useTypingRipple\\ \\(\\ mainRef\\ ,\\ ringsRef\\ \\)$",
+      "reason": "Phase 10e: the typing-response layer is now a small svg (lit contour lines plus a group for rings) and the shell passes two refs to the hook. No form, handler, request or route is touched."
+    },
+    {
+      "file": "src/components/shared/AuthShell.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ CANVAS\\ ,\\ LIT_RING_COUNT\\ ,\\ PEAK\\ ,\\ RING_SPACING\\ ,\\ ringPath\\ \\}\\ from\\ '@/lib/hills/ripple'$",
+      "reason": "Phase 10e: the typing-response layer is now a small svg (lit contour lines plus a group for rings) and the shell passes two refs to the hook. No form, handler, request or route is touched."
+    },
+    {
+      "file": "src/components/shared/AuthShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ LIT_RINGS\\ =\\ Array\\ \\.\\ from\\ \\(\\ \\{\\ length\\ :\\ LIT_RING_COUNT\\ \\}\\ ,\\ \\(\\ _\\ ,\\ i\\ \\)\\ =>\\ ringPath\\ \\(\\ PEAK\\ \\.\\ x\\ ,\\ PEAK\\ \\.\\ y\\ ,\\ \\(\\ i\\ \\+\\ 1\\ \\)\\ \\*\\ RING_SPACING\\ \\)\\ \\)$",
+      "reason": "Phase 10e: the typing-response layer is now a small svg (lit contour lines plus a group for rings) and the shell passes two refs to the hook. No form, handler, request or route is touched."
+    },
+    {
+      "file": "src/components/shared/AuthShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ ringsRef\\ =\\ useRef\\ <\\ SVGSVGElement\\ >\\ \\(\\ null\\ \\)$",
+      "reason": "Phase 10e: the typing-response layer is now a small svg (lit contour lines plus a group for rings) and the shell passes two refs to the hook. No form, handler, request or route is touched."
+    },
+    {
+      "file": "src/components/shared/AuthShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ rootRef\\ =\\ useRef\\ <\\ HTMLDivElement\\ >\\ \\(\\ null\\ \\)$",
+      "reason": "Phase 10e: the typing-response layer is now a small svg (lit contour lines plus a group for rings) and the shell passes two refs to the hook. No form, handler, request or route is touched."
+    },
+    {
+      "file": "src/components/shared/AuthShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^useTypingRipple\\ \\(\\ mainRef\\ ,\\ ringsRef\\ ,\\ rootRef\\ \\)$",
+      "reason": "Phase 10e: the typing-response layer is now a small svg (lit contour lines plus a group for rings) and the shell passes two refs to the hook. No form, handler, request or route is touched."
+    },
+    {
+      "file": "src/components/shared/AuthShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^ref=\\{\\ rootRef\\ \\}$",
+      "reason": "Phase 10e: the typing-response layer is now a small svg (lit contour lines plus a group for rings) and the shell passes two refs to the hook. No form, handler, request or route is touched."
+    },
+    {
+      "file": "src/components/shared/AuthShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ LIT_RINGS\\ \\.\\ map\\ \\(\\ \\(\\ d\\ ,\\ i\\ \\)\\ =>\\ \\(\\ <JSX/>\\ \\)\\ \\)\\ \\}$",
+      "reason": "Phase 10e: the typing-response layer is now a small svg (lit contour lines plus a group for rings) and the shell passes two refs to the hook. No form, handler, request or route is touched."
+    },
+    {
+      "file": "src/components/shared/AuthShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^key=\\{\\ i\\ \\}$",
+      "reason": "Phase 10e: the typing-response layer is now a small svg (lit contour lines plus a group for rings) and the shell passes two refs to the hook. No form, handler, request or route is touched."
+    },
+    {
+      "file": "src/components/shared/AuthShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^data\\-lit\\-ring=true$",
+      "reason": "Phase 10e: the typing-response layer is now a small svg (lit contour lines plus a group for rings) and the shell passes two refs to the hook. No form, handler, request or route is touched."
+    },
+    {
+      "file": "src/components/shared/AuthShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^data\\-ripple\\-waves=true$",
+      "reason": "Phase 10e: the typing-response layer is now a small svg (lit contour lines plus a group for rings) and the shell passes two refs to the hook. No form, handler, request or route is touched."
+    },
+    {
+      "file": "src/lib/hills/ripple.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^export\\ const\\ RIPPLE_CLEANUP_MS\\ =\\ 3200$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/ripple.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^export\\ const\\ RIPPLE_MAX_RINGS\\ =\\ 6$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/ripple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ const\\ RIPPLE_CLEANUP_MS\\ =\\ 2600$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/ripple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ const\\ RIPPLE_MAX_RINGS\\ =\\ 5$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/ripple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ const\\ CANVAS\\ =\\ \\{\\ w\\ :\\ 1200\\ ,\\ h\\ :\\ 800\\ \\}\\ as\\ const$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/ripple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ const\\ PEAK\\ =\\ \\{\\ x\\ :\\ 860\\ ,\\ y\\ :\\ 290\\ \\}\\ as\\ const$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/ripple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ const\\ RING_SPACING\\ =\\ 26$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/ripple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ const\\ LIT_RING_COUNT\\ =\\ 8$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/ripple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ const\\ RIPPLE_START_K\\ =\\ RING_SPACING\\ \\*\\ 5\\.5$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/ripple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ function\\ ringPath\\ \\(\\ cx\\ :\\ number\\ ,\\ cy\\ :\\ number\\ ,\\ k\\ :\\ number\\ \\)\\ :\\ string\\ \\{\\}$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/ripple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ N\\ =\\ 96$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/ripple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^let\\ d\\ =\\ ''$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/ripple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^for\\ \\(\\ let\\ s\\ =\\ 0\\ ;\\ s\\ <=\\ N\\ ;\\ s\\ \\+\\+\\ \\)\\ \\{\\}$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/ripple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ a\\ =\\ \\(\\ s\\ /\\ N\\ \\)\\ \\*\\ Math\\ \\.\\ PI\\ \\*\\ 2$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/ripple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ rr\\ =\\ k\\ \\*\\ \\(\\ 1\\ \\+\\ 0\\.16\\ \\*\\ Math\\ \\.\\ sin\\ \\(\\ 3\\ \\*\\ a\\ \\+\\ 1\\.2\\ \\)\\ \\+\\ 0\\.1\\ \\*\\ Math\\ \\.\\ sin\\ \\(\\ 5\\ \\*\\ a\\ \\+\\ 0\\.4\\ \\)\\ \\+\\ 0\\.07\\ \\*\\ Math\\ \\.\\ sin\\ \\(\\ 7\\ \\*\\ a\\ \\+\\ 2\\.1\\ \\)\\ \\+\\ 0\\.05\\ \\*\\ Math\\ \\.\\ sin\\ \\(\\ 2\\ \\*\\ a\\ \\+\\ k\\ \\*\\ 0\\.01\\ \\)\\ \\)$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/ripple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^d\\ \\+=\\ `\\$\\{\\ s\\ \\?\\ 'L'\\ :\\ 'M'\\ \\}\\$\\{\\ \\(\\ cx\\ \\+\\ Math\\ \\.\\ cos\\ \\(\\ a\\ \\)\\ \\*\\ rr\\ \\*\\ 1\\.35\\ \\)\\ \\.\\ toFixed\\ \\(\\ 1\\ \\)\\ \\}\\ \\$\\{\\ \\(\\ cy\\ \\+\\ Math\\ \\.\\ sin\\ \\(\\ a\\ \\)\\ \\*\\ rr\\ \\*\\ 0\\.82\\ \\)\\ \\.\\ toFixed\\ \\(\\ 1\\ \\)\\ \\}`$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/ripple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return\\ `\\$\\{\\ d\\ \\}Z`$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/ripple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ interface\\ FieldState\\ \\{\\ type\\ :\\ string\\ value\\ :\\ string\\ \\}$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/ripple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ EMAIL\\ =\\ /\\^\\[\\^\\\\s@\\]\\+@\\[\\^\\\\s@\\]\\+\\\\\\.\\[\\^\\\\s@\\]\\{2,\\}\\$/$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/ripple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ function\\ litRingCount\\ \\(\\ fields\\ :\\ readonly\\ FieldState\\ \\[\\ \\]\\ \\)\\ :\\ number\\ \\{\\}$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/ripple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^let\\ n\\ =\\ 0$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/ripple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^for\\ \\(\\ const\\ f\\ of\\ fields\\ \\)\\ \\{\\}$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/ripple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ v\\ =\\ f\\ \\.\\ value\\ \\.\\ trim\\ \\(\\ \\)$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/ripple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ f\\ \\.\\ type\\ ===\\ 'email'\\ \\)\\ n\\ \\+=\\ EMAIL\\ \\.\\ test\\ \\(\\ v\\ \\)\\ \\?\\ 3\\ :\\ 0\\ else\\ if\\ \\(\\ f\\ \\.\\ type\\ ===\\ 'password'\\ \\)\\ n\\ \\+=\\ Math\\ \\.\\ min\\ \\(\\ f\\ \\.\\ value\\ \\.\\ length\\ ,\\ 5\\ \\)\\ else\\ if\\ \\(\\ f\\ \\.\\ type\\ ===\\ 'text'\\ \\|\\|\\ f\\ \\.\\ type\\ ===\\ 'tel'\\ \\|\\|\\ f\\ \\.\\ type\\ ===\\ 'search'\\ \\)\\ n\\ \\+=\\ Math\\ \\.\\ min\\ \\(\\ Math\\ \\.\\ floor\\ \\(\\ v\\ \\.\\ length\\ /\\ 4\\ \\)\\ ,\\ 2\\ \\)$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/ripple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return\\ Math\\ \\.\\ min\\ \\(\\ n\\ ,\\ LIT_RING_COUNT\\ \\)$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/ripple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ function\\ glowAmount\\ \\(\\ fields\\ :\\ readonly\\ FieldState\\ \\[\\ \\]\\ \\)\\ :\\ number\\ \\{\\}$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/ripple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^let\\ longest\\ =\\ 0$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/ripple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^for\\ \\(\\ const\\ f\\ of\\ fields\\ \\)\\ if\\ \\(\\ f\\ \\.\\ type\\ ===\\ 'password'\\ \\)\\ longest\\ =\\ Math\\ \\.\\ max\\ \\(\\ longest\\ ,\\ f\\ \\.\\ value\\ \\.\\ length\\ \\)$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/ripple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return\\ Math\\ \\.\\ round\\ \\(\\ Math\\ \\.\\ min\\ \\(\\ longest\\ /\\ 12\\ ,\\ 1\\ \\)\\ \\*\\ 100\\ \\)\\ /\\ 100$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "removed",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ RIPPLE_CLEANUP_MS\\ ,\\ RIPPLE_MAX_RINGS\\ ,\\ shouldAddRipple\\ \\}\\ from\\ '@/lib/hills/ripple'$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^export\\ function\\ useTypingRipple\\ \\(\\ listenOn\\ :\\ RefObject\\ <\\ HTMLElement\\ \\|\\ null\\ >\\ ,\\ layer\\ :\\ RefObject\\ <\\ HTMLElement\\ \\|\\ null\\ >\\ ,\\ \\)\\ :\\ void\\ \\{\\}$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^useEffect\\ \\(\\ \\(\\ \\)\\ =>\\ \\{\\}\\ ,\\ \\[\\ listenOn\\ ,\\ layer\\ ,\\ motionEnabled\\ \\]\\ \\)$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ rings\\ =\\ layer\\ \\.\\ current$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ !\\ host\\ \\|\\|\\ !\\ rings\\ \\|\\|\\ !\\ motionEnabled\\ \\)\\ return$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ !\\ shouldAddRipple\\ \\(\\ \\{\\ now\\ ,\\ last\\ ,\\ motionEnabled\\ ,\\ prefersReducedMotion\\ :\\ reduced\\ \\.\\ matches\\ \\}\\ \\)\\ \\)\\ return$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ ring\\ =\\ document\\ \\.\\ createElement\\ \\(\\ 'span'\\ \\)$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^ring\\ \\.\\ className\\ =\\ 'hills\\-ripple__ring'$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^rings\\ \\.\\ appendChild\\ \\(\\ ring\\ \\)$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^while\\ \\(\\ rings\\ \\.\\ childElementCount\\ >\\ RIPPLE_MAX_RINGS\\ \\)\\ rings\\ \\.\\ firstElementChild\\ \\?\\.\\ remove\\ \\(\\ \\)$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^rings\\ \\.\\ replaceChildren\\ \\(\\ \\)$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ RIPPLE_CLEANUP_MS\\ ,\\ RIPPLE_MAX_RINGS\\ ,\\ RIPPLE_START_K\\ ,\\ glowAmount\\ ,\\ litRingCount\\ ,\\ ringPath\\ ,\\ shouldAddRipple\\ ,\\ type\\ FieldState\\ ,\\ \\}\\ from\\ '@/lib/hills/ripple'$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ SVG_NS\\ =\\ 'http://www\\.w3\\.org/2000/svg'$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ function\\ useTypingRipple\\ \\(\\ listenOn\\ :\\ RefObject\\ <\\ HTMLElement\\ \\|\\ null\\ >\\ ,\\ layer\\ :\\ RefObject\\ <\\ SVGSVGElement\\ \\|\\ null\\ >\\ ,\\ glowOn\\ :\\ RefObject\\ <\\ HTMLElement\\ \\|\\ null\\ >\\ ,\\ \\)\\ :\\ void\\ \\{\\}$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^useEffect\\ \\(\\ \\(\\ \\)\\ =>\\ \\{\\}\\ ,\\ \\[\\ listenOn\\ ,\\ layer\\ ,\\ glowOn\\ ,\\ motionEnabled\\ \\]\\ \\)$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ svg\\ =\\ layer\\ \\.\\ current$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ glowHost\\ =\\ glowOn\\ \\.\\ current$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ !\\ host\\ \\|\\|\\ !\\ svg\\ \\|\\|\\ !\\ motionEnabled\\ \\)\\ return$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ waves\\ =\\ svg\\ \\.\\ querySelector\\ <\\ SVGGElement\\ >\\ \\(\\ '\\[data\\-ripple\\-waves\\]'\\ \\)$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ lit\\ =\\ Array\\ \\.\\ from\\ \\(\\ svg\\ \\.\\ querySelectorAll\\ <\\ SVGPathElement\\ >\\ \\(\\ '\\[data\\-lit\\-ring\\]'\\ \\)\\ \\)$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ waveD\\ =\\ ringPath\\ \\(\\ 0\\ ,\\ 0\\ ,\\ RIPPLE_START_K\\ \\)$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^let\\ litNow\\ =\\ \\-\\ 1$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^let\\ glowNow\\ =\\ \\-\\ 1$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ readFields\\ =\\ \\(\\ \\)\\ :\\ FieldState\\ \\[\\ \\]\\ =>\\ Array\\ \\.\\ from\\ \\(\\ host\\ \\.\\ querySelectorAll\\ <\\ HTMLInputElement\\ >\\ \\(\\ 'input'\\ \\)\\ \\)\\ \\.\\ map\\ \\(\\ \\(\\ el\\ \\)\\ =>\\ \\(\\ \\{\\ type\\ :\\ el\\ \\.\\ type\\ ,\\ value\\ :\\ el\\ \\.\\ value\\ \\}\\ \\)\\ \\)$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ fields\\ =\\ readFields\\ \\(\\ \\)$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ n\\ =\\ litRingCount\\ \\(\\ fields\\ \\)$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ n\\ !==\\ litNow\\ \\)\\ \\{\\}$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^litNow\\ =\\ n$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^lit\\ \\.\\ forEach\\ \\(\\ \\(\\ p\\ ,\\ i\\ \\)\\ =>\\ p\\ \\.\\ classList\\ \\.\\ toggle\\ \\(\\ 'is\\-lit'\\ ,\\ i\\ <\\ n\\ \\)\\ \\)$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ g\\ =\\ glowAmount\\ \\(\\ fields\\ \\)$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ g\\ !==\\ glowNow\\ \\&\\&\\ glowHost\\ \\)\\ \\{\\}$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^glowNow\\ =\\ g$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^glowHost\\ \\.\\ style\\ \\.\\ setProperty\\ \\(\\ '\\-\\-hills\\-pw'\\ ,\\ String\\ \\(\\ g\\ \\)\\ \\)$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ !\\ waves\\ \\|\\|\\ !\\ shouldAddRipple\\ \\(\\ \\{\\ now\\ ,\\ last\\ ,\\ motionEnabled\\ ,\\ prefersReducedMotion\\ :\\ reduced\\ \\.\\ matches\\ \\}\\ \\)\\ \\)\\ return$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ ring\\ =\\ document\\ \\.\\ createElementNS\\ \\(\\ SVG_NS\\ ,\\ 'path'\\ \\)$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^ring\\ \\.\\ setAttribute\\ \\(\\ 'class'\\ ,\\ 'hills\\-ripple__ring'\\ \\)$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^ring\\ \\.\\ setAttribute\\ \\(\\ 'd'\\ ,\\ waveD\\ \\)$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^waves\\ \\.\\ appendChild\\ \\(\\ ring\\ \\)$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^while\\ \\(\\ waves\\ \\.\\ childElementCount\\ >\\ RIPPLE_MAX_RINGS\\ \\)\\ waves\\ \\.\\ firstElementChild\\ \\?\\.\\ remove\\ \\(\\ \\)$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^onInput\\ \\(\\ \\)$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^waves\\ \\?\\.\\ replaceChildren\\ \\(\\ \\)$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^lit\\ \\.\\ forEach\\ \\(\\ \\(\\ p\\ \\)\\ =>\\ p\\ \\.\\ classList\\ \\.\\ remove\\ \\(\\ 'is\\-lit'\\ \\)\\ \\)$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^glowHost\\ \\?\\.\\ style\\ \\.\\ removeProperty\\ \\(\\ '\\-\\-hills\\-pw'\\ \\)$",
+      "reason": "Phase 10e: typing response rebuilt after the approved sign-in mockup. Display-only: it reads field type and value from the page, draws into one svg, and sets one CSS variable. No store write, no request."
     }
   ],
   "approvedFrozen": [

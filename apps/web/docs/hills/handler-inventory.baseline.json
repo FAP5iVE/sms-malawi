@@ -10210,8 +10210,8 @@
   ]
  },
  "src/components/shared/AuthShell.tsx": {
-  "digest": "586dc14a1f1b45b3ca0cbb95277f1a78d35b3f77",
-  "tokens": 32,
+  "digest": "6073fbde999b4661e4c0556fbd0132da83d8c1aa",
+  "tokens": 40,
   "items": []
  },
  "src/components/shared/AuthShellSkeleton.tsx": {
