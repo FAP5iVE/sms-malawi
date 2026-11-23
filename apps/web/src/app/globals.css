@@ -2182,54 +2182,33 @@ span[data-math] .katex-display {
 
 
 /* ════════════════════════════════════════════════════════════════════════════
-   HILLS STUDIO (Phase 4b): the 5iveStack Labs signature in the landing footer
-   A large wordmark that rises into place above the bottom bar (CSS scroll-driven,
-   in place where unsupported), and the credit line's name in the studio orange.
-   The footer is always dark, so one orange works in light and dark themes.
-   Hanken Grotesk has no old-style figures: the 5 is drawn smaller by hand so it
-   sits at x-height and the name reads "five-stack".
+   HILLS STUDIO (Phase 4b): the studio signature in the landing footer
+   The 5iveStack Labs and Saviour Digital Solutions logos side by side above the
+   bottom bar, logos only. Both are the light-on-dark artwork (the footer is
+   always dark). Heights, not widths, are set so each keeps its own proportions;
+   the Saviour mark is stacked (icon over name) so it is drawn taller to carry
+   the same visual weight as the wide 5iveStack lockup. The credit line's name
+   stays in the studio orange.
    ════════════════════════════════════════════════════════════════════════════ */
 
 :root { --hills-studio: #ff8a3d; }
 
 .hills-studio {
-  container-type: inline-size;
-  overflow: hidden; /* clips the name while it rises from behind the bottom bar */
-  padding-block: 1.5rem 0.25rem;
-}
-.hills-studio__mark {
-  --studio-size: clamp(2.75rem, 16.2cqi, 15rem);
   display: flex;
-  flex-wrap: wrap; /* on a phone "Labs" drops under "5iveStack" */
-  align-items: baseline;
-  column-gap: 0.22em;
-  margin: 0;
-  font-size: var(--studio-size);
-  font-weight: 700;
-  letter-spacing: -0.045em;
-  line-height: 0.92;
-  color: var(--hills-studio);
-  white-space: nowrap;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap; /* a very narrow phone stacks them rather than squeezing */
+  gap: 1.5rem clamp(1.75rem, 6vw, 4rem);
+  padding-block: 2rem 1.25rem;
 }
-.hills-studio__name { display: inline-block; }
-.hills-studio__five { font-size: 0.72em; font-weight: 800; }
-.hills-studio__labs { font-weight: 500; }
+.hills-studio__logo { display: block; width: auto; max-width: 100%; object-fit: contain; }
+.hills-studio__logo--five { height: 2.25rem; }
+.hills-studio__logo--saviour { height: 4.5rem; }
+@media (min-width: 640px) {
+  .hills-studio__logo--five { height: 3rem; }
+  .hills-studio__logo--saviour { height: 6rem; }
+}
 .hills-studio__credit-name { color: var(--hills-studio); font-weight: 700; }
-
-@supports (animation-timeline: view()) {
-  .hills-studio__mark {
-    animation: hills-studio-rise linear both;
-    animation-timeline: view();
-    animation-range: entry 0% entry 100%;
-  }
-  @keyframes hills-studio-rise {
-    from { transform: translateY(35%); }
-    to { transform: none; }
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .hills-studio__mark { animation: none; }
-}
 
 /* The landing page header (logo, eight links, three buttons) is about 1243px wide.
    With the standard 5vw side padding it overflows on 1280 and 1366px screens (the

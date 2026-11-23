@@ -121,8 +121,9 @@
  *     in (staggered, nothing hidden above the fold, none under reduced motion or
  *     the app motion setting off), the hero photo settles from a 4% zoom, a thin
  *     progress bar runs along the top (<ScrollProgress/>, CSS only).
- *   - Footer: the 5iveStack Labs wordmark rises above the bottom bar and the
- *     credit line names the studio in its orange (<StudioWordmark/>, <StudioCredit/>).
+ *   - Footer: the 5iveStack Labs and Saviour Digital Solutions logos sit side by
+ *     side above the bottom bar (logos only), and the credit line names the
+ *     studio in its orange (<StudioWordmark/>, <StudioCredit/>).
  *   Not touched: data hooks, search, newsletter and contact handlers, scroll
  *   logic, link targets, ids, labels and button text.
  *

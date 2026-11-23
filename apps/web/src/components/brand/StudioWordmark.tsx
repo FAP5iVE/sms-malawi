@@ -2,16 +2,16 @@
  * apps/web/src/components/brand/StudioWordmark.tsx
  *
  * [CHANGE TYPE]: NEW FILE (Chikangawa Hills theme, Phase 4b: home polish)
+ *   Revised: the large watermark name is replaced by the two logos.
  * [PURPOSE]: The studio signature for the landing page footer.
- *   <StudioWordmark />  the large name that rises into place above the bottom
- *                       bar. Decorative (aria-hidden); the readable name is the
- *                       credit line.
- *   <StudioCredit />    "The system designed by 5iveStack Labs", the name in the
- *                       studio orange, a link only when studio.url is set.
+ *   <StudioWordmark /> the 5iveStack Labs and Saviour Digital Solutions logos
+ *                      side by side above the bottom bar, logos only, no text.
+ *                      Both are the reverse (light-on-dark) artwork on a
+ *                      transparent background, since the footer is always dark.
+ *                      Files: public/brand/*-reverse.svg
+ *   <StudioCredit />   "The system designed by 5iveStack Labs", the name in the
+ *                      studio orange, a link only when studio.url is set.
  *   Styles: globals.css ("HILLS STUDIO"). Which parts show: studio.signature.
- *
- *   Hanken Grotesk has no old-style figures, so the numeral is drawn smaller by
- *   hand (.hills-studio__five) to sit at x-height and read as the word "five".
  */
 
 import { studio } from '@/lib/hills/studio'
@@ -19,13 +19,23 @@ import { studio } from '@/lib/hills/studio'
 export function StudioWordmark() {
   if (studio.signature !== 'wordmark') return null
   return (
-    <div className="hills-studio" aria-hidden="true">
-      <p className="hills-studio__mark">
-        <span className="hills-studio__name">
-          <span className="hills-studio__five">5</span>iveStack
-        </span>
-        <span className="hills-studio__labs">Labs</span>
-      </p>
+    <div className="hills-studio">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/brand/5ivestack-labs-reverse.svg"
+        alt="5iveStack Labs"
+        className="hills-studio__logo hills-studio__logo--five"
+        width={584}
+        height={109}
+      />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/brand/saviour-digital-solutions-reverse.svg"
+        alt="Saviour Digital Solutions"
+        className="hills-studio__logo hills-studio__logo--saviour"
+        width={310}
+        height={237}
+      />
     </div>
   )
 }
