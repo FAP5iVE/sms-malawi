@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const m = vi.hoisted(() => {
   const model = () => ({
     findUnique: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(), create: vi.fn(),
-    update: vi.fn(async (a: { data: object }) => ({ id: 'reg1', ...a.data })), updateMany: vi.fn(),
+    update: vi.fn(async (a: { data: object }): Promise<Record<string, unknown>> => ({ id: 'reg1', ...a.data })), updateMany: vi.fn(),
     upsert: vi.fn(), delete: vi.fn(), count: vi.fn(), groupBy: vi.fn(),
   })
   const prisma = {
