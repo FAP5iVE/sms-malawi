@@ -108,7 +108,7 @@ export function renderAnnouncement(
     headerLabel:  `Announcement: ${audienceLabel}`,
     body:         bodyHtml,
     cta: {
-      label: 'View on portal',
+      label: 'View announcement',
       url:   `${school.loginUrl}/announcements`,
     },
     school,
@@ -126,7 +126,7 @@ export function renderAnnouncement(
       data.body,
       '',
       ...(data.eventDate ? [`Event date: ${format(data.eventDate, 'EEEE, d MMMM yyyy')}`, ''] : []),
-      `View on portal: ${school.loginUrl}/announcements`,
+      `View announcement: ${school.loginUrl}/announcements`,
     ].join('\n'),
     school
   )

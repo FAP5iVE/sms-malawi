@@ -57,6 +57,7 @@ import { TeacherSelect } from '@/components/shared/TeacherSelect'
 import { ClassSubjectsField } from '@/components/classes/ClassSubjectsField'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import { StatusText } from '@/components/shared/StatusText'
+import { useStudentMe } from '@/hooks/useStudents'
 import type { ApiClass } from '@shared/types/api'
 import { Users, ChevronRight, UserPlus, Pencil, Archive, Inbox, ArchiveRestore, GraduationCap, Loader2 } from 'lucide-react'
 import { Modal, MODAL_BTN_PRIMARY
@@ -110,9 +111,15 @@ function ClassesContent() {
     [classes, activeYear, showArchived]
   )
 
+  // A student's own class: found at once, not by opening cards. useStudentMe only runs for
+  // the student role, so for staff `myClass` is always undefined and nothing changes.
+  const { data: me } = useStudentMe()
+  const myClass = me?.classId ? yearClasses.find((c) => c.id === me.classId) : undefined
+
   const forms = useMemo(
-    () => Array.from(new Set(yearClasses.map((c) => c.form))).sort((a, b) => a - b),
-    [yearClasses]
+    () => Array.from(new Set(yearClasses.map((c) => c.form))).sort((a, b) =>
+      myClass ? (a === myClass.form ? -1 : b === myClass.form ? 1 : a - b) : a - b),
+    [yearClasses, myClass]
   )
 
   function handleArchive(id: string, onSettled?: () => void) {
@@ -157,6 +164,16 @@ function ClassesContent() {
         </div>
       </div>
 
+      {myClass && (
+        <p className="text-sm text-body" data-testid="my-class-banner">
+          You are in{' '}
+          <Link href={`/classes/${myClass.id}`} className="font-heading font-semibold text-brand-navy underline underline-offset-2 hover:text-brand-teal">
+            {myClass.name}
+          </Link>
+          .
+        </p>
+      )}
+
       <ModuleSurface>
       {actionError && (
         <p role="alert" className="text-sm text-tone-coral bg-brand-coral/8 rounded-xl px-4 py-3">
@@ -178,7 +195,9 @@ function ClassesContent() {
         </div>
       ) : (
         forms.map((form) => {
-          const formClasses = yearClasses.filter((c) => c.form === form)
+          const formClasses = yearClasses
+            .filter((c) => c.form === form)
+            .sort((a, b) => Number(b.id === myClass?.id) - Number(a.id === myClass?.id))
           return (
             <div key={form}>
               <h2 className="font-heading font-semibold text-sm text-brand-navy mb-3">Form {form}</h2>
@@ -190,7 +209,7 @@ function ClassesContent() {
                   : formClasses.map((cls) => (
                       <div
                         key={cls.id}
-                        className={`app-tint rounded-xl p-4 flex flex-col gap-3 relative ${cls.status === 'ARCHIVED' ? 'opacity-60' : ''}`}
+                        className={`app-tint rounded-xl p-4 flex flex-col gap-3 relative ${cls.status === 'ARCHIVED' ? 'opacity-60' : ''} ${cls.id === myClass?.id ? 'ring-2 ring-inset ring-brand-navy' : ''}`}
                       >
                         <Link href={`/classes/${cls.id}`} className="flex items-start justify-between">
                           <div>
@@ -198,6 +217,9 @@ function ClassesContent() {
                               {cls.name}
                               {cls.status === 'ARCHIVED' && (
                                 <StatusText tone="neutral" className="ml-2 font-sans font-normal">Archived</StatusText>
+                              )}
+                              {cls.id === myClass?.id && (
+                                <StatusText tone="info" className="ml-2 font-sans font-normal">My class</StatusText>
                               )}
                             </p>
                             <p className="text-xs text-muted mt-0.5">

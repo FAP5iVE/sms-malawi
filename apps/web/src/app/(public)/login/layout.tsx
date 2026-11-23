@@ -1,9 +1,9 @@
 import { pageMetadata } from '@/lib/site'
 
 export const metadata = pageMetadata({
-  title: 'Portal Login',
+  title: 'Sign in',
   description:
-    'Sign in to the student and staff portal.',
+    'Sign in to the student and staff account.',
   path: '/login',
   noindex: true,
 })

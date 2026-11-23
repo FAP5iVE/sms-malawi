@@ -39,6 +39,7 @@ import { prisma, withRetry } from '@/lib/prisma'
 import { logger }        from '@/lib/logger'
 import * as auditService from '@/server/services/auditService'
 import * as settingsService from '@/server/services/settingsService'
+import * as manebRegistration from '@/server/services/manebRegistrationService'
 import { SETTING_KEYS } from '@shared/types/settings'
 import * as admin        from 'firebase-admin'
 import { getAdminApp }   from '@/lib/verifyAuth'
@@ -63,7 +64,7 @@ import type { ApiStudentWelfare, ApiSupportNeed, ApiWelfareSummary } from '@shar
 import * as algolia from '@/server/services/algoliaService'
 import * as guardianDirectorySync from '@/server/services/guardian/guardianDirectorySync'
 import * as riskService from '@/server/services/riskService'
-import { sendEmail } from '@/lib/email'
+import { sendEmail, getSchoolDisplayName } from '@/lib/email'
 import { generateTempPassword } from '@/lib/tempPassword'
 
 // ─────────────────────────────────────────────────────────
@@ -233,6 +234,12 @@ export interface ApiStudentSummary {
   classId:         string | null
   className:       string | null
   classForm:       number | null
+  /** Stream letter of the class (detail view only). */
+  classStream?:      string | null
+  /** How many live classes this form has in the class's year (detail view only); 2 or more means show the stream. */
+  classStreamCount?: number | null
+  /** MANEB registration for the exam this student's form sits (JCE at Form 2, MSCE at Form 4); null for other forms. */
+  maneb?: { examType: 'JCE' | 'MSCE'; academicYear: string; registered: boolean; candidateNo: string | null } | null
   photoKey:        string | null
   hasFirebaseUid:  boolean
   riskLevel:       RiskLevel
@@ -632,7 +639,7 @@ export async function getById(
       createdAt:       true,
       updatedAt:       true,
       class: {
-        select: { name: true, form: true },
+        select: { name: true, form: true, stream: true, academicYear: true },
       },
       borrowings: {
         where:  { status: 'ACTIVE' },
@@ -642,6 +649,14 @@ export async function getById(
   })
 
   if (!row) return null
+
+  // How many live classes the student's form has this year, so the screens show the stream
+  // only when the school really runs more than one.
+  const classStreamCount = row.class
+    ? await prisma.class.count({ where: { form: row.class.form, academicYear: row.class.academicYear, status: { not: 'ARCHIVED' } } })
+    : null
+
+  const maneb = await manebRegistration.registrationSummaryForStudent(row.id, row.class)
 
   const assessment = (await riskService.assessStudents([row.id], await resolveRiskPeriod(period))).get(row.id)
   const risk       = riskFields(assessment, row.status, viewer)
@@ -678,6 +693,9 @@ export async function getById(
     classId:         row.classId,
     className:       row.class?.name  ?? null,
     classForm:       row.class?.form  ?? null,
+    classStream:      row.class?.stream ?? null,
+    classStreamCount,
+    maneb,
     photoKey:        row.photoKey,
     hasFirebaseUid:  Boolean(row.firebaseUid),
     riskLevel:       risk.riskLevel,
@@ -798,7 +816,7 @@ export async function sendStudentWelcomeEmail(params: {
   try {
     const emailResult = await sendEmail({
       to:      params.email,
-      subject: 'Welcome to SMS Malawi — Your Student Login Details',
+      subject: `Welcome to ${await getSchoolDisplayName()} — Your Student Login Details`,
       html: `<p>Dear ${params.displayName},</p>
         <p>A student account has been created for you on the School Management System.</p>
         <p><strong>Email:</strong> ${params.email}<br>
@@ -1445,6 +1463,25 @@ export async function createFromApplication(
       new Error('This application has already been converted to a student record.'),
       { status: 409 }
     )
+  }
+
+  // ── 2a. The chosen class must be a live class of the form the applicant applied for.
+  // The admit dialog only offers those, but the check lives here so no caller can place a
+  // Form 1 applicant in a Form 3 stream or in an archived class.
+  if (classId) {
+    const target = await prisma.class.findUnique({ where: { id: classId }, select: { form: true, status: true, name: true } })
+    if (!target) {
+      throw Object.assign(new Error('That class does not exist.'), { status: 400 })
+    }
+    if (target.status !== 'ACTIVE') {
+      throw Object.assign(new Error(`${target.name} is archived. Choose a live class.`), { status: 400 })
+    }
+    if (target.form !== app.applyingForForm) {
+      throw Object.assign(
+        new Error(`${target.name} is a Form ${target.form} class, but this applicant applied for Form ${app.applyingForForm}.`),
+        { status: 400 },
+      )
+    }
   }
 
   // ── 2b. Data that rides along from the application.

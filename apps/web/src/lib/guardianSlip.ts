@@ -39,7 +39,7 @@ export interface SlipInput {
 export function buildSlipHtml(i: SlipInput): string {
   const e = escapeHtml
   return `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>Parent portal invitation</title>
+<html lang="en"><head><meta charset="utf-8"><title>Guardian account invitation</title>
 <style>
   body { font-family: Arial, Helvetica, sans-serif; color: #111; margin: 0; padding: 32px; }
   .slip { max-width: 520px; margin: 0 auto; border: 2px dashed #555; border-radius: 12px; padding: 28px; }
@@ -51,7 +51,7 @@ export function buildSlipHtml(i: SlipInput): string {
   ol { font-size: 14px; line-height: 1.6; padding-left: 20px; }
 </style></head>
 <body><div class="slip">
-  <h1>Parent portal invitation</h1>
+  <h1>Guardian account invitation</h1>
   <p>For <strong>${e(i.guardianName)}</strong>, guardian of <strong>${e(i.studentName)}</strong>.</p>
   <div class="code">${e(i.code)}</div>
   <ol>

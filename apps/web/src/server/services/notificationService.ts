@@ -657,7 +657,7 @@ export async function sendPendingActionCreated(
 
   const subject = `⏳ Action pending your approval — ${params.entityType}: ${params.action}`
   const htmlBody = `
-    <p>A new action requires your approval in the ${school.schoolName} portal.</p>
+    <p>A new action requires your approval in the ${school.schoolName} system.</p>
     <table style="width:100%;border-collapse:collapse;margin:16px 0;">
       <tr><td style="padding:8px 12px;border:1px solid #d1d5db;background:#f9fafb;font-weight:600;">Action</td><td style="padding:8px 12px;border:1px solid #d1d5db;">${params.action}</td></tr>
       <tr><td style="padding:8px 12px;border:1px solid #d1d5db;background:#f9fafb;font-weight:600;">Entity</td><td style="padding:8px 12px;border:1px solid #d1d5db;">${params.entityType} (${params.entityId})</td></tr>

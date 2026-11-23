@@ -61,6 +61,7 @@ model Student {
   attendanceRecords Attendance[]
   universityPlacements UniversityPlacement[]   // R18 — advisory university placements
   guardians        StudentGuardian[]   // Student.guardianName/Phone/Relation stay as the denormalised PRIMARY guardian
+  manebRegistrations ManebRegistration[]  // In-house MANEB candidate list (JCE at Form 2, MSCE at Form 4).
   guardianLinks    GuardianLink[]      // Guardian PORTAL access grants (see GuardianLink). Not the contact cards above.
   supportNeeds     StudentSupportNeed[]
   yearOutcomes     StudentYearOutcome[]
@@ -1330,6 +1331,7 @@ model ManebRecord {
   aggregatePoints Int?          // GR-2: MSCE only — sum of best-6 PERFORMED subjects' points (English incl. only if naturally in the best 6). Always null for JCE — JCE has no numeric aggregate.
   status        ManebStatus   @default(REGISTERED)
   universityPlacement UniversityPlacement?   // R18 — placement derived from this MSCE record
+  registrationId String?      // The ManebRegistration this result belongs to (null for results entered before registration existed)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
@@ -1347,6 +1349,59 @@ enum ManebStatus   {
     RESULTS_RECEIVED 
     CERTIFIED
  }
+
+// ─── MANEB CANDIDATE REGISTRATION (in-house record) ───────
+// Candidates register themselves with MANEB online (a school teacher may help); this is the
+// school's own record of who is registered. Marks entry (ManebRecord) is only allowed for a
+// student on this list, and the list can be closed (ManebListLock) once all marks are entered.
+model ManebRegistration {
+  id              String                  @id @default(cuid())
+  studentId       String
+  student         Student                 @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  academicYear    String
+  examType        ManebExamType
+  status          ManebRegistrationStatus @default(REGISTERED)
+  registeredVia   ManebRegistrationSource @default(SCHOOL)
+  candidateNo     String?                 // MANEB examination number; empty until MANEB issues it
+  centerNo        String?                 // blank = the school's centre number from Settings
+  invoiceNo       String?                 // MANEB invoice or payment reference the candidate received
+  feePaidAt       DateTime?               // null = fee not yet confirmed as paid
+  subjects        Json                    @default("[]")  // subject names entered, as on the MANEB form
+  notes           String?
+  createdById     String
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  withdrawnAt     DateTime?
+  withdrawnReason String?
+
+  @@unique([studentId, academicYear, examType])
+  @@unique([examType, academicYear, candidateNo])
+  @@index([academicYear, examType])
+  @@map("maneb_registrations")
+}
+
+enum ManebRegistrationStatus {
+  REGISTERED
+  WITHDRAWN
+}
+
+enum ManebRegistrationSource {
+  SELF     // the candidate registered online themselves
+  SCHOOL   // a teacher registered them or helped
+}
+
+// A row here means the list for that exam and year is closed: no new registrations, and only
+// withdrawals with a reason. Created when marks entry is finished; an admin can reopen it.
+model ManebListLock {
+  id           String        @id @default(cuid())
+  academicYear String
+  examType     ManebExamType
+  lockedById   String
+  lockedAt     DateTime      @default(now())
+
+  @@unique([academicYear, examType])
+  @@map("maneb_list_locks")
+}
 
 // ─── HR MODULE ────────────────────────────────────────────
 model GalleryPhoto {

@@ -64,6 +64,8 @@ export interface PublicManebStats {
   stats: PublicManebStat[]
   /** Real, live ACTIVE student count — see public.ts's route comment. */
   enrolledStudents: number
+  /** Candidates on the school's registered MANEB list this year (counts only). */
+  registered?: { JCE: number; MSCE: number }
 }
 
 export interface PublicAnnouncement {

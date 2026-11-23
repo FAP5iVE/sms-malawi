@@ -115,23 +115,16 @@
   --color-accent:              hsl(var(--accent));
   --color-accent-foreground:   hsl(var(--accent-foreground));
   --color-destructive:         hsl(var(--destructive));
-  --color-destructive-foreground: hsl(var(--destructive-foreground));
   --color-border:              hsl(var(--border));
   --color-input:               hsl(var(--input));
   --color-ring:                hsl(var(--ring));
 
   /* ── Chart palette (used by components/ui/chart.tsx) */
   --color-chart-1: hsl(var(--chart-1));
-  --color-chart-2: hsl(var(--chart-2));
-  --color-chart-3: hsl(var(--chart-3));
-  --color-chart-4: hsl(var(--chart-4));
-  --color-chart-5: hsl(var(--chart-5));
 
   /* ── Sidebar (used by components/ui/sidebar.tsx) */
   --color-sidebar:                    hsl(var(--sidebar-background));
   --color-sidebar-foreground:         hsl(var(--sidebar-foreground));
-  --color-sidebar-primary:            hsl(var(--sidebar-primary));
-  --color-sidebar-primary-foreground: hsl(var(--sidebar-primary-foreground));
   --color-sidebar-accent:             hsl(var(--sidebar-accent));
   --color-sidebar-accent-foreground:  hsl(var(--sidebar-accent-foreground));
   --color-sidebar-border:             hsl(var(--sidebar-border));
@@ -150,7 +143,6 @@
         brighter, more saturated equivalents. */
   --color-brand-navy:       hsl(var(--brand-navy));
   --color-brand-navy-mid:   hsl(var(--brand-navy-mid));
-  --color-brand-navy-light: hsl(var(--brand-navy-light));
   --color-brand-teal:       hsl(var(--brand-teal));
   --color-brand-teal-light: hsl(var(--brand-teal-light));
   --color-brand-amber:      hsl(var(--brand-amber));
@@ -266,7 +258,6 @@
        relies on. Now an alias, so shadcn's Button/Badge `destructive`
        variants automatically match brand-coral with no call-site changes. */
     --destructive:          var(--brand-coral);
-    --destructive-foreground: 0 0% 100%;
 
     /* UI chrome */
     --border:               220 13% 88%;   /* #dde2ea — subtle borders */
@@ -278,16 +269,10 @@
 
     /* Charts — school palette */
     --chart-1: 213 51% 42%;   /* navy-blue */
-    --chart-2: 186 72% 37%;   /* teal */
-    --chart-3: 43 74% 49%;    /* amber */
-    --chart-4: 262 52% 47%;   /* purple */
-    --chart-5: 0 72% 56%;     /* coral-red */
 
     /* Sidebar — uses brand navy surface */
     --sidebar-background:          213 51% 15%;  /* deep navy #0e2240 */
     --sidebar-foreground:          215 25% 93%;  /* off-white */
-    --sidebar-primary:             210 40% 98%;  /* nearly white for active items */
-    --sidebar-primary-foreground:  213 51% 15%;  /* navy text on white active */
     --sidebar-accent:              213 51% 22%;  /* slightly lighter navy for hover */
     --sidebar-accent-foreground:   215 25% 93%;
     --sidebar-border:              213 51% 22%;
@@ -297,14 +282,12 @@
     --color-page:    215 25% 97%;  /* same as --background */
     --color-surface: 0 0% 100%;   /* same as --card */
     --color-text:    222 47% 11%; /* same as --foreground */
-    --color-muted-val: 215 16% 42%;
 
     /* ── Brand palette [PRODUCTION FIX] — light-mode values, HSL
        equivalents of the previous static hex, so light mode is visually
        unchanged by this fix. */
     --brand-navy:        213 51% 24%;  /* #1e3a5f */
     --brand-navy-mid:    199 56% 40%;  /* #2e86ab */
-    --brand-navy-light:  209 67% 55%;  /* #4a90d9 */
     --brand-teal:        163 79% 30%;  /* #0e8a6a */
     --brand-teal-light:  162 72% 40%;  /* #1db88e */
     --brand-amber:       32  93% 44%;  /* #d97706 */
@@ -356,7 +339,6 @@
     /* Destructive — [R15 fix] aliased to --brand-coral; see light-mode
        comment above for why. */
     --destructive:          var(--brand-coral);
-    --destructive-foreground: 215 25% 93%;
 
     /* UI chrome */
     --border:               224 25% 20%;   /* #1e2a3c — subtle dark border */
@@ -365,16 +347,10 @@
 
     /* Charts — slightly desaturated for dark bg */
     --chart-1: 210 68% 62%;   /* light blue */
-    --chart-2: 165 60% 42%;   /* teal */
-    --chart-3: 43 74% 60%;    /* amber */
-    --chart-4: 262 52% 66%;   /* purple */
-    --chart-5: 0 72% 65%;     /* coral */
 
     /* Sidebar — slightly lighter than page background for definition */
     --sidebar-background:          224 44% 9%;   /* #0a1120 */
     --sidebar-foreground:          215 25% 93%;
-    --sidebar-primary:             210 68% 62%;
-    --sidebar-primary-foreground:  224 44% 7%;
     --sidebar-accent:              224 44% 13%;
     --sidebar-accent-foreground:   215 25% 93%;
     --sidebar-border:              224 25% 16%;
@@ -384,7 +360,6 @@
     --color-page:     224 44% 7%;
     --color-surface:  224 36% 11%;
     --color-text:     215 25% 93%;
-    --color-muted-val: 215 16% 58%;
 
     /* ── Brand palette [PRODUCTION FIX] — dark-mode overrides. Same hues
        as light mode, lightness/saturation raised so each color actually
@@ -394,7 +369,6 @@
        there. */
     --brand-navy:        210 68% 62%;  /* #4a9bd4 — matches --primary dark */
     --brand-navy-mid:    199 70% 65%;
-    --brand-navy-light:  209 80% 72%;
     --brand-teal:        163 60% 55%;
     --brand-teal-light:  162 65% 62%;
     --brand-amber:       38  92% 60%;
@@ -533,9 +507,6 @@
   .font-heading {
     font-family: var(--font-heading);
   }
-  .font-body {
-    font-family: var(--font-sans);
-  }
 
   /* ── Tabular numbers — financial data, marks, student IDs */
   .tabular {
@@ -589,34 +560,6 @@
     animation: skeleton-sweep 1.5s ease-in-out infinite;
     border-radius: var(--radius);
   }
-
-  /* ── Status badge colour overrides for dark mode
-        Tailwind's opaque amber-100 etc. look washed out in dark mode.
-        These utility classes produce correct contrast on dark surfaces. */
-
-  .badge-amber-dark {
-    background-color: hsl(43 74% 18% / 0.8);
-    color:            hsl(43 74% 70%);
-    border-color:     hsl(43 74% 30% / 0.5);
-  }
-
-  .badge-green-dark {
-    background-color: hsl(142 52% 16% / 0.8);
-    color:            hsl(142 52% 65%);
-    border-color:     hsl(142 52% 26% / 0.5);
-  }
-
-  .badge-red-dark {
-    background-color: hsl(0 62% 20% / 0.8);
-    color:            hsl(0 62% 72%);
-    border-color:     hsl(0 62% 30% / 0.5);
-  }
-
-  .badge-blue-dark {
-    background-color: hsl(210 68% 20% / 0.8);
-    color:            hsl(210 68% 72%);
-    border-color:     hsl(210 68% 30% / 0.5);
-  }
 }
 
 /* ─────────────────────────────────────────────────────────
@@ -633,34 +576,10 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes slide-in-from-right {
-  from { opacity: 0; transform: translateX(16px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-
-@keyframes slide-in-from-bottom {
-  from { opacity: 0; transform: translateY(12px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes scale-in {
-  from { opacity: 0; transform: scale(0.95); }
-  to   { opacity: 1; transform: scale(1); }
-}
-
 /* Expose as utilities for Framer Motion fallback and CSS-only use */
 @layer utilities {
   .animate-fade-in {
     animation: fade-in 200ms cubic-bezier(0, 0, 0.2, 1) both;
-  }
-  .animate-slide-right {
-    animation: slide-in-from-right 200ms cubic-bezier(0, 0, 0.2, 1) both;
-  }
-  .animate-slide-bottom {
-    animation: slide-in-from-bottom 200ms cubic-bezier(0, 0, 0.2, 1) both;
-  }
-  .animate-scale-in {
-    animation: scale-in 150ms cubic-bezier(0, 0, 0.2, 1) both;
   }
 }
 
@@ -783,8 +702,6 @@
   }
 
   /* ── Page-break utility classes ─────────────────────── */
-  .print-break-before { break-before: page; }
-  .print-break-after  { break-after:  page; }
   .print-no-break     { break-inside: avoid; }
 
   /* ── A4 document layout classes ─────────────────────── */
@@ -815,7 +732,6 @@
   /*
     .transcript
     Academic transcript — may span multiple A4 pages.
-    Section headers use .print-break-before for page breaks.
   */
   .transcript {
     width:      210mm   !important;
@@ -826,11 +742,10 @@
   }
 
   /*
-    .fee-statement  /  .invoice-print
+    .fee-statement
     Single-page fee statement or invoice.
   */
-  .fee-statement,
-  .invoice-print {
+  .fee-statement {
     width:      210mm  !important;
     min-height: 277mm  !important;
     margin:     0 auto !important;
@@ -841,40 +756,6 @@
     page-break-inside: avoid;
   }
 
-  /*
-    .payslip-print
-    Half-A4 payslip (138 mm tall = 2 per A4 page).
-    Two consecutive payslips use a page break between them.
-  */
-  .payslip-print {
-    width:      210mm   !important;
-    height:     138mm   !important;
-    overflow:   hidden  !important;
-    background: #ffffff !important;
-    color:      #000000 !important;
-    font-size:  9pt     !important;
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-
-  .payslip-print + .payslip-print {
-    break-before:     page;
-    page-break-before: always;
-  }
-
-  /*
-    .student-profile-print
-    Student ID / profile card at A5 landscape (148 mm × 105 mm).
-  */
-  .student-profile-print {
-    width:      148mm  !important;
-    height:     105mm  !important;
-    background: #ffffff !important;
-    color:      #000000 !important;
-    font-size:  9pt    !important;
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
 }
 
 /* ─────────────────────────────────────────────────────────
@@ -963,7 +844,7 @@
 
    • Screen-edge gutter: 16px. This is the guideline minimum, and it
      also covers the articles' "curved displays need extra padding"
-     rule. Space is saved INSIDE cards instead (see --space-card),
+     rule. Space is saved INSIDE cards instead,
      where nested padding was stacking up (page 16 + card 16 + cell 16).
    • Card padding: 12px, 8px gaps between tightly related items, on the
      4/8pt grid. Desktop (md+) is untouched.
@@ -982,8 +863,6 @@
    ───────────────────────────────────────────────────────── */
 
 :root {
-  --space-gutter: 1rem;      /* 16px — screen-edge margin on mobile */
-  --space-card:   0.75rem;   /* 12px — padding inside nested cards on mobile */
   --touch-min:    2.75rem;   /* 44px — minimum interactive target */
 }
 
@@ -1022,15 +901,6 @@
   background-repeat: no-repeat;
   background-size: 2rem 100%, 2rem 100%, 0.75rem 100%, 0.75rem 100%;
   background-attachment: local, local, scroll, scroll;
-}
-
-/* Dialog panels: never taller than the visible viewport (dvh follows the
-   on-screen keyboard / collapsing browser bars) and scroll inside instead of
-   being cut off top and bottom by the flex-centred overlay. */
-.modal-panel {
-  max-height: calc(100dvh - 2rem);
-  overflow-y: auto;
-  overscroll-behavior: contain;
 }
 
 /* Minimum 44×44 hit area for icon-only buttons. */
@@ -1191,7 +1061,6 @@ span[data-math] .katex-display {
 @property --hills-sky-2  { syntax: '<color>'; inherits: true; initial-value: #d9f0f1; }
 @property --hills-ink    { syntax: '<color>'; inherits: true; initial-value: #0c2634; }
 @property --hills-accent { syntax: '<color>'; inherits: true; initial-value: #932e09; }
-@property --hills-accent-2 { syntax: '<color>'; inherits: true; initial-value: #ffb27a; }
 @property --hills-tint   { syntax: '<color>'; inherits: true; initial-value: rgba(255, 255, 255, 0); }
 @property --hills-on     { syntax: '<color>'; inherits: true; initial-value: #f4fafc; }
 @property --hills-danger { syntax: '<color>'; inherits: true; initial-value: #6c160d; }
@@ -1207,7 +1076,6 @@ span[data-math] .katex-display {
   --hills-sky-2:    #d9f0f1;
   --hills-ink:      #0c2634;
   --hills-accent:   #932e09;
-  --hills-accent-2: #ffb27a;
   --hills-tint:     rgba(255, 255, 255, 0);
   --hills-on:       #f4fafc;
   --hills-danger:   #6c160d;
@@ -1237,7 +1105,6 @@ span[data-math] .katex-display {
     --hills-sky-2 var(--hills-ease-time) var(--hills-ease),
     --hills-ink var(--hills-ease-time) var(--hills-ease),
     --hills-accent var(--hills-ease-time) var(--hills-ease),
-    --hills-accent-2 var(--hills-ease-time) var(--hills-ease),
     --hills-tint var(--hills-ease-time) var(--hills-ease),
     --hills-on var(--hills-ease-time) var(--hills-ease),
     --hills-danger var(--hills-ease-time) var(--hills-ease),
@@ -1256,7 +1123,6 @@ span[data-math] .katex-display {
   --hills-sky-2: #f7c38e;
   --hills-ink: #0c2232;
   --hills-accent: #87290a;
-  --hills-accent-2: #ffb27a;
   --hills-tint: rgba(255, 170, 100, 0.1);
   --hills-on: #f6fafb;
   --hills-danger: #661309;
@@ -1273,7 +1139,6 @@ span[data-math] .katex-display {
   --hills-sky-2: #d9f0f1;
   --hills-ink: #0c2634;
   --hills-accent: #932e09;
-  --hills-accent-2: #ffb27a;
   --hills-tint: rgba(255, 255, 255, 0);
   --hills-on: #f4fafc;
   --hills-danger: #6c160d;
@@ -1290,7 +1155,6 @@ span[data-math] .katex-display {
   --hills-sky-2: #8a3d26;
   --hills-ink: #fff4e8;
   --hills-accent: #ffb35e;
-  --hills-accent-2: #a8350b;
   --hills-tint: rgba(255, 110, 60, 0.08);
   --hills-on: #1a1a22;
   --hills-danger: #ffc9bd;
@@ -1307,7 +1171,6 @@ span[data-math] .katex-display {
   --hills-sky-2: #17364a;
   --hills-ink: #e9f1f4;
   --hills-accent: #f2a650;
-  --hills-accent-2: #a8350b;
   --hills-tint: rgba(0, 8, 24, 0);
   --hills-on: #06121b;
   --hills-danger: #ff9c8f;
@@ -1332,10 +1195,6 @@ span[data-math] .katex-display {
   inset: 0;
   pointer-events: none;
   background: var(--hills-tint);
-}
-
-.font-hills {
-  font-family: var(--font-hills, 'Hanken Grotesk', ui-sans-serif, system-ui, sans-serif);
 }
 
 /* Hanken Grotesk for everything inside a public page. The app's font-sans and
@@ -3214,7 +3073,6 @@ a.hills-go { text-decoration: none; }
 .hills-status__icon svg { width: 30px; height: 30px; }
 .hills-status__icon--ok { --c-x: var(--c-ok); }
 .hills-status__icon--danger { --c-x: var(--c-danger); }
-.hills-status__icon--key { --c-x: var(--c-ink); }
 .hills-status .hills-auth__lede { margin-bottom: 28px; }
 .hills-status .hills-auth__lede strong { color: var(--c-ink); }
 .hills-status .hills-go { margin-top: 0; }

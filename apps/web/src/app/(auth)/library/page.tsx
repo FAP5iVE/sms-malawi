@@ -1881,7 +1881,7 @@ function LibraryContent() {
             <ModuleTabs<'active' | 'waivers'>
               tabs={[
                 { id: 'active',  label: seesAllLoans ? 'Active borrowings' : 'My borrowings', icon: Repeat },
-                { id: 'waivers', label: 'Fine waiver portal',  icon: Shield, badge: canReviewWaivers ? fineWaivers.length : undefined, badgeNoun: 'to review' },
+                { id: 'waivers', label: 'Fine waivers',  icon: Shield, badge: canReviewWaivers ? fineWaivers.length : undefined, badgeNoun: 'to review' },
               ]}
               active={borrowingsSubTab}
               onChange={setBorrowingsSubTab}

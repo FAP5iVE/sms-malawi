@@ -25,6 +25,7 @@ import { Calendar } from '@/components/ui/calendar'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { ShieldOff, ChevronDown, ChevronRight, Search, Download, CalendarIcon, RefreshCw } from 'lucide-react'
 import type { Severity } from '@/server/services/auditService'
+import { SITE_NAME } from '@/lib/site'
 
 // ─────────────────────────────────────────────────────────
 //  TYPES
@@ -196,7 +197,7 @@ function AuditLogSkeleton() {
 async function exportToXlsx(entries: AuditLogRow[], filename: string): Promise<void> {
   const ExcelJS = (await import('exceljs')).default
   const wb = new ExcelJS.Workbook()
-  wb.creator = 'SMS Malawi'
+  wb.creator = SITE_NAME
   wb.created  = new Date()
 
   const ws = wb.addWorksheet('Audit Log')

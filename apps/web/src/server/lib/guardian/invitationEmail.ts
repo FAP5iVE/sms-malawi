@@ -17,9 +17,9 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 
 export function buildInvitationEmail(i: InvitationEmailInput): { subject: string; html: string; text: string } {
   const expires = i.expiresAt.toUTCString()
-  const subject = `Your ${i.schoolName} parent portal invitation`
+  const subject = `Your ${i.schoolName} guardian account invitation`
   const text = [
-    `${i.schoolName} has invited you to the parent portal.`,
+    `${i.schoolName} has invited you to a guardian account.`,
     '',
     `Your one-time code: ${i.code}`,
     `Use it here: ${i.claimUrl}`,
@@ -27,10 +27,10 @@ export function buildInvitationEmail(i: InvitationEmailInput): { subject: string
     '',
     'If you were not expecting this, ignore this message. Never share this code, and the school will never ask you for it.',
   ].join('\n')
-  const html = `<p>${esc(i.schoolName)} has invited you to the parent portal.</p>
+  const html = `<p>${esc(i.schoolName)} has invited you to a guardian account.</p>
 <p>Your one-time code:</p>
 <p style="font-size:22px;font-weight:bold;letter-spacing:2px;font-family:monospace">${esc(i.code)}</p>
-<p><a href="${esc(i.claimUrl)}">Open the parent portal</a></p>
+<p><a href="${esc(i.claimUrl)}">Open your guardian account</a></p>
 <p>The code works once and expires on ${esc(expires)}.</p>
 <p style="color:#555">If you were not expecting this, ignore this message. Never share this code; the school will never ask you for it.</p>`
   return { subject, html, text }

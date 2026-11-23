@@ -61,8 +61,8 @@ export function renderPlacementUpdate(
     ${rejectionHtml}
     ${para(
       isRejected
-        ? 'Sign in to the school portal to review the details and submit a corrected claim.'
-        : 'Sign in to the school portal to see your confirmed placement.',
+        ? 'Sign in to your account to review the details and submit a corrected claim.'
+        : 'Sign in to your account to see your confirmed placement.',
     )}
   `
 
@@ -91,8 +91,8 @@ export function renderPlacementUpdate(
         ? [`Placement: ${data.programmeName}, ${data.universityName}`, '']
         : []),
       isRejected
-        ? 'Sign in to the school portal to review the details and submit a corrected claim.'
-        : 'Sign in to the school portal to see your confirmed placement.',
+        ? 'Sign in to your account to review the details and submit a corrected claim.'
+        : 'Sign in to your account to see your confirmed placement.',
       '',
       `View placement: ${school.loginUrl}/placements`,
     ].join('\n'),

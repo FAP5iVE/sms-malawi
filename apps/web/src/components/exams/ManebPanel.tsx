@@ -29,28 +29,51 @@ import { MALAWI_SUBJECTS } from '@shared/constants/malawi'
 import { chipClass } from '@/lib/hills/chip'
 import { StatusText } from '@/components/shared/StatusText'
 import { statusTone, statusWord } from '@/lib/hills/statusWord'
+import { ManebRegistrationPanel } from '@/components/exams/ManebRegistrationPanel'
+import { useManebBoard, type ManebBoardRow } from '@/hooks/useManebRegistration'
 
 interface Props { academicYear: string }
 
 // Six core MSCE/JCE subjects offered as quick grade inputs; staff can leave
 // any blank. Grade strings are validated server-side via CreateManebRecordSchema.
 
+// Marks entry is for registered candidates only: the candidate is picked from the registered
+// list, and the examination number and centre come from their registration.
 interface BulkRow {
-  candidateNo: string
   studentId: string
-  centerNo: string
-  centerName: string
   grades: Record<string, string>
 }
 
 function emptyRow(): BulkRow {
-  return { candidateNo: '', studentId: '', centerNo: '', centerName: '', grades: {} }
+  return { studentId: '', grades: {} }
+}
+
+/** Picks a registered candidate who has an examination number and no marks yet. */
+function CandidatePicker({ value, onChange, candidates, label }: {
+  value: string; onChange: (id: string) => void; candidates: ManebBoardRow[]; label: string
+}) {
+  return (
+    <select
+      aria-label={label}
+      className="w-full rounded-lg border border-base bg-page px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal/40 sm:col-span-2"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+    >
+      <option value="">Choose a registered candidate</option>
+      {candidates.map((c) => (
+        <option key={c.studentId} value={c.studentId} disabled={!c.candidateNo}>
+          {c.name} · {c.className}{c.candidateNo ? ` · ${c.candidateNo}` : ' · no examination number yet'}
+        </option>
+      ))}
+    </select>
+  )
 }
 
 export function ManebPanel({ academicYear }: Props) {
   const { role } = useAuthStore()
   const { can } = usePermissions()
   const [examType, setExamType] = useState<'JCE' | 'MSCE'>('MSCE')
+  const [view, setView] = useState<'registration' | 'results'>('registration')
   const [showBulk, setShowBulk] = useState(false)
   const [rows, setRows] = useState<BulkRow[]>([emptyRow()])
   const [feedback, setFeedback] = useState<string | null>(null)
@@ -65,6 +88,10 @@ export function ManebPanel({ academicYear }: Props) {
 
   const { data: records = [], isLoading } = useManebRecords(academicYear)
   const bulkCreate = useBulkCreateManebRecords(academicYear)
+
+  // Candidates who can have marks entered: registered, no marks yet.
+  const { data: board } = useManebBoard(academicYear, examType, view === 'results')
+  const candidates = (board?.rows ?? []).filter((r) => r.registered && !r.hasResult)
 
   const typed = records as ApiManebRecord[]
   const filtered = typed.filter((r) => r.examType === examType)
@@ -92,8 +119,8 @@ export function ManebPanel({ academicYear }: Props) {
     const payload: CreateManebRecordInput[] = []
     for (let i = 0; i < rows.length; i += 1) {
       const r = rows[i]!
-      if (!r.candidateNo.trim() || !r.studentId.trim() || !r.centerNo.trim() || !r.centerName.trim()) {
-        setFeedback(`Row ${i + 1}: candidate number, student, centre number and centre name are all required.`)
+      if (!r.studentId.trim()) {
+        setFeedback(`Row ${i + 1}: choose a registered candidate.`)
         return
       }
       const grades: Record<string, string> = {}
@@ -107,9 +134,6 @@ export function ManebPanel({ academicYear }: Props) {
       payload.push({
         studentId: r.studentId.trim(),
         examType,
-        candidateNo: r.candidateNo.trim(),
-        centerNo: r.centerNo.trim(),
-        centerName: r.centerName.trim(),
         academicYear,
         subjectGrades: grades,
         status: 'RESULTS_RECEIVED',
@@ -135,6 +159,10 @@ export function ManebPanel({ academicYear }: Props) {
 
   return (
     <div className="space-y-5">
+      <div className="flex flex-wrap gap-2" role="group" aria-label="MANEB view">
+        <button type="button" aria-pressed={view === 'registration'} onClick={() => setView('registration')} className={chipClass(view === 'registration')}>Registered candidates</button>
+        <button type="button" aria-pressed={view === 'results'} onClick={() => setView('results')} className={chipClass(view === 'results')}>Marks and results</button>
+      </div>
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex gap-2">
           {(['JCE', 'MSCE'] as const).map((t) => (
@@ -145,13 +173,13 @@ export function ManebPanel({ academicYear }: Props) {
           ))}
         </div>
         <div className="flex items-center gap-3">
-          {canManage && (
+          {view === 'results' && canManage && (
             <button onClick={() => setShowIndividual((v) => !v)}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-brand-navy text-brand-navy text-sm font-semibold hover:bg-brand-navy/5">
               {showIndividual ? 'Close individual entry' : 'Individual entry'}
             </button>
           )}
-          {canManage && (
+          {view === 'results' && canManage && (
             <button onClick={() => setShowBulk((v) => !v)}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-deep text-white text-sm font-semibold">
               <Upload className="w-4 h-4" /> {showBulk ? 'Close bulk entry' : 'Bulk entry'}
@@ -159,11 +187,15 @@ export function ManebPanel({ academicYear }: Props) {
           )}
           <a href="https://www.maneb.edu.mw/" target="_blank" rel="noopener noreferrer"
             className="flex items-center gap-1.5 text-sm text-tone-teal app-action">
-            <ExternalLink className="w-3.5 h-3.5" /> MANEB Portal
+            <ExternalLink className="w-3.5 h-3.5" /> MANEB website
           </a>
         </div>
       </div>
 
+      {view === 'registration' ? (
+        <ManebRegistrationPanel academicYear={academicYear} examType={examType} />
+      ) : (
+      <>
       <div className="py-1 text-sm text-tone-amber flex items-start gap-2">
         <GraduationCap className="w-4 h-4 mt-0.5 shrink-0" />
         <span>
@@ -195,10 +227,7 @@ export function ManebPanel({ academicYear }: Props) {
             sit it. Saved with status - Results received.
           </p>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-            <input className={fieldClass} placeholder="Candidate no." value={individualRow.candidateNo} onChange={(e) => setIndividualRow((p) => ({ ...p, candidateNo: e.target.value }))} />
-            <input className={fieldClass} placeholder="Student ID" value={individualRow.studentId} onChange={(e) => setIndividualRow((p) => ({ ...p, studentId: e.target.value }))} />
-            <input className={fieldClass} placeholder="Centre no." value={individualRow.centerNo} onChange={(e) => setIndividualRow((p) => ({ ...p, centerNo: e.target.value }))} />
-            <input className={fieldClass} placeholder="Centre name" value={individualRow.centerName} onChange={(e) => setIndividualRow((p) => ({ ...p, centerName: e.target.value }))} />
+            <CandidatePicker label="Candidate" value={individualRow.studentId} candidates={candidates} onChange={(id) => setIndividualRow((p) => ({ ...p, studentId: id }))} />
           </div>
           <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
             {MALAWI_SUBJECTS.map((subject) => (
@@ -217,8 +246,8 @@ export function ManebPanel({ academicYear }: Props) {
           <button
             onClick={() => {
               setIndividualFeedback(null)
-              if (!individualRow.candidateNo.trim() || !individualRow.studentId.trim() || !individualRow.centerNo.trim() || !individualRow.centerName.trim()) {
-                setIndividualFeedback('Candidate number, student, centre number and centre name are all required.')
+              if (!individualRow.studentId.trim()) {
+                setIndividualFeedback('Choose a registered candidate.')
                 return
               }
               const grades: Record<string, string> = {}
@@ -233,9 +262,6 @@ export function ManebPanel({ academicYear }: Props) {
                 {
                   studentId: individualRow.studentId.trim(),
                   examType,
-                  candidateNo: individualRow.candidateNo.trim(),
-                  centerNo: individualRow.centerNo.trim(),
-                  centerName: individualRow.centerName.trim(),
                   academicYear,
                   subjectGrades: grades,
                   status: 'RESULTS_RECEIVED',
@@ -279,10 +305,7 @@ export function ManebPanel({ academicYear }: Props) {
                   )}
                 </div>
                 <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                  <input className={fieldClass} placeholder="Candidate no." value={r.candidateNo} onChange={(e) => updateRow(i, { candidateNo: e.target.value })} />
-                  <input className={fieldClass} placeholder="Student ID" value={r.studentId} onChange={(e) => updateRow(i, { studentId: e.target.value })} />
-                  <input className={fieldClass} placeholder="Centre no." value={r.centerNo} onChange={(e) => updateRow(i, { centerNo: e.target.value })} />
-                  <input className={fieldClass} placeholder="Centre name" value={r.centerName} onChange={(e) => updateRow(i, { centerName: e.target.value })} />
+                  <CandidatePicker label={`Candidate ${i + 1}`} value={r.studentId} candidates={candidates} onChange={(id) => updateRow(i, { studentId: id })} />
                 </div>
                 <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
                   {MALAWI_SUBJECTS.map((subject) => (
@@ -367,6 +390,8 @@ export function ManebPanel({ academicYear }: Props) {
             </tbody>
           </table>
         </div>
+      )}
+      </>
       )}
     </div>
   )

@@ -112,6 +112,7 @@ import { SETTING_KEYS } from '@shared/types/settings'
 import * as classService    from '@/server/services/classService'
 import * as auditService    from '@/server/services/auditService'
 import * as announcementService from '@/server/services/announcementService'
+import * as manebRegistration from '@/server/services/manebRegistrationService'
 import type { UserRole }    from '@shared/types/roles'
 import type { CreateExamInput, UpdateExamInput, BulkMarkEntryInput, CreateManebRecordInput } from '@shared/schemas/exam'
 import type { Decimal } from '@prisma/client/runtime/library'
@@ -1077,9 +1078,40 @@ export async function computeTermResults(
 export async function createManebRecord(data: CreateManebRecordInput, actor: ExamActor) {
   // Integrity: the studentId must resolve to a real Student — a typo'd id
   // would otherwise create an orphan MANEB record.
-  const student = await prisma.student.findUnique({ where: { id: data.studentId }, select: { id: true } })
+  const student = await prisma.student.findUnique({ where: { id: data.studentId }, select: { id: true, firstName: true, lastName: true } })
   if (!student) {
     throw Object.assign(new Error(`No student found for id ${data.studentId}.`), { status: 400 })
+  }
+
+  // Marks can only be entered for a candidate on the registered list for this exam and year.
+  // The registration also supplies the examination number and centre, so they are entered once.
+  const registration = await manebRegistration.findLiveRegistration(data.studentId, data.academicYear, data.examType)
+  if (!registration) {
+    throw Object.assign(
+      new Error(`${student.firstName} ${student.lastName} is not on the registered ${data.examType} list for ${data.academicYear}. Register them first, then enter their marks.`),
+      { status: 400 },
+    )
+  }
+  const candidateNo = registration.candidateNo ?? data.candidateNo?.trim()
+  if (!candidateNo) {
+    throw Object.assign(
+      new Error(`${student.firstName} ${student.lastName} has no examination number yet. Enter it on the registration, then enter their marks.`),
+      { status: 400 },
+    )
+  }
+  if (registration.candidateNo && data.candidateNo && data.candidateNo.trim() !== registration.candidateNo) {
+    throw Object.assign(
+      new Error(`The examination number ${data.candidateNo.trim()} does not match the registered number ${registration.candidateNo} for ${student.firstName} ${student.lastName}.`),
+      { status: 400 },
+    )
+  }
+  const centerNo = registration.centerNo
+    ?? data.centerNo?.trim()
+    ?? String((await settingsService.get(SETTING_KEYS.EXAM_MANEB_CENTRE_NUMBER)) ?? '').trim()
+  const centerName = data.centerName?.trim()
+    ?? String((await settingsService.get(SETTING_KEYS.EXAM_MANEB_CENTRE_NAME)) ?? '').trim()
+  if (!centerNo || !centerName) {
+    throw Object.assign(new Error('The MANEB centre number and name are not set. Add them in Settings, then enter marks.'), { status: 400 })
   }
 
   // GR-1: overallGrade / aggregatePoints are computed server-side from the
@@ -1092,10 +1124,18 @@ export async function createManebRecord(data: CreateManebRecordInput, actor: Exa
   const record = await prisma.manebRecord.create({
     data: {
       ...rest,
+      candidateNo,
+      centerNo,
+      centerName,
+      registrationId:  registration.id,
       overallGrade:    aggregate.classification,
       aggregatePoints: aggregate.points,
     },
   })
+  // First time the number is known: keep it on the registration, the single source for placement.
+  if (!registration.candidateNo) {
+    await prisma.manebRegistration.update({ where: { id: registration.id }, data: { candidateNo } })
+  }
   await auditService.log({
     action: 'maneb.record_created', entityType: 'ManebRecord', entityId: record.id,
     actorUid: actor.uid, actorRole: actor.role,
@@ -1152,7 +1192,7 @@ export async function bulkCreateManebRecords(rows: CreateManebRecordInput[], act
     } catch (err) {
       errors.push({
         index: i,
-        candidateNo: row.candidateNo,
+        candidateNo: row.candidateNo ?? '',
         error: err instanceof Error ? err.message : 'Unknown error creating MANEB record',
       })
     }

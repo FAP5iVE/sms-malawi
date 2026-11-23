@@ -12,6 +12,7 @@
 import { useEffect, useState } from 'react'
 import { Search, X } from 'lucide-react'
 import { useStudents } from '@/hooks/useStudents'
+import { studentClassName } from '@/lib/hills/studentClass'
 
 export interface PickedStudent { id: string; name: string; registrationNo: string }
 
@@ -70,7 +71,7 @@ export function GuardianStudentPicker({ selected, onSelect, onClear, inputId = '
                 onClick={() => onSelect({ id: s.id, name: `${s.firstName} ${s.lastName}`.trim(), registrationNo: s.registrationNo })}
               >
                 <span className="block text-sm font-medium text-body">{s.firstName} {s.lastName}</span>
-                <span className="block text-xs text-muted">{s.registrationNo}{s.class ? ` · ${s.class.name}` : ''}</span>
+                <span className="block text-xs text-muted">{s.registrationNo}{studentClassName(s) ? ` · ${studentClassName(s)}` : ''}</span>
               </button>
             </li>
           ))}

@@ -113,8 +113,8 @@ export function AuthShell({ children, footer, skeletonOnBusy = false }: AuthShel
                     <SchoolMark kind="logo" tone="onDark" alt="" width={176} height={176} priority className="hills-auth__crest-light" />
                   </Link>
                   <div>
-                    <span className="hills-auth__brand-name">SMS Malawi</span>
-                    <span className="hills-auth__brand-sub">Chikangawa Hills Academy</span>
+                    <span className="hills-auth__brand-name">Chikangawa Hills Academy</span>
+                    <span className="hills-auth__brand-sub">School management system</span>
                   </div>
                 </div>
 

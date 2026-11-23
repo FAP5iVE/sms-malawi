@@ -130,6 +130,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
+import { SITE_NAME } from '@/lib/site'
 import Image from 'next/image'
 import { SchoolMark } from '@/components/shared/SchoolMark'
 import { PublicAmbientBackground } from '@/components/shared/PublicAmbientBackground'
@@ -450,7 +451,7 @@ export default function LandingPage() {
               </DropdownMenu>
               <Link
                 href="/login"
-                aria-label="Login Portal"
+                aria-label="Sign in"
                 className={`sm:hidden w-9 h-9 rounded-lg border flex items-center justify-center transition-colors ${
                   scrolled ? 'border-base text-body hover:bg-page' : 'border-white/25 text-white hover:bg-white/10'
                 }`}
@@ -461,7 +462,7 @@ export default function LandingPage() {
                 href="/login"
                 className="hidden sm:flex items-center gap-2 bg-btn-brand text-btn-brand-fg px-4 py-2.5 rounded-lg font-heading font-bold text-[13px] hover:bg-btn-brand-hover transition-colors"
               >
-                Login Portal <ArrowRight className="w-3.5 h-3.5" />
+                Sign in <ArrowRight className="w-3.5 h-3.5" />
               </Link>
               <button
                 onClick={() => { setMenuOpen((v) => !v); setSearchOpen(false) }}
@@ -550,7 +551,7 @@ export default function LandingPage() {
                   {
                     title: 'Current Students',
                     links: [
-                      { label: 'Login Portal (Students & Staff)', href: '/login' },
+                      { label: 'Sign in (students and staff)', href: '/login' },
                       { label: 'Student Life', href: '/student-life' },
                       { label: 'Facilities', href: '/academics#facilities' },
                       { label: 'Gallery', href: '/gallery' },
@@ -607,7 +608,7 @@ export default function LandingPage() {
           <div className="relative z-10 hills-container pb-20 pt-[180px] w-full">
             <div className="hills-measure fade-up">
               <h1 className="font-heading font-extrabold text-white leading-[1.04] tracking-tight text-5xl md:text-6xl lg:text-7xl mb-4">
-                {schoolInfo?.schoolName ?? 'SMS Malawi'}
+                {schoolInfo?.schoolName ?? SITE_NAME}
               </h1>
               <p className="font-heading font-semibold text-xl text-white/80 mb-1.5">
                 {schoolInfo?.systemTagline ?? 'Secondary School Management System'}
@@ -962,7 +963,7 @@ export default function LandingPage() {
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 border border-white/25 text-white px-5 py-2.75 rounded-xl font-heading font-bold text-[13px] hover:bg-white/10 transition-colors whitespace-nowrap"
               >
-                MANEB Portal <ExternalLink className="w-3.5 h-3.5" />
+                MANEB website <ExternalLink className="w-3.5 h-3.5" />
               </a>
             </Reveal>
 
@@ -1005,8 +1006,8 @@ export default function LandingPage() {
                       JCE, and University Placement as internal rows. */}
                   <Reveal delay={staggerDelay(1)} className="bg-white/[0.07] border border-white/15 rounded-2xl grid sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-white/15">
                     {[
-                      { key: 'MSCE', stat: msce, rateLabel: 'Pass rate', totalLabel: 'Candidates', totalText: msce ? `${msce.passed} passed / ${msce.total} total` : null, rate: msce?.passRate, year: manebStats?.year },
-                      { key: 'JCE', stat: jce, rateLabel: 'Pass rate', totalLabel: 'Candidates', totalText: jce ? `${jce.passed} passed / ${jce.total} total` : null, rate: jce?.passRate, year: manebStats?.year },
+                      { key: 'MSCE', stat: msce, rateLabel: 'Pass rate', totalLabel: 'Candidates', totalText: msce ? `${msce.passed} passed / ${msce.total} total` : null, rate: msce?.passRate, year: manebStats?.year, registered: manebStats?.registered?.MSCE ?? 0 },
+                      { key: 'JCE', stat: jce, rateLabel: 'Pass rate', totalLabel: 'Candidates', totalText: jce ? `${jce.passed} passed / ${jce.total} total` : null, rate: jce?.passRate, year: manebStats?.year, registered: manebStats?.registered?.JCE ?? 0 },
                       {
                         key: 'University Placement',
                         stat: placementStats && placementStats.qualified > 0 ? placementStats : undefined,
@@ -1017,6 +1018,7 @@ export default function LandingPage() {
                           : null,
                         rate: placementStats && placementStats.qualified > 0 ? placementStats.selectionRate : undefined,
                         year: placementStats?.year,
+                        registered: 0,
                       },
                     ].map((card) => (
                       <div key={card.key} className="p-6">
@@ -1041,7 +1043,17 @@ export default function LandingPage() {
                               <span className="text-white/75">{card.totalLabel}</span>
                               <span className="text-white/90 font-semibold">{card.totalText}</span>
                             </div>
+                            {card.registered > 0 && (
+                              <div className="flex justify-between text-xs mt-2">
+                                <span className="text-white/75">Registered</span>
+                                <span className="text-white/90 font-semibold">{card.registered} candidates</span>
+                              </div>
+                            )}
                           </>
+                        ) : card.registered > 0 ? (
+                          <div className="py-4 text-center text-sm text-white/75">
+                            {card.registered} {card.registered === 1 ? 'candidate' : 'candidates'} registered. Results are not published yet.
+                          </div>
                         ) : (
                           <div className="py-4 text-center text-sm text-white/75">Data unavailable</div>
                         )}
@@ -1362,7 +1374,7 @@ export default function LandingPage() {
                 </div>
                 <div className="text-[13.5px] text-white/70 leading-loose">
                   The Head Teacher<br />
-                  {schoolInfo?.schoolName ?? 'SMS Malawi'}<br />
+                  {schoolInfo?.schoolName ?? SITE_NAME}<br />
                   {schoolInfo?.address ?? ''}<br />
                   {schoolInfo?.phone ?? ''}<br />
                   {schoolInfo?.email ?? ''}
@@ -1385,7 +1397,7 @@ export default function LandingPage() {
                 {
                   title: 'Current Students',
                   links: [
-                    { label: 'Login Portal (Students & Staff)', href: '/login' },
+                    { label: 'Sign in (students and staff)', href: '/login' },
                     { label: 'Change Password', href: '/change-password' },
                     { label: 'Student Life', href: '/student-life' },
                     { label: 'School Leadership', href: '/leadership' },
@@ -1409,7 +1421,7 @@ export default function LandingPage() {
                     { label: 'Announcements', href: '/notices' },
                     { label: 'Academic Advertisements', href: '/academic-advertisements' },
                     { label: 'Events', href: '/events' },
-                    { label: 'MANEB Portal', href: 'https://www.maneb.edu.mw/', external: true },
+                    { label: 'MANEB website', href: 'https://www.maneb.edu.mw/', external: true },
                   ],
                 },
               ].map((col) => (
@@ -1473,7 +1485,7 @@ export default function LandingPage() {
 
             <div className="py-5.5 flex flex-col sm:flex-row items-center justify-between gap-4">
               <p className="text-[12.5px] text-white/60">
-                © {currentYearNum} {schoolInfo?.schoolName ?? 'SMS Malawi'}. All rights reserved.
+                © {currentYearNum} {schoolInfo?.schoolName ?? SITE_NAME}. All rights reserved.
               </p>
               <div className="flex items-center gap-5">
                 <StudioCredit className="text-[12.5px] text-white/60" />

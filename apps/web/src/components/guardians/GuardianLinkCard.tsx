@@ -44,8 +44,8 @@ const STATUS_TONE: Record<GuardianLinkStatusValue, StatusTone> = {
 const MATCH_LABELS: Record<string, string> = {
   NATIONAL_ID_NAME: 'the same national ID and a similar name',
   NATIONAL_ID: 'the same national ID but a different name',
-  EMAIL_NAME: 'the same email and a similar name',
-  EMAIL: 'the same email',
+  EMAIL_NAME: 'the same e-mail and a similar name',
+  EMAIL: 'the same e-mail',
   PHONE_NAME: 'the same phone number and a similar name',
   PHONE_SHARED: 'the same phone number but a different name',
 }
@@ -139,7 +139,7 @@ export function GuardianLinkCard({ link, showStudent = false, profileNames }: {
           <StatusText tone={STATUS_TONE[link.status]}>{GUARDIAN_LINK_STATUS_LABELS[link.status]}</StatusText>
           {link.isPrimaryContact && <StatusText tone="info">Primary contact</StatusText>}
           {link.isFinancialResponsible && <StatusText tone="info">Pays fees</StatusText>}
-          {profile?.hasAccount && <StatusText tone="success">Has portal account</StatusText>}
+          {profile?.hasAccount && <StatusText tone="success">Has guardian account</StatusText>}
           {profileSuspended && <StatusText tone="danger">Guardian suspended</StatusText>}
         </div>
       </header>
@@ -189,7 +189,7 @@ export function GuardianLinkCard({ link, showStudent = false, profileNames }: {
               <p>The ID is the same, so check the name before deciding: a married name, a nickname or a spelling difference can explain it.</p>
             )}
             {link.suggestion.idConflict && (
-              <p>Their national IDs are <strong>different</strong>, so these may be two people who share a phone or email.</p>
+              <p>Their national IDs are <strong>different</strong>, so these may be two people who share a phone or e-mail.</p>
             )}
             {link.suggestion.students && link.suggestion.students.length > 0 && (
               <RelatedStudents

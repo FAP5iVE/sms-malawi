@@ -44,7 +44,7 @@ import { PublicThemeToggle } from '@/components/shared/PublicThemeToggle'
 
 /** First matching prefix wins. Keep specific routes before general ones. */
 const ROUTE_TITLES: ReadonlyArray<readonly [prefix: string, title: string]> = [
-  ['/login', 'Portal Login'],
+  ['/login', 'Sign in'],
   ['/forgot-password', 'Forgot Password'],
   ['/change-password', 'Change Password'],
   ['/reset-password', 'Reset Password'],

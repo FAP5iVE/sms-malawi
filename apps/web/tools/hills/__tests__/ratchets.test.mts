@@ -7,6 +7,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { findLegacyPairs, findPills, findTells, looksLikeProse } from '../lib/ratchets.mjs'
+import { findDeadCss } from '../lib/deadCss.mjs'
 
 test('pills: rounded-full with side padding is found, a plain round dot is not', () => {
   assert.equal(findPills('a.tsx', `const a = <span className="rounded-full bg-x px-2 text-xs">New</span>`).length, 1)
@@ -39,4 +40,20 @@ test('looksLikeProse separates sentences from tokens', () => {
   assert.equal(looksLikeProse('Saved. Nothing else to do.'), true)
   assert.equal(looksLikeProse('/api/files/abc'), false)
   assert.equal(looksLikeProse('flex items-center gap-2 text-xs'), false)
+})
+
+test('dead css: a class or token nothing uses is found, used and built names are kept', () => {
+  const css = `
+    .used { color: red; }
+    .dead { color: blue; }
+    .app-modal-panel--md { color: red; }
+    .recharts-wrapper { display: none; }
+    :root { --read: 1; --unread: 2; --color-brand-navy: red; --color-brand-gold: gold; --shadow: none; }
+    .x { width: var(--read); }
+    /* .in-a-comment { } */
+  `
+  const code = 'const a = "used x bg-brand-navy"'
+  const dead = findDeadCss(css, code)
+  assert.deepEqual(dead.classes, ['dead'])
+  assert.deepEqual(dead.properties, ['--color-brand-gold', '--unread'])
 })

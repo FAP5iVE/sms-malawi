@@ -73,6 +73,13 @@ export interface ApiStudent {
   exitReason?: 'TRANSFERRED_OUT' | 'DROPPED_OUT' | 'DISMISSED' | 'DECEASED' | 'WITHDRAWN' | 'OTHER' | null
   exitDate?: string | null
   yearOutcomes?: Array<{ academicYear: string; form: number; outcome: 'PROMOTED' | 'REPEATED' | 'GRADUATED' | 'AWAITING_MANEB' }>
+  // Detail view only: the class as flat fields (the endpoints never return a nested `class`),
+  // and the MANEB registration state for the exam this student's form sits.
+  className?: string | null
+  classForm?: number | null
+  classStream?: string | null
+  classStreamCount?: number | null
+  maneb?: { examType: 'JCE' | 'MSCE'; academicYear: string; registered: boolean; candidateNo: string | null } | null
   status: string
   classId?: string
   class?: { id: string; name: string; form: number }

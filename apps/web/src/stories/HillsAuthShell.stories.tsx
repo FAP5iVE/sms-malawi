@@ -90,7 +90,7 @@ const notice = (
     <ShieldCheck aria-hidden />
     <div>
       <p className="hills-auth__notice-title">Authorised access</p>
-      <p>This portal is for authorised students and staff only.</p>
+      <p>Sign in is for authorised students and staff only.</p>
       <p>Contact your school administrator if you need access.</p>
     </div>
   </>

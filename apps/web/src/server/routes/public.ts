@@ -41,10 +41,11 @@ import { getFirestore }    from 'firebase-admin/firestore'
 import { getAdminApp }     from '@/lib/verifyAuth'
 import { prisma }          from '@/lib/prisma'
 import { isPassingClassification } from '@/server/services/gradeService'
-import { sendEmail }       from '@/lib/email'
+import { sendEmail, getSchoolDisplayName } from '@/lib/email'
 import { randomBytes }     from 'crypto'
 import { z }               from 'zod'
 import * as settingsService  from '@/server/services/settingsService'
+import * as manebRegistration from '@/server/services/manebRegistrationService'
 import { SETTING_KEYS }      from '@shared/types/settings'
 import { COLLECTIONS }       from '@shared/constants/storage'
 import { getSchoolBranding } from '@/server/services/notificationService'
@@ -78,7 +79,7 @@ publicRouter.get('/school-info', async (_req, res) => {
   )
 
   res.json({
-    schoolName:  settings[SETTING_KEYS.SCHOOL_NAME]           ?? 'SMS Malawi',
+    schoolName:  settings[SETTING_KEYS.SCHOOL_NAME]           ?? 'Secondary School',
     slogan:      settings[SETTING_KEYS.SCHOOL_SLOGAN]         ?? 'Where Minds Ignite & Futures Begin.',
     // [PRODUCTION FIX 2026-07-28] Previously hardcoded in page.tsx.
     systemTagline: settings[SETTING_KEYS.SCHOOL_SYSTEM_TAGLINE] ?? 'Secondary School Management System',
@@ -113,7 +114,7 @@ publicRouter.get('/school-info', async (_req, res) => {
 publicRouter.get('/maneb-stats', async (req, res) => {
   const { academicYear: year } = await settingsService.resolvePeriod({ academicYear: req.query.year })
 
-  const [records, enrolledStudents] = await Promise.all([
+  const [records, enrolledStudents, registered] = await Promise.all([
     prisma.manebRecord.findMany({
       where:  { academicYear: year },
       select: { examType: true, overallGrade: true },
@@ -126,10 +127,12 @@ publicRouter.get('/maneb-stats', async (req, res) => {
     // check below) so it still shows even in a year with no MANEB
     // records published yet.
     prisma.student.count({ where: { status: 'ACTIVE' } }),
+    // Candidates on the school's registered MANEB list (counts only).
+    manebRegistration.countRegistered(year),
   ])
 
   if (records.length === 0) {
-    return res.json({ year, stats: [], enrolledStudents })
+    return res.json({ year, stats: [], enrolledStudents, registered })
   }
 
   const byType: Record<string, { total: number; passed: number }> = {}
@@ -151,6 +154,7 @@ publicRouter.get('/maneb-stats', async (req, res) => {
   res.json({
     year,
     enrolledStudents,
+    registered,
     stats: Object.entries(byType).map(([examType, b]) => ({
       examType,
       total:    b.total,
@@ -373,7 +377,7 @@ publicRouter.get('/newsletter/confirm', async (req, res) => {
     data:  { confirmed: true, token: null },
   })
 
-  res.json({ message: 'Your subscription has been confirmed. Welcome to the SMS Malawi newsletter!' })
+  res.json({ message: `Your subscription has been confirmed. Welcome to the ${await getSchoolDisplayName()} newsletter!` })
 })
 
 // ─── NEWSLETTER UNSUBSCRIBE ───────────────────────────────────────────────────
@@ -388,7 +392,7 @@ publicRouter.get('/newsletter/unsubscribe', async (req, res) => {
     data:  { unsubscribedAt: new Date() },
   })
 
-  res.json({ message: 'You have been unsubscribed from the SMS Malawi newsletter.' })
+  res.json({ message: `You have been unsubscribed from the ${await getSchoolDisplayName()} newsletter.` })
 })
 
 // ─── PASSWORD RESET (public "forgot password") ────────────────────────────────

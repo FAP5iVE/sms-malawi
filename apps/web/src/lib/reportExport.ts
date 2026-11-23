@@ -20,6 +20,7 @@
 import type { CsvCell, CsvColumn } from '@/lib/csv'
 import { csvFilename } from '@/lib/csv'
 import { DEFAULT_SCHOOL_LOGO_DATA_URI } from '@/lib/schoolLogoData'
+import { SITE_NAME } from '@/lib/site'
 
 /** One exportable table. `rows` is held as unknown[] (type erased at the boundary). */
 export interface ExportTable {
@@ -129,7 +130,7 @@ export async function downloadXlsx(label: string, tables: readonly ExportTable[]
 
   const ExcelJS = (await import('exceljs')).default
   const wb = new ExcelJS.Workbook()
-  wb.creator = 'SMS Malawi'
+  wb.creator = SITE_NAME
   wb.created = new Date()
 
   // The About sheet is named first so a data table can never take its name.

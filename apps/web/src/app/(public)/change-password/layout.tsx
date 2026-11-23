@@ -3,7 +3,7 @@ import { pageMetadata } from '@/lib/site'
 export const metadata = pageMetadata({
   title: 'Change Password',
   description:
-    'Change your portal password.',
+    'Change your password.',
   path: '/change-password',
   noindex: true,
 })

@@ -66,7 +66,7 @@ import 'server-only'
 import * as admin from 'firebase-admin'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
-import { sendEmail } from '@/lib/email'
+import { sendEmail, getSchoolDisplayName } from '@/lib/email'
 import { generateTempPassword } from '@/lib/tempPassword'
 import { addDays, startOfDay, endOfDay } from 'date-fns'
 import * as auditService from '@/server/services/auditService'
@@ -639,7 +639,7 @@ export async function createStaff(data: CreateStaffInput, actorUid: string) {
   //    is still returned to the caller for manual relay.
   const emailResult = await sendEmail({
     to:      data.email,
-    subject: 'Welcome to SMS Malawi — Your Login Details',
+    subject: `Welcome to ${await getSchoolDisplayName()} — Your Login Details`,
     html: `<p>Dear ${data.firstName} ${data.lastName},</p>
       <p>A staff account has been created for you on the School Management System.</p>
       <p><strong>Email:</strong> ${data.email}<br>

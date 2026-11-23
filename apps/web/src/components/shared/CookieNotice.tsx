@@ -81,7 +81,7 @@ export function CookieNotice() {
     >
       <p className="text-[13.5px] leading-relaxed text-body">
         This site uses only essential cookies, such as the one that keeps you signed in to the
-        portal. We do not use advertising or tracking cookies.{' '}
+        site. We do not use advertising or tracking cookies.{' '}
         <Link
           href="/privacy#your-choices"
           className="text-brand-teal underline underline-offset-2 hover:no-underline"

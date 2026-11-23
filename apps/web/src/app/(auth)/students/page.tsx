@@ -73,6 +73,7 @@ import type { ApiStudent }                        from '@shared/types/api'
 import { useRouter }                              from 'next/navigation'
 import StatusText from '@/components/shared/StatusText'
 import { statusWord } from '@/lib/hills/statusWord'
+import { studentClassName } from '@/lib/hills/studentClass'
 
 type Student = ApiStudent
 
@@ -131,7 +132,7 @@ const COLUMNS: DataColumn<Student>[] = [
     // Visible on tablet + desktop; hidden on mobile (card shows it as key-value)
     priority: 'important',
     render: (s: Student) => (
-      <span className="text-sm text-body">{s.class?.name ?? '—'}</span>
+      <span className="text-sm text-body">{studentClassName(s) ?? '—'}</span>
     ),
   },
   {

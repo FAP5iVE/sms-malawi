@@ -176,7 +176,7 @@ describe('invitation email', () => {
     }
     expect(m.html).not.toContain('<b>Mary')
     expect(m.html).toContain('&lt;b&gt;')
-    expect(m.subject).toContain('parent portal')
+    expect(m.subject).toContain('guardian account')
   })
   it('warns the reader never to share the code', () => {
     expect(buildInvitationEmail(input).text.toLowerCase()).toContain('never share')

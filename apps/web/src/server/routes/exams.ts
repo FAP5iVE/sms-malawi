@@ -93,7 +93,12 @@ import { verifyAuth, requireRole } from '@/lib/verifyAuth'
 import { requirePermission }   from '@/server/middleware/verifyPermission'
 import { rateLimit }           from '@/lib/ratelimit'
 import { idempotent }          from '@/server/middleware/idempotency'
-import { CreateExamSchema, UpdateExamSchema, BulkMarkEntrySchema, FinalizeMarksSchema, CreateManebRecordSchema } from '@shared/schemas/exam'
+import {
+  CreateExamSchema, UpdateExamSchema, BulkMarkEntrySchema, FinalizeMarksSchema, CreateManebRecordSchema,
+  RegisterManebCandidateSchema, BulkRegisterManebCandidatesSchema, UpdateManebRegistrationSchema,
+  WithdrawManebRegistrationSchema, ImportManebNumbersSchema, ManebListScopeSchema,
+} from '@shared/schemas/exam'
+import * as manebRegistration from '@/server/services/manebRegistrationService'
 import * as examService        from '@/server/services/examService'
 import { getSignedViewUrl, canReadFile } from '@/lib/storage'
 import { prisma }              from '@/lib/prisma'
@@ -568,6 +573,71 @@ examsRouter.post('/maneb/bulk', verifyAuth, requirePermission('exam.manageManebR
     const parsed = CreateManebRecordSchema.array().min(1).max(500).safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
     return res.status(201).json(await examService.bulkCreateManebRecords(parsed.data, { uid: req.user!.uid, role: req.user!.role }))
+  })
+
+// ── MANEB candidate registration (the school's own list; candidates register with MANEB themselves).
+// Reading the board is open to the same roles as the MANEB results list; every change needs
+// exam.manageManebRecords. Reopening a closed list is for administrators and the head only.
+const MANEB_BOARD_ROLES = ['admin', 'high_rank', 'exam_officer'] as const
+
+examsRouter.get('/maneb/registrations', verifyAuth, requireRole([...MANEB_BOARD_ROLES]),
+  async (req, res) => {
+    const parsed = ManebListScopeSchema.safeParse(req.query)
+    if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
+    return res.json(await manebRegistration.getBoard(parsed.data.academicYear, parsed.data.examType))
+  })
+
+examsRouter.post('/maneb/registrations', verifyAuth, requirePermission('exam.manageManebRecords'),
+  async (req, res) => {
+    const parsed = RegisterManebCandidateSchema.safeParse(req.body)
+    if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
+    return res.status(201).json(await manebRegistration.register(parsed.data, { uid: req.user!.uid, role: req.user!.role }))
+  })
+
+examsRouter.post('/maneb/registrations/bulk', verifyAuth, requirePermission('exam.manageManebRecords'),
+  rateLimit('bulk-mutation'), idempotent(),
+  async (req, res) => {
+    const parsed = BulkRegisterManebCandidatesSchema.safeParse(req.body)
+    if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
+    return res.status(201).json(await manebRegistration.bulkRegister(parsed.data, { uid: req.user!.uid, role: req.user!.role }))
+  })
+
+examsRouter.post('/maneb/registrations/numbers', verifyAuth, requirePermission('exam.manageManebRecords'),
+  rateLimit('bulk-mutation'), idempotent(),
+  async (req, res) => {
+    const parsed = ImportManebNumbersSchema.safeParse(req.body)
+    if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
+    return res.json(await manebRegistration.importCandidateNumbers(parsed.data, { uid: req.user!.uid, role: req.user!.role }))
+  })
+
+examsRouter.post('/maneb/registrations/lock', verifyAuth, requirePermission('exam.manageManebRecords'),
+  async (req, res) => {
+    const parsed = ManebListScopeSchema.safeParse(req.body)
+    if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
+    const lock = await manebRegistration.lockList(parsed.data.academicYear, parsed.data.examType, { uid: req.user!.uid, role: req.user!.role })
+    return res.status(201).json({ lockedAt: lock.lockedAt })
+  })
+
+examsRouter.post('/maneb/registrations/unlock', verifyAuth, requireRole(['admin', 'high_rank']),
+  async (req, res) => {
+    const parsed = ManebListScopeSchema.safeParse(req.body)
+    if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
+    await manebRegistration.unlockList(parsed.data.academicYear, parsed.data.examType, { uid: req.user!.uid, role: req.user!.role })
+    return res.json({ ok: true })
+  })
+
+examsRouter.patch('/maneb/registrations/:id', verifyAuth, requirePermission('exam.manageManebRecords'),
+  async (req, res) => {
+    const parsed = UpdateManebRegistrationSchema.safeParse(req.body)
+    if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
+    return res.json(await manebRegistration.update(String(req.params.id), parsed.data, { uid: req.user!.uid, role: req.user!.role }))
+  })
+
+examsRouter.post('/maneb/registrations/:id/withdraw', verifyAuth, requirePermission('exam.manageManebRecords'),
+  async (req, res) => {
+    const parsed = WithdrawManebRegistrationSchema.safeParse(req.body)
+    if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
+    return res.json(await manebRegistration.withdraw(String(req.params.id), parsed.data.reason, { uid: req.user!.uid, role: req.user!.role }))
   })
 
 // POST /exams/maneb/recompute — GR-1: recompute overallGrade + aggregatePoints

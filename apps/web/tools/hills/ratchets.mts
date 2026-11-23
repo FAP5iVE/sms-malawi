@@ -9,6 +9,7 @@
  *
  *   pills         must be 0 (count badges are allowed: COUNT_BADGES below, RULEBOOK R2.2)
  *   legacy pairs  must be 0
+ *   dead css      must be 0: a class or custom property in globals.css that nothing uses (tools/hills/lib/deadCss.mts)
  *   AI tells      may only go down: tools/hills/ai-tells/baseline.json holds the total and the count per rule
  *   Contrast 100 percent and handler drift are checked by hills:contrast and hills:inventory:check.
  *   Scope: src/app (not api/), src/components, src/hooks; stories and tests are skipped.
@@ -17,6 +18,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { findDeadCss } from './lib/deadCss.mjs'
 import { walk } from './lib/paths.mjs'
 import { findLegacyPairs, findPills, findTells, type Hit } from './lib/ratchets.mjs'
 
@@ -34,6 +36,25 @@ const accept = (rel: string): boolean =>
   (rel.startsWith('src/components/') || rel.startsWith('src/hooks/') || (rel.startsWith('src/app/') && !rel.startsWith('src/app/api/')))
 
 interface Found { file: string; hit: Hit }
+
+const CSS_FILE = 'src/app/globals.css'
+const CORPUS_ROOTS = ['src', 'public', '.storybook', 'tools', 'e2e', 'test']
+
+/** Dead classes and custom properties in globals.css (phase 16). */
+export function scanDeadCss(): { classes: string[]; properties: string[] } {
+  const parts: string[] = []
+  for (const root of CORPUS_ROOTS) {
+    const dir = path.join(webRoot, root)
+    let rels: string[] = []
+    try { rels = walk(dir, (r) => /\.(?:ts|tsx|js|jsx|mjs|mts|css|html|md|mdx|json|svg)$/.test(r), dir) } catch { continue }
+    for (const rel of rels) {
+      const file = `${root}/${rel}`.replace(/\\/g, '/')
+      if (file === CSS_FILE) continue
+      parts.push(readFileSync(path.join(webRoot, file), 'utf8'))
+    }
+  }
+  return findDeadCss(readFileSync(path.join(webRoot, CSS_FILE), 'utf8'), parts.join('\n'))
+}
 
 export function scan(): { pills: Found[]; legacy: Found[]; tells: Found[]; files: number } {
   const files = walk(path.join(webRoot, 'src'), (rel) => accept(`src/${rel}`), path.join(webRoot, 'src')).map((r) => `src/${r}`.replace(/\\/g, '/'))
@@ -56,6 +77,7 @@ function countBy(found: Found[]): Record<string, number> {
 function main(): void {
   const args = new Set(process.argv.slice(2))
   const r = scan()
+  const dead = scanDeadCss()
   const byRule = countBy(r.tells)
   const total = r.tells.length
   const filesWithTells = new Set(r.tells.map((t) => t.file)).size
@@ -79,6 +101,8 @@ function main(): void {
   const problems: string[] = []
   if (r.pills.length) problems.push(`pills: ${r.pills.length} (must be 0)\n` + r.pills.map((f) => `    ${f.file}:${f.hit.line}  ${f.hit.text}`).join('\n'))
   if (r.legacy.length) problems.push(`legacy button pairs: ${r.legacy.length} (must be 0)\n` + r.legacy.map((f) => `    ${f.file}:${f.hit.line}  ${f.hit.text}`).join('\n'))
+  if (dead.classes.length) problems.push(`dead css classes in globals.css: ${dead.classes.length} (must be 0)\n` + dead.classes.map((c) => `    .${c}`).join('\n'))
+  if (dead.properties.length) problems.push(`dead css custom properties in globals.css: ${dead.properties.length} (must be 0)\n` + dead.properties.map((p) => `    ${p}`).join('\n'))
   if (!base) problems.push('AI-tell baseline missing: run pnpm hills:ratchets --write')
   else {
     if (total > base.total) problems.push(`AI tells: ${total} (limit ${base.total}); the number may only go down`)
@@ -88,7 +112,7 @@ function main(): void {
     }
   }
 
-  console.log(`Ratchets over ${r.files} files: pills ${r.pills.length}, legacy button pairs ${r.legacy.length}, AI tells ${total} in ${filesWithTells} files (limit ${base?.total ?? 'none'}).`)
+  console.log(`Ratchets over ${r.files} files: pills ${r.pills.length}, legacy button pairs ${r.legacy.length}, dead css ${dead.classes.length + dead.properties.length}, AI tells ${total} in ${filesWithTells} files (limit ${base?.total ?? 'none'}).`)
   console.log(`  by rule: ${JSON.stringify(byRule)}`)
   if (base && total < base.total) console.log(`  below the limit by ${base.total - total}: run pnpm hills:ratchets --write to lock the lower number in.`)
   if (problems.length) {

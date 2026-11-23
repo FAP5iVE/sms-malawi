@@ -43,7 +43,8 @@ import type { DataColumn, MobileAction } from '@/components/shared/DataTable'
 import { ModuleTabs } from '@/components/shared/ModuleTabs'
 import type { TabItem } from '@/components/shared/ModuleTabs'
 import { usePermissions } from '@/hooks/usePermissions'
-import { CheckCircle, XCircle, UserPlus, Loader2, Inbox } from 'lucide-react'
+import { AdmitStudentDialog } from '@/components/applications/AdmitStudentDialog'
+import { CheckCircle, XCircle, UserPlus, Inbox } from 'lucide-react'
 
 type ApplicationStatusValue = (typeof ApplicationStatusSchema.options)[number]
 
@@ -97,15 +98,19 @@ function ApplicationsContent() {
     )
   }
 
-  function handleConvert(id: string) {
+  // The application being admitted; set by the Admit button, cleared when the dialog closes.
+  const [admitting, setAdmitting] = useState<ApiApplication | null>(null)
+
+  function handleConvert(id: string, classId?: string) {
     setActionError(null)
     // Universal credential flow: admitting an applicant provisions their login
     // from the email on their application — a generated password is emailed and
     // must be reset on first sign-in. If the applicant has no email on file the
     // backend returns a clear 400, surfaced below.
     convert(
-      { id, createLoginAccount: true },
+      { id, classId, createLoginAccount: true },
       {
+        onSuccess: () => setAdmitting(null),
         onError: (err) => setActionError(err instanceof Error ? err.message : 'Failed to admit applicant as student.'),
       }
     )
@@ -172,17 +177,13 @@ function ApplicationsContent() {
           )}
           {(activeStatus === 'APPROVED' || activeStatus === 'AWAITING_ADMISSION') && canConvert && (
             <button
-              onClick={() => handleConvert(app.id)}
+              onClick={() => { setActionError(null); setAdmitting(app) }}
               disabled={converting}
               className="flex items-center gap-1 text-xs font-semibold border border-status-success/60 text-status-success px-2.5 py-1 rounded-lg hover:bg-status-success/10 transition-colors disabled:opacity-60 min-h-[44px] sm:min-h-0"
               aria-label={`Admit ${app.firstName} ${app.lastName} as a student`}
             >
-              {converting ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden />
-              ) : (
-                <UserPlus className="w-3.5 h-3.5" aria-hidden />
-              )}
-              Admit as Student
+              <UserPlus className="w-3.5 h-3.5" aria-hidden />
+              Admit as student
             </button>
           )}
           {activeStatus === 'PENDING' && !canApprove && !canDeny && (
@@ -220,7 +221,7 @@ function ApplicationsContent() {
             label:   'Admit as student',
             icon:    UserPlus,
             variant: 'default' as const,
-            onClick: (row: ApiApplication) => handleConvert(row.id),
+            onClick: (row: ApiApplication) => { setActionError(null); setAdmitting(row) },
           },
         ]
       : []),
@@ -249,7 +250,7 @@ function ApplicationsContent() {
         }}
       />
 
-      {actionError && (
+      {actionError && !admitting && (
         <p
           role="alert"
           className="text-sm text-tone-coral bg-brand-coral/8 rounded-xl px-4 py-3"
@@ -283,6 +284,15 @@ function ApplicationsContent() {
           }}
           emptyMessage="No applications found for this status."
           bordered={false}
+        />
+      )}
+      {admitting && (
+        <AdmitStudentDialog
+          application={admitting}
+          busy={converting}
+          error={actionError}
+          onClose={() => { if (!converting) setAdmitting(null) }}
+          onConfirm={(classId) => handleConvert(admitting.id, classId)}
         />
       )}
       </ModuleSurface>

@@ -51,7 +51,7 @@ export async function issueInvitation(
   if (!link) throw notFound('Guardian link')
   if (link.status !== 'ACTIVE') throw conflict('NOT_ACTIVE', 'Approve this guardian before issuing an invitation.')
   if (link.profile.status !== 'ACTIVE') throw conflict('PROFILE_NOT_ACTIVE', 'This guardian profile is suspended or merged.')
-  if (link.profile.firebaseUid) throw conflict('ALREADY_CLAIMED', 'This guardian already has a portal account. The child will appear there once access is approved.')
+  if (link.profile.firebaseUid) throw conflict('ALREADY_CLAIMED', 'This guardian already has a guardian account. The child will appear there once access is approved.')
   if (link.reverifyRequired === true) throw conflict('NEEDS_REVERIFY', 'Re-verify this guardian before issuing an invitation: their details changed.')
 
   let contactId: string | null = null

@@ -181,7 +181,7 @@ export const INFORMATIONAL_TAB_COUNTS: ReadonlyArray<{
   { file: 'app/(auth)/library/page.tsx', tab: 'Fines & Penalties Ledger', reason: 'total number of fines, a list size' },
   { file: 'app/(auth)/library/page.tsx', tab: 'Catalog Distribution', reason: 'number of categories, a list size' },
   { file: 'app/(auth)/library/page.tsx', tab: 'Active Borrowings', reason: 'total loans, a list size' },
-  { file: 'app/(auth)/library/page.tsx', tab: 'Fine Waiver Portal', reason: 'may be requests waiting for review; check in 8b-2', unsure: true },
+  { file: 'app/(auth)/library/page.tsx', tab: 'Fine waivers', reason: 'may be requests waiting for review; check in 8b-2', unsure: true },
   { file: 'app/(auth)/announcements/page.tsx', tab: 'Published', reason: 'total published, a list size' },
   { file: 'app/(auth)/announcements/page.tsx', tab: 'Drafts', reason: 'own drafts, a list size' },
   { file: 'app/(auth)/classes/[id]/page.tsx', tab: 'Assignments (staff)', reason: 'total assignments for staff; only the student count is attention' },

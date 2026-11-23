@@ -55,13 +55,13 @@ function RecentAccess({ onOpen }: { onOpen: (s: PickedStudent) => void }) {
         <div className="app-tint rounded-xl p-10 text-center">
           <ScrollText className="w-8 h-8 mx-auto text-muted mb-2" aria-hidden />
           <p className="font-medium text-body">No activity yet</p>
-          <p className="text-sm text-muted mt-1">No guardian has opened a child’s information yet.</p>
+          <p className="text-sm text-muted mt-1">Nobody has opened a child’s information through guardian access.</p>
         </div>
       )}
 
       {rows.length > 0 && (
         <>
-          <ul className="app-tint rounded-xl divide-y divide-[var(--border-base,rgba(0,0,0,0.08))] overflow-hidden">
+          <ul className="rounded-xl border border-base bg-surface divide-y divide-[var(--border-base,rgba(0,0,0,0.08))] overflow-hidden">
             {paging.visible.map((r) => (
               <li key={r.student.id}>
                 <button
@@ -130,14 +130,14 @@ export function GuardianAccessLogTab() {
         <div className="app-tint rounded-xl p-10 text-center">
           <ScrollText className="w-8 h-8 mx-auto text-muted mb-2" aria-hidden />
           <p className="font-medium text-body">No activity yet</p>
-          <p className="text-sm text-muted mt-1">Nobody has opened this child’s information through the parent portal.</p>
+          <p className="text-sm text-muted mt-1">Nobody has opened this child’s information through guardian access.</p>
         </div>
       )}
 
       {rows.length > 0 && (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <caption className="sr-only">Parent portal access for {student?.name}</caption>
+            <caption className="sr-only">Guardian access for {student?.name}</caption>
             <thead>
               <tr className="text-left text-xs text-muted border-b border-base">
                 <th scope="col" className="px-4 py-3 font-medium">When</th>

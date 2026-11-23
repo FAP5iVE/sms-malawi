@@ -376,7 +376,7 @@ export function SchoolIdentitySettings() {
       <div className="grid sm:grid-cols-2 gap-4">
         <div>
           <label className={label}>School name</label>
-          <input value={data.school_name ?? ''} onChange={(e) => setField('school_name', e.target.value)} className={inputCls} placeholder="SMS Malawi" />
+          <input value={data.school_name ?? ''} onChange={(e) => setField('school_name', e.target.value)} className={inputCls} placeholder="Chikangawa Hills Academy" />
         </div>
         <div>
           <label className={label}>Slogan</label>

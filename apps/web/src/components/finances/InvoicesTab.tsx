@@ -97,6 +97,7 @@ import {
 import { Modal, MODAL_BTN_SECONDARY } from '@/components/shared/Modal'
 import { StatusText } from '@/components/shared/StatusText'
 import { statusTone, statusWord } from '@/lib/hills/statusWord'
+import { studentClassLabel } from '@/lib/hills/studentClass'
 
 type PaymentMethodValue = (typeof PAYMENT_METHOD_OPTIONS)[number]['value']
 
@@ -677,7 +678,7 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
                           {s.firstName} {s.lastName}
                         </p>
                         <p className="text-xs text-muted">
-                          {s.registrationNo} &middot; {s.class?.name ?? 'Unassigned'}
+                          {s.registrationNo} &middot; {studentClassLabel(s, 'Unassigned')}
                         </p>
                       </button>
                     ))
@@ -693,7 +694,7 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
                   <span className="text-muted font-normal">
                     {' '}
                     ({selectedStudent.registrationNo} &middot;{' '}
-                    {selectedStudent.class?.name ?? 'Unassigned'})
+                    {studentClassLabel(selectedStudent, 'Unassigned')})
                   </span>
                 </p>
                 <p className="text-xs text-muted">

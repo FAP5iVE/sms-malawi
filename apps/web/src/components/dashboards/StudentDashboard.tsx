@@ -56,6 +56,7 @@ import { Chart } from '@/components/shared/chart'
 import type { ChartDataPoint } from '@/components/shared/chart'
 import type { QuickAction } from '@/components/shared/QuickActions'
 import { StudentResultsView } from '@/components/exams/StudentResultsView'
+import { StudentIdentityLine } from '@/components/students/StudentIdentity'
 import { useStudentMe } from '@/hooks/useStudents'
 import { useStudentPerformanceTrend, useOwnAttendance } from '@/hooks/useAnalytics'
 import { useMyOverview, useMyAttention } from '@/hooks/reporting/useStudentReporting'
@@ -141,6 +142,7 @@ export function StudentDashboard() {
 
   return (
     <div className="space-y-4 md:space-y-6">
+      <StudentIdentityLine />
       <PrimaryOverviewKpis
         title="My term"
         summary="Check your results, attendance and assignments for the selected term."

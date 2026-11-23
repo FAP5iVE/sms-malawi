@@ -135,7 +135,7 @@ export function renderOverdueLibrary(
       ? 'Please return your books on or before the due date to avoid fines.'
       : `Please return your books now. The total fine of ${fmtTotal} can be paid at the finance office.`,
     '',
-    `Library portal: ${school.loginUrl}/library`,
+    `Library: ${school.loginUrl}/library`,
   ]
 
   const text = buildEmailText(textLines.join('\n'), school)

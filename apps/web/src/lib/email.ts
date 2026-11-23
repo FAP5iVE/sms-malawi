@@ -44,6 +44,34 @@ const FROM_ADDRESS = process.env.EMAIL_FROM_ADDRESS?.trim() || RESEND_TEST_SENDE
 const FROM_NAME    = process.env.EMAIL_FROM_NAME?.trim()    || 'SMS Malawi'
 const FROM         = `${FROM_NAME} <${FROM_ADDRESS}>`
 
+/**
+ * The From display name. Order: the school name saved in Settings → School identity (so mail
+ * carries the school's own name), then EMAIL_FROM_NAME, then the product name. The name is
+ * read per send (settingsService caches it), and a failed read never blocks an email.
+ */
+const DEFAULT_SCHOOL_NAME_SETTING = 'Secondary School Management System'
+
+/** Strips characters that would break the From header. */
+export function cleanFromName(name: string): string {
+  return name.replace(/["<>,;\r\n]/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+export async function getSchoolDisplayName(): Promise<string> {
+  try {
+    const { get } = await import('@/server/services/settingsService')
+    const { SETTING_KEYS } = await import('@shared/types/settings')
+    const saved = cleanFromName(String((await get(SETTING_KEYS.SCHOOL_NAME)) ?? ''))
+    if (saved && saved !== DEFAULT_SCHOOL_NAME_SETTING) return saved
+  } catch {
+    // Settings unreachable: fall through to the environment name.
+  }
+  return cleanFromName(FROM_NAME) || 'SMS Malawi'
+}
+
+async function resolveFrom(): Promise<string> {
+  return `${await getSchoolDisplayName()} <${FROM_ADDRESS}>`
+}
+
 /** Reply-to address for mail that users may respond to. Set EMAIL_REPLY_TO to a mailbox someone reads. */
 const REPLY_TO = process.env.EMAIL_REPLY_TO?.trim() || FROM_ADDRESS
 
@@ -440,7 +468,7 @@ export async function sendEmail(
 
   // ── Build Resend payload
 const base = {
-  from:     input.from    ?? FROM,
+  from:     input.from    ?? await resolveFrom(),
   to:       recipients,
   subject:  input.subject,
   reply_to: input.replyTo ?? REPLY_TO,

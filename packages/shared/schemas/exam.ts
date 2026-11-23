@@ -103,13 +103,62 @@ export const TeacherCommentSchema = z.object({
 export const CreateManebRecordSchema = z.object({
   studentId:     z.string().min(1),
   examType:      z.enum(['JCE', 'MSCE']),
-  candidateNo:   z.string().min(1),
-  centerNo:      z.string().min(1),
-  centerName:    z.string().min(1),
+  // Marks entry takes these from the candidate's registration when left out; the server
+  // refuses the record if the student is not on the registered list for this exam and year.
+  candidateNo:   z.string().min(1).optional(),
+  centerNo:      z.string().min(1).optional(),
+  centerName:    z.string().min(1).optional(),
   academicYear:  z.string().min(1),
   subjectGrades: z.record(z.string()),
   overallGrade:  z.string().optional(),
   status:        z.enum(['REGISTERED','SITTING','RESULTS_RECEIVED','CERTIFIED']).default('REGISTERED'),
+})
+
+// ── MANEB candidate registration (the school's own record; candidates register with MANEB online)
+const ExamTypeEnum = z.enum(['JCE', 'MSCE'])
+const trimmedOpt   = z.string().trim().max(120).optional().or(z.literal('').transform(() => undefined))
+
+export const ManebRegistrationFieldsSchema = z.object({
+  registeredVia: z.enum(['SELF', 'SCHOOL']).default('SELF'),
+  candidateNo:   trimmedOpt,
+  centerNo:      trimmedOpt,
+  invoiceNo:     trimmedOpt,
+  feePaid:       z.boolean().default(false),
+  subjects:      z.array(z.string().trim().min(1).max(80)).max(20).default([]),
+  notes:         z.string().trim().max(500).optional().or(z.literal('').transform(() => undefined)),
+})
+
+export const RegisterManebCandidateSchema = ManebRegistrationFieldsSchema.extend({
+  studentId:    z.string().min(1),
+  examType:     ExamTypeEnum,
+  academicYear: z.string().min(1),
+})
+
+export const BulkRegisterManebCandidatesSchema = z.object({
+  studentIds:    z.array(z.string().min(1)).min(1).max(500),
+  examType:      ExamTypeEnum,
+  academicYear:  z.string().min(1),
+  registeredVia: z.enum(['SELF', 'SCHOOL']).default('SELF'),
+})
+
+export const UpdateManebRegistrationSchema = ManebRegistrationFieldsSchema.partial()
+
+export const WithdrawManebRegistrationSchema = z.object({
+  reason: z.string().trim().min(3, 'Give a short reason.').max(300),
+})
+
+export const ImportManebNumbersSchema = z.object({
+  academicYear: z.string().min(1),
+  examType:     ExamTypeEnum,
+  rows: z.array(z.object({
+    registrationNo: z.string().trim().min(1),
+    candidateNo:    z.string().trim().min(1).max(40),
+  })).min(1).max(500),
+})
+
+export const ManebListScopeSchema = z.object({
+  academicYear: z.string().min(1),
+  examType:     ExamTypeEnum,
 })
 
 export const PromotionRulesSchema = z.object({
@@ -123,5 +172,7 @@ export type UpdateExamInput        = z.infer<typeof UpdateExamSchema>
 export type BulkMarkEntryInput     = z.infer<typeof BulkMarkEntrySchema>
 export type FinalizeMarksInput     = z.infer<typeof FinalizeMarksSchema>
 export type CreateManebRecordInput = z.infer<typeof CreateManebRecordSchema>
+export type RegisterManebCandidateInput = z.infer<typeof RegisterManebCandidateSchema>
+export type UpdateManebRegistrationInput = z.infer<typeof UpdateManebRegistrationSchema>
 export type PromotionRulesInput    = z.infer<typeof PromotionRulesSchema>
 export type ExamStatus             = z.infer<typeof ExamStatusSchema>

@@ -94,6 +94,7 @@ import {
   EASE,
 } from '@/lib/motion'
 import { ROLE_LABELS }   from '@shared/types/roles'
+import { StudentIdentityMenuLine } from '@/components/students/StudentIdentity'
 import { GlobalSearch }  from '@/components/shared/GlobalSearch'
 import { ReportProblemModal } from '@/components/shared/ReportProblemModal'
 import { AttentionBadge } from '@/components/shared/AttentionBadge'
@@ -797,6 +798,7 @@ export function PageHeader() {
                       <p className="text-xs text-muted font-sans truncate mt-0.5">
                         {user?.email}
                       </p>
+                      {role === 'student' && <StudentIdentityMenuLine />}
                     </div>
 
                     {/* Actions */}

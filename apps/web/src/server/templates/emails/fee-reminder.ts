@@ -72,7 +72,7 @@ export function renderFeeReminder(
       ],
     })}
     ${para(
-      'To pay this balance, visit the school finance office or sign in to the school portal to see payment options.',
+      'To pay this balance, visit the school finance office or sign in to your account to see payment options.',
       `Please quote invoice reference <strong>${data.invoiceId}</strong> when you pay.`,
     )}
     ${note(`If this balance looks wrong, contact the school finance office ${financeContact}.`)}
@@ -104,7 +104,7 @@ export function renderFeeReminder(
       `Invoice reference:  ${data.invoiceId}`,
       `Amount outstanding: ${formattedAmount}`,
       '',
-      'To pay this balance, visit the school finance office or sign in to the school portal to see payment options.',
+      'To pay this balance, visit the school finance office or sign in to your account to see payment options.',
       `Please quote invoice reference ${data.invoiceId} when you pay.`,
       '',
       `If this balance looks wrong, contact the school finance office ${financeContact}.`,

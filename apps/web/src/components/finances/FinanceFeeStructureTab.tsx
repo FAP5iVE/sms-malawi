@@ -36,6 +36,7 @@ import {
 } from 'lucide-react'
 import { Modal, MODAL_BTN_PRIMARY
 } from '@/components/shared/Modal'
+import { studentClassLabel } from '@/lib/hills/studentClass'
 
 // ─────────────────────────────────────────────────────────────────────────
 // MAIN COMPONENT
@@ -159,7 +160,7 @@ export function FinanceFeeStructureTab({ academicYear, term }: { academicYear: s
                 >
                   <p className="text-sm font-medium text-body truncate">{s.firstName} {s.lastName}</p>
                   <p className="text-xs text-muted truncate">
-                    {s.registrationNo} &middot; {s.class?.name ?? 'Unassigned'}
+                    {s.registrationNo} &middot; {studentClassLabel(s, 'Unassigned')}
                   </p>
                 </button>
               ))
@@ -183,7 +184,7 @@ export function FinanceFeeStructureTab({ academicYear, term }: { academicYear: s
                       {selectedStudent.firstName} {selectedStudent.lastName}
                     </h3>
                     <span className="inline-flex items-center gap-1 text-xs font-medium text-muted">
-                      <GraduationCap className="w-3 h-3" /> {selectedStudent.class?.name ?? 'Unassigned'}
+                      <GraduationCap className="w-3 h-3" /> {studentClassLabel(selectedStudent, 'Unassigned')}
                     </span>
                   </div>
                   <p className="text-xs text-muted mt-1 flex items-center gap-1.5">

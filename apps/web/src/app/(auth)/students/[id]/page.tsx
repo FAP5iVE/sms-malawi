@@ -60,6 +60,7 @@ import { Modal } from '@/components/shared/Modal'
 import { ModuleSurface } from '@/components/shared/ModuleSurface'
 import { FactList } from '@/components/students/FactList'
 import { statusWord } from '@/lib/hills/statusWord'
+import { studentClassWithStream } from '@/lib/hills/studentClass'
 
 const sectionHeading = 'mb-3 font-heading text-sm font-semibold text-body'
 
@@ -228,8 +229,14 @@ function ProfileContent() {
                 <h2 className={sectionHeading}>Class and status</h2>
                 <FactList
                   rows={[
-                    ['Class', student.class?.name],
+                    ['Class', studentClassWithStream(student) ?? 'No class yet'],
                     ['Status', statusWord(student.status)],
+                    ...(student.maneb
+                      ? ([
+                          [`${student.maneb.examType} ${student.maneb.academicYear}`, student.maneb.registered ? 'Registered' : 'Not registered'],
+                          ...(student.maneb.candidateNo ? ([['Examination number', student.maneb.candidateNo]] as const) : []),
+                        ] as const)
+                      : []),
                     // The Guardians section below lists every guardian, primary included,
                     // so repeating the primary here was a duplicate. These three rows
                     // remain only for a viewer who can't see that section (no student.view).

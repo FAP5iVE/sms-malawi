@@ -7,7 +7,7 @@
  *
  * [CONFIG]: Set these in Vercel (Project Settings -> Environment Variables):
  *   NEXT_PUBLIC_APP_URL                 canonical origin, e.g. https://www.yourschool.edu.mw
- *   NEXT_PUBLIC_SITE_NAME               brand shown in tab titles (default "SMS Malawi")
+ *   NEXT_PUBLIC_SITE_NAME               brand shown in tab titles (default "Chikangawa Hills Academy")
  *   NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION  token from Google Search Console
  */
 import type { Metadata } from 'next'
@@ -23,10 +23,10 @@ function resolveSiteUrl(): string {
 }
 
 export const SITE_URL = resolveSiteUrl()
-export const SITE_NAME = process.env.NEXT_PUBLIC_SITE_NAME || 'SMS Malawi'
+export const SITE_NAME = process.env.NEXT_PUBLIC_SITE_NAME || 'Chikangawa Hills Academy'
 export const SITE_TAGLINE = 'Secondary school in Malawi'
 export const SITE_DESCRIPTION =
-  'Admissions, MANEB results, news, events and the student and staff portal for a Malawian secondary school.'
+  'Admissions, MANEB results, news, events and the student and staff sign-in for a Malawian secondary school.'
 export const DEFAULT_OG_IMAGE = '/images/og-default.png'
 export const BRAND_NAVY = '#0B1D33'
 
@@ -53,7 +53,7 @@ export const PUBLIC_PAGES: ReadonlyArray<{
 ]
 
 interface PageMetaInput {
-  /** Short page title. The root template appends " | SMS Malawi". */
+  /** Short page title. The root template appends " | Chikangawa Hills Academy". */
   title: string
   description: string
   /** Absolute path starting with "/", used for the canonical and og:url. */
@@ -63,7 +63,7 @@ interface PageMetaInput {
   /** Keep the page out of search results (login, password reset, 404). */
   noindex?: boolean
   type?: 'website' | 'article'
-  /** True when `title` is already complete and must not get the " | SMS Malawi" suffix. */
+  /** True when `title` is already complete and must not get the " | Chikangawa Hills Academy" suffix. */
   absoluteTitle?: boolean
 }
 

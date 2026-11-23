@@ -40,10 +40,10 @@ export function renderResultRelease(
     ${banner({ tone: 'green', title: 'Results are out', detail: `Term ${data.term}, ${data.academicYear}` })}
     ${para(
       `Dear <strong>${data.studentName}</strong>,`,
-      `Your <strong>Term ${data.term} ${data.academicYear}</strong> results for <strong>${data.className}</strong> have been released and are now on the school portal.`,
+      `Your <strong>Term ${data.term} ${data.academicYear}</strong> results for <strong>${data.className}</strong> have been released and are now in your account.`,
     )}
     ${summaryHtml}
-    ${para('Sign in to the school portal to see your full results, including marks for each subject, comments from your class teacher and your report card.')}
+    ${para('Sign in to your account to see your full results, including marks for each subject, comments from your class teacher and your report card.')}
     ${note('Results are only available once all outstanding fees are paid. If you cannot see your results, contact the school finance office.')}
   `
 
@@ -72,7 +72,7 @@ export function renderResultRelease(
         `  Result:         ${data.summary.passStatus ? 'Pass' : 'Fail'}`,
         '',
       ] : []),
-      'Sign in to the school portal to see your full results and report card.',
+      'Sign in to your account to see your full results and report card.',
       '',
       `Results are only available once all outstanding fees are paid.`,
       '',

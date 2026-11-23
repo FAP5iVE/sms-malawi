@@ -228,7 +228,7 @@ export async function submitClaim(firebaseUid: string, input: StudentClaimInput)
   const student = await resolveStudentFromUid(firebaseUid)
   if (!student) throw httpError('No student record is linked to this account.', 403)
   if (student.status !== 'GRADUATED') {
-    throw httpError('The placement claim portal is only available to graduated students.', 403)
+    throw httpError('Placement claims are only available to graduated students.', 403)
   }
 
   const manebRecord = await findCertifiedMsceRecord(student.id)

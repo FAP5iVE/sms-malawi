@@ -15,7 +15,7 @@ const LINKS = [
   { href: '/news', label: 'News' },
   { href: '/events', label: 'Events' },
   { href: '/academics', label: 'Academics' },
-  { href: '/login', label: 'Portal login' },
+  { href: '/login', label: 'Sign in' },
 ]
 
 /**

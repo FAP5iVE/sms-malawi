@@ -47,7 +47,7 @@ import { logger } from '@/lib/logger'
 import { prisma } from '@/lib/prisma'
 import { clearTokensForUser } from '@/lib/push'
 import { generateTempPassword } from '@/lib/tempPassword'
-import { sendEmail } from '@/lib/email'
+import { sendEmail, getSchoolDisplayName } from '@/lib/email'
 import { sendResetEmail } from '@/server/services/passwordResetService'
 import * as algolia from '@/server/services/algoliaService'
 import type { CreateUserInput, NotificationPrefInput } from '@shared/schemas/admin'
@@ -139,7 +139,7 @@ export async function createUser(data: CreateUserInput, actorUid: string) {
   //    Vercel preview URL.
   const emailResult = await sendEmail({
     to:      data.email,
-    subject: 'Welcome to SMS Malawi — Your Login Details',
+    subject: `Welcome to ${await getSchoolDisplayName()} — Your Login Details`,
     html: `<p>Dear ${data.displayName},</p>
       <p>Your account has been created on the School Management System.</p>
       <p><strong>Email:</strong> ${data.email}<br>

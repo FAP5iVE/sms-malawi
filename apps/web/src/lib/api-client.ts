@@ -381,6 +381,8 @@ export const queryKeys = {
       ['exams', 'term-results', filters] as const,
     annualResults: (filters: Record<string, unknown>) =>
       ['exams', 'annual-results', filters] as const,
+    manebBoard: (filters: Record<string, unknown>) =>
+      ['exams', 'maneb-board', filters] as const,
     manebRecords: (filters?: Record<string, unknown>) =>
       ['exams', 'maneb', filters ?? {}] as const,
     analytics: {
