@@ -48,10 +48,10 @@
  */
 
 import { useEffect, useRef }     from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { motion }                from 'framer-motion'
 import { useMotionEnabled }       from '@/store/motionStore'
 import { AttentionBadge }        from '@/components/shared/AttentionBadge'
-import { reducedMotionTransition, SPRING } from '@/lib/motion'
+import { reducedMotionTransition } from '@/lib/motion'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES

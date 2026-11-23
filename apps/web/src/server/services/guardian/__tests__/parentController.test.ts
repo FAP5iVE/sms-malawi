@@ -14,7 +14,6 @@ const deps = {
   resolvePeriod: async (i: { academicYear?: unknown; term?: unknown }) => ({ academicYear: typeof i.academicYear === 'string' ? i.academicYear : '2025/2026', term: Number(i.term) || 1 }),
   getTermAttendance: async () => ({ daysPresent: 8, daysLate: 1, daysAbsent: 1, totalDays: 10, attendanceRate: 90 }),
 }
-const MODULES: ChildModule[] = ['profile', 'results', 'reportCard', 'fees', 'attendance']
 const call = (uid: unknown, linkId: unknown, module: ChildModule | string, query?: { academicYear?: unknown; term?: unknown }) =>
   getChildModule(db, deps, { uid, linkId, module: module as ChildModule, ...(query ? { query } : {}) })
 const links = () => mem.all('guardianLink')

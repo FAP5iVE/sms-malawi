@@ -21,8 +21,8 @@
  *   placeholder="2025/2026">` — a typo'd format here would break
  *   parseAcademicYear() wherever this scholarship's academicYear is later
  *   read. Replaced with the shared <AcademicYearSelect> (apps/web/src/
- *   components/shared/AcademicYearSelect.tsx). `value={watch(
- *   'academicYear')}` is passed alongside the register spread so the
+ *   components/shared/AcademicYearSelect.tsx). `value={academicYearValue}`
+ *   (read via useWatch) is passed alongside the register spread so the
  *   select's out-of-window safety net can see the incoming `academicYear`
  *   prop's value (from the parent finances/page.tsx tab), in case it ever
  *   falls outside the computed default window.
@@ -31,7 +31,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useScholarships } from '@/hooks/useFinances'
@@ -59,14 +59,15 @@ export function ScholarshipTab({ academicYear }: { academicYear: string }) {
     handleSubmit,
     reset,
     setValue,
-    watch,
+    control,
     formState: { errors },
   } = useForm<CreateScholarshipInput>({
     resolver: zodResolver(CreateScholarshipSchema),
     defaultValues: { academicYear, discountType: 'PERCENTAGE', studentId: '' },
   })
 
-  const studentId = watch('studentId')
+  const studentId = useWatch({ control, name: 'studentId' })
+  const academicYearValue = useWatch({ control, name: 'academicYear' })
   const [studentQuery, setStudentQuery] = useState('')
   const [selectedStudentLabel, setSelectedStudentLabel] = useState('')
   const [showResults, setShowResults] = useState(false)
@@ -295,7 +296,7 @@ export function ScholarshipTab({ academicYear }: { academicYear: string }) {
           <div>
             <label className="block text-sm font-medium mb-1">Academic year</label>
             <AcademicYearSelect
-              value={watch('academicYear')}
+              value={academicYearValue}
               {...register('academicYear')}
               className="input w-full"
             />

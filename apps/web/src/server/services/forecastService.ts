@@ -80,13 +80,6 @@ export interface ForecastReport {
 // HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
 
-function monthLabel(year: number, month: number): string {
-  return new Date(year, month - 1, 1).toLocaleDateString('en-GB', {
-    month: 'short',
-    year:  'numeric',
-  })
-}
-
 function addMonths(date: Date, n: number): Date {
   const d = new Date(date)
   d.setMonth(d.getMonth() + n)

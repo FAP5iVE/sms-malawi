@@ -159,28 +159,6 @@ function parseValue<K extends SettingKey>(
   return result.data as SettingValueMap[K]
 }
 
-function toSettingRow<K extends SettingKey>(
-  key: K,
-  row: {
-    value: unknown
-    description: string | null
-    category: string
-    isPublic: boolean
-    updatedByUid: string | null
-    updatedAt: Date
-  }
-): SettingRow<K> {
-  return {
-    key,
-    value: parseValue(key, row.value),
-    category: row.category as SettingCategory,
-    isPublic: row.isPublic,
-    description: row.description,
-    updatedByUid: row.updatedByUid,
-    updatedAt: row.updatedAt,
-  }
-}
-
 // ─────────────────────────────────────────────────────────
 //  PUBLIC API
 // ─────────────────────────────────────────────────────────

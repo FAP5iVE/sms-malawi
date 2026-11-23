@@ -660,7 +660,6 @@ export function DataTable<T extends object>({
   onQuickFilter,
   rowKey,
   onBulkArchive,
-  onBulkAction,
   filterPanel,
   pagination,
   emptyMessage = 'No records found.',

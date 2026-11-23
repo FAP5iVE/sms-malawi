@@ -22,7 +22,7 @@ import { formatMWK } from '@shared/constants/malawi'
 import { format } from 'date-fns'
 import { Building2, Users, ArrowUpRight, Check, Loader2, AlertCircle } from 'lucide-react'
 import type { ApiExpense, ApiStaffLoan } from '@shared/types/api'
-import { statusTone, statusWord } from '@/lib/hills/statusWord'
+import { statusWord } from '@/lib/hills/statusWord'
 
 export function DebtsLoansTab() {
   const { data, isLoading, isError } = useDebts()

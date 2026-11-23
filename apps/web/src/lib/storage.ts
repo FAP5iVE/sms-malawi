@@ -359,8 +359,6 @@ export async function createDirectUploadTicket(
 
 // ─── SIGNED / PRESIGNED VIEW URL ─────────────────────────────────────────────
 
-const SIGNED_URL_TTL_SECONDS = 3600 // retained as the intended proxy-session lifetime
-
 /**
  * Returns the protected same-origin proxy URL used for viewing a file.
  * All sensitive file access must go through this — never expose raw Appwrite URLs.

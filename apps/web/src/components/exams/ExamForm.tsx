@@ -48,7 +48,7 @@
 'use client'
 import { useState } from 'react'
 import { z } from 'zod'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { CreateExamSchema } from '@shared/schemas/exam'
 import type { CreateExamInput } from '@shared/schemas/exam'
@@ -98,7 +98,7 @@ export function ExamForm({ onClose, academicYear, term, exam }: Props) {
   const { data: caConfig } = useCaConfig()
   const [submitError, setSubmitError] = useState<string | null>(null)
 
-  const { register, handleSubmit, watch, formState: { errors } } = useForm<ExamFormValues, unknown, CreateExamInput>({
+  const { register, handleSubmit, control, formState: { errors } } = useForm<ExamFormValues, unknown, CreateExamInput>({
     resolver: zodResolver(CreateExamSchema),
     defaultValues: exam
       ? {
@@ -112,7 +112,8 @@ export function ExamForm({ onClose, academicYear, term, exam }: Props) {
       : { academicYear, term, maxMark: 100, weightPercent: 100 },
   })
 
-  const selectedClassId = watch('classId')
+  const selectedClassId = useWatch({ control, name: 'classId' })
+  const watchedType = useWatch({ control, name: 'type' })
   const { data: subjectsMeta } = useClassSubjects(selectedClassId || undefined)
 
   // AC-4: teachers pick only from their assigned classes/subjects.
@@ -147,7 +148,7 @@ export function ExamForm({ onClose, academicYear, term, exam }: Props) {
   // CA slot picker: shown for continuous-assessment types only while
   // aggregation is on. The first option is the default type before the
   // select has been touched.
-  const typeValue = watch('type') ?? availableTypes[0]?.value
+  const typeValue = watchedType ?? availableTypes[0]?.value
   const showCaSlot = !!caConfig?.enabled && !!typeValue && isCaExamType(typeValue)
 
   function onSubmit(data: CreateExamInput) {

@@ -28,7 +28,6 @@ import type {
   SettingCategory,
   CategoryGroupedSettings,
   SchoolIdentitySettings,
-  SettingRow,
   DepartmentTitles,
 } from '@shared/types/settings'
 

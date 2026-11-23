@@ -33,7 +33,6 @@ import {
   useRecordStaffPlacement,
   usePlacementCatalogue,
 } from '@/hooks/usePlacements'
-import { PlacementStatusBadge } from '@/components/placements/PlacementStatusBadge'
 import { groupProgramsByFaculty, formatPrerequisites } from '@/lib/placementCatalogueHelpers'
 import type { ApiPlacementEligibleStudent } from '@shared/types/api'
 import { Search, Building2, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react'

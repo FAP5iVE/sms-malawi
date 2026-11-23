@@ -18,7 +18,6 @@ import { makeFakePrisma } from '../../../../../test/fakePrisma'
 
 const NOW = Date.now()
 const ago = (d: number) => new Date(NOW - d * 86_400_000)
-const ahead = (d: number) => new Date(NOW + d * 86_400_000)
 
 const buildingMain = { name: 'Main' }
 const roomLab = { id: 'r-lab', name: 'Lab', building: buildingMain, buildingId: 'b-main', departmentId: 'd-sci', custodianUid: 'u-banda', custodian: { firstName: 'Tiyamike', lastName: 'Banda' } }

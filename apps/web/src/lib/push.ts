@@ -1,7 +1,7 @@
 //apps\web\src\lib\push.ts
 import 'server-only'
 
-import { getFirestore, Timestamp, FieldValue } from 'firebase-admin/firestore'
+import { getFirestore, Timestamp } from 'firebase-admin/firestore'
 import { getMessaging } from 'firebase-admin/messaging'
 import type {
   Message,

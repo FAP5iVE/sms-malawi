@@ -115,7 +115,7 @@ import { getRasterSchoolLogo } from '@/server/services/schoolLogoService'
 import {
   createPdfDoc, drawCard, drawLetterhead, drawStamp, ellipsize, fillColor, fmtDate, gradeInk, put, resolveHeadTeacher,
   resolveStaffSignatory, sectionLabel, setFace, stampPlace, strokeColor, tint, tracked,
-  PDF_COLORS as C, PT, type PdfBranding, type RGB,
+  PDF_COLORS as C, PT, type PdfBranding,
 } from '@/server/services/pdfBranding'
 import type { jsPDF } from 'jspdf'
 import * as attendanceService from '@/server/services/attendanceService'

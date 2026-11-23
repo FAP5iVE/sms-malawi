@@ -92,7 +92,7 @@ import { logger } from '@/lib/logger'
 import { prisma } from '@/lib/prisma'
 import { PAYMENT_METHOD_LABELS } from '@shared/constants/malawi'
 import {
-  PDF_COLORS as C, amountInWords, createPdfDoc, drawCard, drawDocumentFooters, drawDocumentTitle, drawLetterhead,
+  PDF_COLORS as C, amountInWords, createPdfDoc, drawDocumentFooters, drawDocumentTitle, drawLetterhead,
   drawSignatory, drawStamp, ellipsize, fillColor, fitFontSize, fmtDate, getPdfBranding, money, put,
   resolveFinanceSignatory, sectionLabel, setFace, strokeColor, tint, tracked, PT,
   type PdfBranding, type PdfSignatory, type RGB,

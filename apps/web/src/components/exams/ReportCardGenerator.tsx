@@ -46,12 +46,10 @@
  */
 
 import { useState, useCallback }       from 'react'
-import { motion, AnimatePresence }     from 'framer-motion'
-import { getAuth }                      from 'firebase/auth'
+import { motion }                     from 'framer-motion'
 import { toast }                        from 'sonner'
 import {
   FileText,
-  Download,
   ExternalLink,
   Loader2,
   CheckCircle2,

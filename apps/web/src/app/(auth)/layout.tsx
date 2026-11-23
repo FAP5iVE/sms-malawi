@@ -137,7 +137,6 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
   // instead of only being noticed as a visual bug later.
   useEffect(() => {
     if (process.env.NODE_ENV !== 'production' && SIDEBAR_COLLAPSED_WIDTH_PX !== 60) {
-      // eslint-disable-next-line no-console
       console.warn(
         `[AuthLayout] Sidebar wrapper is hardcoded to reserve 60px (md:w-[60px]), ` +
         `but SIDEBAR_COLLAPSED_WIDTH_PX is now ${SIDEBAR_COLLAPSED_WIDTH_PX}. ` +

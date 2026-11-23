@@ -38,7 +38,6 @@ import {
   StudentExitSchema,
 } from '@shared/schemas/student'
 import type { StudentStatus, Sex }     from '@prisma/client'
-import type { UserRole }               from '@shared/types/roles'
 import { sendError } from '@/server/lib/sendError'
 import { parsePageParams } from '@/lib/requestLimits'
 import { z } from 'zod'
@@ -74,25 +73,6 @@ function periodFromQuery(req: Request): { academicYear?: string; term?: number }
 /** What this caller may see of the risk engine's output (see riskService.riskViewerFor). */
 function riskViewerOf(req: Request): riskService.RiskViewer {
   return riskService.riskViewerFor(req.user?.role, req.user?.superUser === true)
-}
-
-/**
- * Resolve the authenticated student's database ID from their Firebase UID.
- * Only used when req.user.role === 'student'.
- * Returns null and sends 403 if no student record is linked.
- */
-async function resolveStudentId(
-  req: Request,
-  res: Response
-): Promise<string | null> {
-  const student = await studentService.resolveStudentFromUid(req.user!.uid)
-  if (!student) {
-    res.status(403).json({
-      error: 'No student record is linked to your account. Please contact administration.',
-    })
-    return null
-  }
-  return student.id
 }
 
 // ─────────────────────────────────────────────────────────

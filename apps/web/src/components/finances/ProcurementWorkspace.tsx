@@ -227,7 +227,7 @@ function RFQForm({ onClose }: { onClose: () => void }) {
   const approved = requisitions.filter(r => r.status === 'APPROVED')
   const [prId, setPrId] = useState(''); const [selectedLines, setSelectedLines] = useState<Set<string>>(new Set()); const [deadline, setDeadline] = useState('')
   const pr = approved.find(r => r.id === prId)
-  function toggleLine(id: string) { setSelectedLines(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next }) }
+  function toggleLine(id: string) { setSelectedLines(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next }) }
   function submit() {
     if (!prId || selectedLines.size === 0) return
     create.mutate({ purchaseRequisitionId: prId, lineIds: Array.from(selectedLines), responseDeadline: deadline || undefined }, { onSuccess: onClose })

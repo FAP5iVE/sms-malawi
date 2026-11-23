@@ -1,7 +1,7 @@
 'use client'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { apiFetch, queryKeys }                    from '@/lib/api-client'
+import { apiFetch }                               from '@/lib/api-client'
 import { useAuthStore }                           from '@/store/authStore'
 import type { PendingActionStatus }               from '@prisma/client'
 

@@ -46,7 +46,7 @@
 
 import { useEffect, useState }   from 'react'
 import { createPortal }          from 'react-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion }              from 'framer-motion'
 import { AlertTriangle }          from 'lucide-react'
 import { useMotionEnabled }       from '@/store/motionStore'
 import {

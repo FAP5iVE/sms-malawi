@@ -17,7 +17,21 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     "fix-migration-checksum.cjs",
   ]),
-  ...storybook.configs["flat/recommended"]
+  ...storybook.configs["flat/recommended"],
+  {
+    // Underscore-prefixed names are the conventional "intentionally unused" marker
+    // (Express error handlers need all 4 params; test stubs mirror real signatures).
+    rules: {
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+        },
+      ],
+    },
+  },
 ]);
 
 export default eslintConfig;

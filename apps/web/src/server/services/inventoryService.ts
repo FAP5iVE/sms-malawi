@@ -18,20 +18,13 @@ import 'server-only'
 import { prisma } from '@/lib/prisma'
 import * as auditService from '@/server/services/auditService'
 import type { UserRole } from '@shared/types/roles'
-import { balanceFromTransactions, INBOUND, OUTBOUND } from './inventoryBalance'
+import { balanceFromTransactions } from './inventoryBalance'
 
 // Note: TRANSFER is modelled as one outbound leg from sourceRoomId and one inbound
 // leg (also transactionType TRANSFER) into destinationRoomId — see transferStock().
 // A transfer's *net* effect on total quantity is zero; it only moves the
 // room-level distribution, so it's excluded from the plain outbound sum below
 // and instead handled by summing per-room in getStockBalance's `byRoom`.
-
-function signedQuantity(transactionType: string, quantity: number, isDestinationLeg: boolean): number {
-  if (transactionType === 'TRANSFER') return isDestinationLeg ? quantity : -quantity
-  if (INBOUND.includes(transactionType)) return quantity
-  if (OUTBOUND.includes(transactionType)) return -quantity
-  return 0
-}
 
 // ─── ITEMS ────────────────────────────────────────────────
 

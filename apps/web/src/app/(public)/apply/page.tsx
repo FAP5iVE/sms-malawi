@@ -139,7 +139,7 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useForm, Controller } from 'react-hook-form'
+import { useForm, useWatch, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ApplicationSchema } from '@shared/schemas/student'
 import type { ApplicationInput } from '@shared/schemas/student'
@@ -285,7 +285,6 @@ export default function ApplyPage() {
   const {
     register,
     handleSubmit,
-    watch,
     trigger,
     setError,
     control,
@@ -303,9 +302,10 @@ export default function ApplyPage() {
     },
   })
 
-  const nationality = watch('nationality')
+  const nationality = useWatch({ control, name: 'nationality' })
   const isMalawian = nationality === 'Malawi'
-  const isVulnerable = watch('isVulnerable')
+  const isVulnerable = useWatch({ control, name: 'isVulnerable' })
+  const academicYearValue = useWatch({ control, name: 'academicYear' })
 
   const STEP_FIELDS: (keyof ApplicationInput)[][] = [
     ['firstName', 'surname', 'dateOfBirth', 'sex', 'nationality', 'nrbNumber'],
@@ -696,7 +696,7 @@ export default function ApplyPage() {
                   </Field>
                   <Field label="Academic Year" required error={errors.academicYear?.message}>
                     <AcademicYearSelect
-                      value={watch('academicYear')}
+                      value={academicYearValue}
                       {...register('academicYear')}
                       optionsConfig={{ back: 0, forward: 1 }}
                       className={`${inputCls} ${errors.academicYear ? inputError : inputBase}`}

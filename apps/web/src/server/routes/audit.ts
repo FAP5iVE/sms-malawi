@@ -281,7 +281,7 @@ auditRouter.get(
 
 // Local reference for the single-entry route's severity lookup
 const ACTION_SEVERITY_LOOKUP: Record<string, string> = {}
-import('@/server/services/auditService').then((m) => {
+import('@/server/services/auditService').then(() => {
   // Populate from the service's internal map via getAuditStats export
   // This is a minor indirection — acceptable for a rarely-called route
 }).catch(() => {})

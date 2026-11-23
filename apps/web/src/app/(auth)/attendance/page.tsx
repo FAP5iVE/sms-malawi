@@ -31,8 +31,8 @@ import { useEffectiveViewingPeriod } from '@/hooks/useViewingPeriod'
 import { useOwnAttendance } from '@/hooks/useAnalytics'
 import { useStudentAttendance } from '@/hooks/useAttendance'
 import {
-  startOfMonth, endOfMonth, eachDayOfInterval, format, isSameMonth,
-  isSameDay, addMonths, subMonths, isToday, isFuture,
+  startOfMonth, endOfMonth, eachDayOfInterval, format,
+  addMonths, subMonths, isToday, isFuture,
 } from 'date-fns'
 import { ChevronLeft, ChevronRight, CheckCircle2, XCircle, Clock3, CalendarDays } from 'lucide-react'
 

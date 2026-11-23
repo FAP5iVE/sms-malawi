@@ -40,7 +40,7 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import type { Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { CreateClassSchema } from '@shared/schemas/student'
@@ -356,7 +356,7 @@ function ClassFormDialog({ onClose, classToEdit, classes, activeYear, onCreated 
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     formState: { errors },
   } = useForm<CreateClassInput>({
@@ -373,7 +373,8 @@ function ClassFormDialog({ onClose, classToEdit, classes, activeYear, onCreated 
       : { academicYear: activeYear ?? undefined },
   })
 
-  const formYear = watch('academicYear')
+  const formYear = useWatch({ control, name: 'academicYear' })
+  const formTeacherId = useWatch({ control, name: 'teacherId' })
   // A staff member may head at most one ACTIVE class per academicYear —
   // classService.assertNotAlreadyClassTeacher's client-side mirror. Only
   // classes in the same target year count, and the class being edited
@@ -455,7 +456,7 @@ function ClassFormDialog({ onClose, classToEdit, classes, activeYear, onCreated 
       {canAssignTeacher ? (
         <Field label="Class teacher" error={errors.teacherId?.message}>
           <TeacherSelect
-            value={watch('teacherId')}
+            value={formTeacherId}
             onChange={(uid) => setValue('teacherId', uid, { shouldValidate: true, shouldDirty: true })}
             disabledUids={disabledTeacherUids}
             disabledReason={(t) => `${t.firstName} ${t.lastName} is already the class teacher of another class for ${formYear}.`}
@@ -469,7 +470,7 @@ function ClassFormDialog({ onClose, classToEdit, classes, activeYear, onCreated 
       )}
       <Field label="Academic year" error={errors.academicYear?.message} required>
         <AcademicYearSelect
-          value={watch('academicYear')}
+          value={formYear}
           {...register('academicYear')}
           className={inputCls}
         />
