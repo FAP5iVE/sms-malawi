@@ -1284,6 +1284,6 @@ export async function saveComment(
   await auditService.log({
     action: 'exams.reportComment.save', entityType: 'TeacherComment', entityId: termResult.id,
     actorUid: actor.uid, actorRole: actor.role,
-    metadata: { studentId: input.studentId, term: input.term, academicYear: input.academicYear, kind: input.kind, cleared: !text },
+    metadata: { context: { studentId: input.studentId, term: input.term, academicYear: input.academicYear, kind: input.kind, cleared: !text } },
   })
 }

@@ -1353,7 +1353,7 @@ export async function addPerformanceNote(data: PerformanceNoteInput, actorUid: s
   await auditService.log({
     action: 'hr.performance.add', entityType: 'PerformanceNote', entityId: note.id,
     actorUid, actorRole,
-    metadata: { staffId: data.staffId, academicYear: data.academicYear, term: data.term, rating: data.rating },
+    metadata: { context: { staffId: data.staffId, academicYear: data.academicYear, term: data.term, rating: data.rating } },
   })
   return note
 }

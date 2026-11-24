@@ -473,7 +473,7 @@ export async function completeOwnRegistration(
     entityId:   student.id,
     actorUid:   firebaseUid,
     actorRole:  'student',
-    metadata:   { fields: Object.keys(data).filter((k) => k !== 'registrationCompletedAt' && k !== 'nrbNumber') },
+    metadata:   { context: { fields: Object.keys(data).filter((k) => k !== 'registrationCompletedAt' && k !== 'nrbNumber') } },
   })
 }
 
