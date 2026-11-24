@@ -56,6 +56,8 @@ export interface ManebBoardRow {
   registrationNo: string
   name:           string
   className:      string
+  /** ACTIVE, AWAITING_MANEB_RESULTS or GRADUATED: candidates who have finished stay on the list. */
+  studentStatus:  string
   sex:            string | null
   /** Registered | Not registered (a withdrawn candidate counts as not registered). */
   registered:     boolean
@@ -90,8 +92,16 @@ export async function getBoard(academicYear: string, examType: ManebExamTypeKey)
   const form = FORM_FOR_EXAM[examType]
   const [students, registrations, lock, centreNumber, deadline] = await Promise.all([
     prisma.student.findMany({
-      where: { status: 'ACTIVE', class: { form, academicYear, status: { not: 'ARCHIVED' } } },
-      select: { id: true, registrationNo: true, firstName: true, lastName: true, sex: true, class: { select: { name: true } } },
+      // Students who have finished the year and wait for results stay on the list, and so does anyone
+      // already registered who has since graduated, so their status never disappears.
+      where: {
+        class: { form, academicYear, status: { not: 'ARCHIVED' } },
+        OR: [
+          { status: { in: ['ACTIVE', 'AWAITING_MANEB_RESULTS'] } },
+          { status: 'GRADUATED', manebRegistrations: { some: { academicYear, examType } } },
+        ],
+      },
+      select: { id: true, registrationNo: true, firstName: true, lastName: true, sex: true, status: true, class: { select: { name: true } } },
       orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
     }),
     prisma.manebRegistration.findMany({ where: { academicYear, examType } }),
@@ -114,6 +124,7 @@ export async function getBoard(academicYear: string, examType: ManebExamTypeKey)
       registrationNo: s.registrationNo,
       name: `${s.firstName} ${s.lastName}`,
       className: s.class?.name ?? '',
+      studentStatus: s.status,
       sex: s.sex ?? null,
       registered: Boolean(reg) && !withdrawn,
       registrationId: reg?.id ?? null,
@@ -157,8 +168,9 @@ async function assertEligible(studentId: string, examType: ManebExamTypeKey, aca
   })
   if (!student) throw httpError(404, 'That student does not exist.')
   const name = `${student.firstName} ${student.lastName}`
-  if (student.status !== 'ACTIVE') {
-    throw httpError(400, `${name} is not an active student, so cannot be registered.`)
+  // A student who has finished and awaits results can still be put on the list (a late registration).
+  if (student.status !== 'ACTIVE' && student.status !== 'AWAITING_MANEB_RESULTS') {
+    throw httpError(400, `${name} is not a current student, so cannot be registered.`)
   }
   const needForm = FORM_FOR_EXAM[examType]
   if (!student.class || student.class.form !== needForm || student.class.academicYear !== academicYear) {
@@ -356,6 +368,42 @@ export async function lockList(academicYear: string, examType: ManebExamTypeKey,
   return lock
 }
 
+/**
+ * The owner's rule: the list closes by itself once every registered candidate has their marks entered.
+ * Called after each result is saved. Returns true only when this call closed the list. Never throws:
+ * a result that was saved must not fail because the list could not be closed.
+ */
+export async function closeListWhenComplete(academicYear: string, examType: ManebExamTypeKey, actor: RegistrationActor): Promise<boolean> {
+  try {
+    if (await isListLocked(academicYear, examType)) return false
+    const registrations = await prisma.manebRegistration.findMany({
+      where: { academicYear, examType, status: 'REGISTERED' },
+      select: { studentId: true },
+    })
+    if (registrations.length === 0) return false
+    const withMarks = await prisma.manebRecord.findMany({
+      where: { academicYear, examType, studentId: { in: registrations.map((r) => r.studentId) } },
+      select: { studentId: true },
+    })
+    const done = new Set(withMarks.map((r) => r.studentId))
+    if (!registrations.every((r) => done.has(r.studentId))) return false
+    const lock = await prisma.manebListLock.upsert({
+      where: { academicYear_examType: { academicYear, examType } },
+      create: { academicYear, examType, lockedById: actor.uid },
+      update: {},
+    })
+    await auditService.log({
+      action: 'maneb.list_closed', entityType: 'ManebListLock', entityId: lock.id,
+      actorUid: actor.uid, actorRole: actor.role,
+      metadata: { context: { academicYear, examType, registered: registrations.length, automatic: true } },
+    })
+    return true
+  } catch (err) {
+    logger.warn({ event: 'maneb.auto_close_failed', academicYear, examType, err }, 'Could not close the MANEB list automatically')
+    return false
+  }
+}
+
 export async function unlockList(academicYear: string, examType: ManebExamTypeKey, actor: RegistrationActor) {
   const lock = await prisma.manebListLock.findUnique({ where: { academicYear_examType: { academicYear, examType } } })
   if (!lock) throw httpError(404, 'The list is not closed.')
@@ -377,15 +425,42 @@ export async function findLiveRegistration(studentId: string, academicYear: stri
 }
 
 /** What a student's own screens show: registered or not, for the exam their form sits. Null for other forms. */
+export interface ManebStudentSummary {
+  examType: ManebExamTypeKey
+  academicYear: string
+  registered: boolean
+  candidateNo: string | null
+  /** True once the school has entered this candidate's MANEB results. */
+  resultsEntered: boolean
+}
+
+/**
+ * The student's MANEB registration for the exam their form sits (JCE at Form 2, MSCE at Form 4), so the
+ * status shows for current students and for those who have finished: a student awaiting results or
+ * graduated may have no class for the year, so their latest registration is used.
+ */
 export async function registrationSummaryForStudent(
   studentId: string,
   cls: { form: number; academicYear: string } | null | undefined,
-): Promise<{ examType: ManebExamTypeKey; academicYear: string; registered: boolean; candidateNo: string | null } | null> {
-  if (!cls) return null
-  const examType: ManebExamTypeKey | null = cls.form === 2 ? 'JCE' : cls.form === 4 ? 'MSCE' : null
-  if (!examType) return null
-  const reg = await findLiveRegistration(studentId, cls.academicYear, examType)
-  return { examType, academicYear: cls.academicYear, registered: Boolean(reg), candidateNo: reg?.candidateNo ?? null }
+  status?: string,
+): Promise<ManebStudentSummary | null> {
+  const examType: ManebExamTypeKey | null = cls?.form === 2 ? 'JCE' : cls?.form === 4 ? 'MSCE' : null
+  const finished = status === 'AWAITING_MANEB_RESULTS' || status === 'GRADUATED'
+  let target: { examType: ManebExamTypeKey; academicYear: string } | null = cls && examType ? { examType, academicYear: cls.academicYear } : null
+  if (!target && finished) {
+    const latest = await prisma.manebRegistration.findFirst({
+      where: { studentId },
+      orderBy: { createdAt: 'desc' },
+      select: { examType: true, academicYear: true },
+    })
+    if (latest) target = { examType: latest.examType as ManebExamTypeKey, academicYear: latest.academicYear }
+  }
+  if (!target) return null
+  const reg = await findLiveRegistration(studentId, target.academicYear, target.examType)
+  const resultsEntered = reg
+    ? (await prisma.manebRecord.count({ where: { studentId, academicYear: target.academicYear, examType: target.examType } })) > 0
+    : false
+  return { ...target, registered: Boolean(reg), candidateNo: reg?.candidateNo ?? null, resultsEntered }
 }
 
 /** Registered candidate counts for a year (public statistics). */

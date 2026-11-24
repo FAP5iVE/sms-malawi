@@ -1,9 +1,55 @@
 # Roadmap after phase 11 (written in phase 12, 2026-11-22)
 
-This is the plan for the batch of requests the owner sent on 2026-11-22. **Nothing in it is built yet.**
+This is the plan for the batch of requests the owner sent on 2026-11-22. **Every phase below is now built (phases 13a to 17, 2026-11-22 and 2026-11-23).**
+The sections below keep the original plan; the status block that follows says what was actually done, the owner's answers, and what the owner still has to do.
 Each phase below is one branch, one review pack, one gate run. Read `HANDOFF.md` (method, gotchas)
 and `RULEBOOK.md` (looks rules) first. This file says WHAT is left and IN WHAT ORDER; HANDOFF item 35
 says what was found while planning.
+
+## Status (updated 2026-11-23)
+
+Branch stack, each on top of the one before, base `origin/main` (b755a43). The owner pushes; nothing was pushed from the sandbox.
+
+| Phase | Branch | State |
+| --- | --- | --- |
+| 12 | `hills/phase-12-plan` | Plan only. |
+| 13a | `hills/phase-13a-fixes` | Done. "Class not recorded" fixed through `src/lib/hills/studentClass.ts`; school name in emails (`getSchoolDisplayName()` in `src/lib/email.ts`); "portal" reworded (terms and privacy pages left for the owner); stray files deleted. |
+| 13b | `hills/phase-13b-identity` | Done. Student sees status, class and stream (dashboard line, muted account-menu line, profile); "My class" on the Classes page. Stream is shown only when the form has more than one class. |
+| 14 | `hills/phase-14-admit-stream` | Done. `AdmitStudentDialog`; `createFromApplication` rejects a class that is not active or not the form applied for. |
+| 15a | `hills/phase-15a-maneb-registration` | Done. Prisma `ManebRegistration`, `ManebListLock`, `ManebRecord.registrationId`; `manebRegistrationService`; marks entry needs a live registration. |
+| 15b | `hills/phase-15b-maneb-screens` | Done. Registered candidates panel, marks entry from the registered list, student profile and identity line, registered counts on the public stats. |
+| 16 | `hills/phase-16-css-clean` | Done. `globals.css` 3,464 to 3,322 lines; compiled output differs only by the removed rules; new dead-CSS ratchet in `hills:ratchets` (`tools/hills/lib/deadCss.mts`). Checked by compiling before and after with Tailwind and running `hills:contrast`, not by screenshots, as the owner asked. |
+| 17 | `hills/phase-17-signatures` | Done. `UserSignature` table, `signatureService`, `/signatures` routes, "My signature" under Settings, Profile; drawn on report cards, receipts, payslips and transcripts. |
+
+### The owner's answers (2026-11-22, Sunday)
+- JCE is written at Form 2 term 3 and MSCE at Form 4 term 3. The system already stresses this (`getManebExamType`).
+- "Results released" for the list lock means: after all the candidates' marks are entered. The list now closes by itself when the last registered candidate's marks are saved (`closeListWhenComplete`, phase 18). The head can also close it sooner with "Close list" (any time somebody is registered); reopening is admin or head only.
+- Candidates register themselves online with MANEB. The school keeps its own record of that registration (in-house record keeping) and may help; each registration says whether it was `SELF` or `SCHOOL`.
+- Marks entry: the registration holds the exam number and centre; marks entry takes them from it. Placement and graduate selection read `ManebRecord.candidateNo`, which is now filled from the registration.
+- "Start and keep it easy to load, don't take screenshots, just build and test": phases 13a to 17 were first checked with unit tests, lint, type checks and the gate. On 2026-11-23 the owner asked for screenshots, so phase 18 verified them on screen (see below).
+- Logic and look changes were approved for this batch; every logic change is declared in `tools/hills/logic-allowlist.json`.
+
+### Phase 18: fixes and screen checks (2026-11-23, branch `hills/phase-18-fixes`)
+From the owner's report: (1) MANEB registration looked empty; (2) students who graduated or await MANEB results had no status; (3) the admit window vanished at once; (4) verify everything with screenshots.
+- Admit dialog: a click in the actions cell also opened the row's detail page. The cell now stops the click.
+- MANEB screen: a failed load shows an alert with the reason and "Try again" (retries once on its own). The most likely cause for an empty screen is the migration not yet run on the real database.
+- Status: the board lists students awaiting results and graduates who are registered, with their status and "Results entered" or "Results awaited". Awaiting students can be registered. A student's own screens and profile show their latest registration with results state, even with no class.
+- Auto-close: the list closes by itself when every registered candidate has marks.
+- Found by the screenshots: with reduced motion on, the sidebar grew to its longest label (about 360 px); fixed. On the public home page the MANEB results heading and the MSCE, JCE and University Placement card headings were dark on navy; now white.
+- Screenshots taken (light and dark, 1280 and 390 wide): student dashboard (active, awaiting, graduated, JCE not registered), Classes ("You are in", "My class"), student profile, MANEB board and marks, admit dialog, Settings My signature (empty and saved), public home stats.
+
+### Decisions taken while building (so nobody re-asks)
+- Student identity placement: a line under the greeting, a muted line in the account menu, the full facts on the profile; nothing in the page header.
+- Signature storage: bytes in the database (`user_signatures`, 200 KB at most) instead of a file store; this keeps it private and needs no storage setup. No API returns the image. If the owner prefers the file store, only `signatureService` changes.
+- Signature signers: class teacher and head on report cards; the finance officer who recorded the payment on receipts and who ran payroll on payslips; the head on transcripts. The head's signature prints on every report card while the school switch is on. Report card data sent to a browser never carries a signature (`getReportCardData(..., { forPdf: true })` adds it for the PDF only).
+
+### What the owner still has to do
+1. Run `prisma migrate deploy` for `20261122180000_maneb_candidate_registration` and `20261123100000_user_signatures`, then `prisma generate`. The sandbox cannot generate the client, so the type check shows Prisma noise that is not real.
+2. Set `NEXT_PUBLIC_SITE_NAME` to the school name. If Vercel has `EMAIL_FROM_NAME`, it only applies when no school name is saved.
+3. The email From ADDRESS needs a verified domain (Resend's test sender only delivers to the Resend account owner).
+4. `terms` and `privacy` pages still say "portal": legal wording, the owner's call.
+5. The phase 11 audit branch (`hills/phase-11-audit`) is not merged into this stack.
+6. The inventory baseline drifted before this batch; `hills:inventory:check` and the `securityDocs` endpoint inventory test need the baseline regenerated on the real repo.
 
 ## Ground rules that change from "looks only"
 
@@ -199,7 +245,7 @@ Permissions: new `maneb.register` (head, deputy, exam officer) and `maneb.viewRe
 - MANEB marks entry: picker lists registered students only, with an empty state "No registered candidates yet. Register candidates first." and a link.
 - Public stats and placement read the new source (13b-style small reads).
 
-### Open questions for the owner (needed before 15a)
+### Open questions for the owner (needed before 15a) (answered, see Status)
 1. Is JCE still sat in your school at Form 2? MANEB's national JCE was changed in recent years; the schema keeps JCE, but confirm the exam you register Form 2 for.
 2. Who issues the examination number and when (at registration or after)? Does your MANEB form include a photo, fee reference, access arrangements?
 3. What marks "results released" for the lock: first results entered, or a switch the head presses?
@@ -236,7 +282,7 @@ No behaviour changes; the allowlist needs no entry since CSS is not logic.
   signature images are never sent to the browser by an API (only embedded in the PDF); removing a signature does not change PDFs already issued; a head can
   switch "use signatures on documents" off in settings. Draft or preview PDFs carry no signature.
 - Legal: this is a scanned-signature image, not a legal e-signature. Say so in the settings help text.
-**Open questions:** who counts as signer for each document, and whether the head's signature should print on every report card.
+**Open questions:** who counts as signer for each document, and whether the head's signature should print on every report card. (Answered by decision in Status: see "Decisions taken while building"; the owner can change them.)
 
 ---
 

@@ -1142,6 +1142,8 @@ export async function createManebRecord(data: CreateManebRecordInput, actor: Exa
     metadata: { after: { studentId: record.studentId, examType: record.examType, candidateNo: record.candidateNo } },
   })
   logger.info({ event: 'maneb.record.create', recordId: record.id, actorUid: actor.uid })
+  // When this was the last registered candidate without marks, the list closes by itself.
+  await manebRegistration.closeListWhenComplete(data.academicYear, data.examType, actor)
   return record
 }
 

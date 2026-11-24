@@ -234,6 +234,9 @@ function ProfileContent() {
                       ? ([
                           [`${student.maneb.examType} ${student.maneb.academicYear}`, student.maneb.registered ? 'Registered' : 'Not registered'],
                           ...(student.maneb.candidateNo ? ([['Examination number', student.maneb.candidateNo]] as const) : []),
+                          ...(student.maneb.registered
+                            ? ([['Results', student.maneb.resultsEntered ? 'Entered' : student.status === 'AWAITING_MANEB_RESULTS' ? 'Awaited' : 'Not yet']] as const)
+                            : []),
                         ] as const)
                       : []),
                     // The Guardians section below lists every guardian, primary included,

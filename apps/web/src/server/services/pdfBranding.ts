@@ -39,6 +39,7 @@ import { prisma } from '@/lib/prisma'
 import { PDF_FONT_DATA } from '@/lib/pdfFontData'
 import { getRasterSchoolLogo } from '@/server/services/schoolLogoService'
 import { getIdentitySettings } from '@/server/services/settingsService'
+import { loadSignatureImage } from '@/server/services/signatureService'
 import { CURRENCY_CODE, formatMWK } from '@shared/constants/malawi'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -616,13 +617,51 @@ export function drawStamp(doc: jsPDF, o: StampOptions): void {
 // SIGNATORY BLOCK + resolvers (name & title come from the staff directory)
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** A scanned signature ready to embed. Only ever built by signatureService, only ever drawn into a PDF. */
+export interface PdfSignatureImage {
+  dataUri: string
+  format: 'PNG' | 'JPEG'
+  width: number
+  height: number
+}
+
 export interface PdfSignatory {
+  /** Firebase uid of the staff member, so the PDF step can look up their signature. Never sent to a browser. */
+  uid?: string | undefined
   /** "First Last"; null when the directory has nobody for the role. */
   name: string | null
   /** The staff member's own job title, e.g. "Bursar". */
   title: string
   /** Their department, e.g. "Finance & Accounts". */
   unit: string | null
+  /** Their scanned signature, set only by withSignature() when a document is built as a PDF. */
+  signature?: PdfSignatureImage | null | undefined
+}
+
+/**
+ * Adds the person's scanned signature, when they have one and the school allows it. Call it only where a
+ * PDF is built, never on data that goes to a browser. `document` is the name recorded in the audit entry.
+ */
+export async function withSignature(sig: PdfSignatory | null, document: string): Promise<PdfSignatory | null> {
+  if (!sig?.uid) return sig
+  const signature = await loadSignatureImage(sig.uid, document)
+  return signature ? { ...sig, signature } : sig
+}
+
+/** Draws a scanned signature sitting on the line, as large as fits the box, keeping its shape. */
+export function drawSignatureImage(
+  doc: jsPDF,
+  img: PdfSignatureImage,
+  box: { x: number; y: number; w: number; h: number },
+): void {
+  const scale = Math.min(box.w / img.width, box.h / img.height)
+  const w = img.width * scale
+  const h = img.height * scale
+  try {
+    doc.addImage(img.dataUri, img.format, box.x, box.y + box.h - h, w, h, undefined, 'FAST')
+  } catch {
+    /* an unreadable image leaves the line blank rather than failing the document */
+  }
 }
 
 /**
@@ -635,6 +674,10 @@ export function drawSignatory(
   o: { x: number; y: number; w: number; sig: PdfSignatory; org: string; space?: number },
 ): number {
   const lineY = o.y + (o.space ?? 11)
+  if (o.sig.signature) {
+    const room = Math.max(6, (o.space ?? 11) - 1.5)
+    drawSignatureImage(doc, o.sig.signature, { x: o.x + 1, y: lineY - 0.6 - room, w: Math.min(o.w * 0.7, 52), h: room })
+  }
   strokeColor(doc, PDF_COLORS.muted)
   doc.setLineWidth(0.25)
   doc.line(o.x, lineY, o.x + o.w, lineY)
@@ -669,6 +712,7 @@ interface StaffRow {
 
 function toSignatory(s: StaffRow): PdfSignatory {
   return {
+    uid: s.uid,
     name: `${s.firstName} ${s.lastName}`.trim(),
     title: s.jobTitle,
     unit: s.departmentRef?.name ?? (s.department || null),

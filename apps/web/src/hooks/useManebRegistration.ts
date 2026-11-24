@@ -16,6 +16,7 @@ export interface ManebBoardRow {
   registrationNo: string
   name: string
   className: string
+  studentStatus: string
   sex: string | null
   registered: boolean
   registrationId: string | null
@@ -58,6 +59,9 @@ export function useManebBoard(academicYear: string, examType: ManebExamTypeKey, 
     queryKey: queryKeys.exams.manebBoard({ academicYear, examType }),
     queryFn: () => apiFetch<ManebBoard>(`/exams/maneb/registrations?academicYear=${encodeURIComponent(academicYear)}&examType=${examType}`),
     enabled: enabled && Boolean(academicYear),
+    // One quick retry, then show the problem; the default of three retries left a blank panel for several seconds.
+    retry: 1,
+    retryDelay: 800,
   })
 }
 

@@ -118,8 +118,62 @@ describe('board and summary', () => {
     expect(await svc.registrationSummaryForStudent('s1', { form: 3, academicYear: '2026/2027' })).toBeNull()
     m.prisma.manebRegistration.findFirst.mockResolvedValue({ candidateNo: 'M1/001' })
     expect(await svc.registrationSummaryForStudent('s1', { form: 4, academicYear: '2026/2027' }))
-      .toEqual({ examType: 'MSCE', academicYear: '2026/2027', registered: true, candidateNo: 'M1/001' })
+      .toEqual({ examType: 'MSCE', academicYear: '2026/2027', registered: true, candidateNo: 'M1/001', resultsEntered: false })
     m.prisma.manebRegistration.findFirst.mockResolvedValue(null)
     expect((await svc.registrationSummaryForStudent('s1', { form: 2, academicYear: '2026/2027' }))?.registered).toBe(false)
+  })
+
+  it('shows a student awaiting results or graduated their latest registration, with results state', async () => {
+    m.prisma.manebRegistration.findFirst
+      .mockResolvedValueOnce({ examType: 'MSCE', academicYear: '2025/2026' }) // latest registration
+      .mockResolvedValueOnce({ candidateNo: 'M1/009' })                        // live registration
+    m.prisma.manebRecord.count.mockResolvedValue(1)
+    expect(await svc.registrationSummaryForStudent('s1', null, 'AWAITING_MANEB_RESULTS'))
+      .toEqual({ examType: 'MSCE', academicYear: '2025/2026', registered: true, candidateNo: 'M1/009', resultsEntered: true })
+  })
+
+  it('gives an active student with no class nothing to show', async () => {
+    expect(await svc.registrationSummaryForStudent('s1', null, 'ACTIVE')).toBeNull()
+  })
+
+  it('lists awaiting-results students on the board with their status, and asks for registered graduates too', async () => {
+    m.prisma.student.findMany.mockResolvedValue([
+      { id: 's9', registrationNo: 'SMS-2025-0009', firstName: 'D', lastName: 'Nine', sex: 'MALE', status: 'AWAITING_MANEB_RESULTS', class: { name: 'Form 4 A' } },
+    ])
+    m.prisma.manebRegistration.findMany.mockResolvedValue([{ id: 'g9', studentId: 's9', status: 'REGISTERED', subjects: [], registeredVia: 'SELF' }])
+    m.prisma.manebRecord.findMany.mockResolvedValue([])
+    const board = await svc.getBoard('2026/2027', 'MSCE')
+    expect(board.rows[0]).toMatchObject({ studentStatus: 'AWAITING_MANEB_RESULTS', registered: true })
+    const where = m.prisma.student.findMany.mock.calls[0]![0].where
+    expect(JSON.stringify(where)).toContain('AWAITING_MANEB_RESULTS')
+    expect(JSON.stringify(where)).toContain('GRADUATED')
+  })
+})
+
+describe('closeListWhenComplete', () => {
+  const regs = [{ studentId: 'a' }, { studentId: 'b' }]
+
+  it('closes the list when every registered candidate has marks', async () => {
+    m.prisma.manebRegistration.findMany.mockResolvedValue(regs)
+    m.prisma.manebRecord.findMany.mockResolvedValue([{ studentId: 'a' }, { studentId: 'b' }])
+    m.prisma.manebListLock.upsert.mockResolvedValue({ id: 'lock1' })
+    expect(await svc.closeListWhenComplete('2026/2027', 'MSCE', actor)).toBe(true)
+    expect(m.prisma.manebListLock.upsert).toHaveBeenCalledTimes(1)
+  })
+
+  it('leaves the list open while someone has no marks yet', async () => {
+    m.prisma.manebRegistration.findMany.mockResolvedValue(regs)
+    m.prisma.manebRecord.findMany.mockResolvedValue([{ studentId: 'a' }])
+    expect(await svc.closeListWhenComplete('2026/2027', 'MSCE', actor)).toBe(false)
+    expect(m.prisma.manebListLock.upsert).not.toHaveBeenCalled()
+  })
+
+  it('does nothing when nobody is registered or the list is already closed, and never throws', async () => {
+    m.prisma.manebRegistration.findMany.mockResolvedValue([])
+    expect(await svc.closeListWhenComplete('2026/2027', 'MSCE', actor)).toBe(false)
+    m.prisma.manebListLock.findUnique.mockResolvedValue({ id: 'lock1' })
+    expect(await svc.closeListWhenComplete('2026/2027', 'MSCE', actor)).toBe(false)
+    m.prisma.manebListLock.findUnique.mockRejectedValue(new Error('db down'))
+    expect(await svc.closeListWhenComplete('2026/2027', 'MSCE', actor)).toBe(false)
   })
 })

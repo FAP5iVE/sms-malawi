@@ -108,6 +108,7 @@ import { assetsRouter }        from '@/server/routes/assets'
 import { galleryRouter }       from '@/server/routes/gallery'
 import { authRouter }          from '@/server/routes/auth'
 import { settingsRouter }      from '@/server/routes/settings'
+import { signaturesRouter }    from '@/server/routes/signatures'
 import { auditRouter }         from '@/server/routes/audit'
 import { sessionsRouter }      from '@/server/routes/sessions'
 import { pendingActionsRouter }from '@/server/routes/pendingActions'
@@ -255,6 +256,7 @@ export function createApiApp() {
   // (/settings/notifications' req.user!.uid). Required for R15's
   // SETTING_KEYS-driven header term badge and dashboard year/term reads.
   app.use('/settings',        verifyAuth, settingsRouter)
+  app.use('/signatures',      verifyAuth, signaturesRouter)
   app.use('/audit',           auditRouter)
   app.use('/sessions',        sessionsRouter)
   app.use('/pending-actions', pendingActionsRouter)

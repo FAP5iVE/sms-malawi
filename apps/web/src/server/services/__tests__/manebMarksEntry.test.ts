@@ -13,6 +13,7 @@ const m = vi.hoisted(() => ({
   },
   live: vi.fn(),
   setting: vi.fn(),
+  autoClose: vi.fn(async () => false),
 }))
 
 vi.mock('server-only', () => ({}))
@@ -24,7 +25,7 @@ vi.mock('@/server/services/settingsService', () => ({ get: m.setting, getMany: v
 vi.mock('@/server/services/announcementService', () => ({}))
 vi.mock('@/server/services/classService', () => ({}))
 vi.mock('@/server/services/auditService', () => ({ log: vi.fn() }))
-vi.mock('@/server/services/manebRegistrationService', () => ({ findLiveRegistration: m.live }))
+vi.mock('@/server/services/manebRegistrationService', () => ({ findLiveRegistration: m.live, closeListWhenComplete: m.autoClose }))
 vi.mock('@/server/services/gradeService', () => ({
   calcGrade: vi.fn(), computeInternalTermOutcome: vi.fn(),
   computeManebAggregate: vi.fn(async () => ({ classification: 'MSCE Awarded — Option A', points: 20 })),
@@ -63,6 +64,16 @@ describe('createManebRecord', () => {
   it('rejects a typed number that disagrees with the registered one', async () => {
     m.live.mockResolvedValue({ id: 'g1', candidateNo: 'M1042/009', centerNo: null })
     await expect(createManebRecord({ ...base, candidateNo: 'M9999/001' } as never, actor)).rejects.toMatchObject({ status: 400 })
+  })
+
+  it('asks the list to close after a result is saved, and does not after a refusal', async () => {
+    m.live.mockResolvedValue({ id: 'g1', candidateNo: 'M1042/009', centerNo: 'C77' })
+    await createManebRecord(base as never, actor)
+    expect(m.autoClose).toHaveBeenCalledWith(base.academicYear, base.examType, actor)
+    m.autoClose.mockClear()
+    m.live.mockResolvedValue(null)
+    await expect(createManebRecord(base as never, actor)).rejects.toMatchObject({ status: 400 })
+    expect(m.autoClose).not.toHaveBeenCalled()
   })
 
   it('stores a number typed at marks entry on the registration for the first time', async () => {

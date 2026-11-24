@@ -951,7 +951,7 @@ export default function LandingPage() {
           <div className="relative z-10 hills-container">
             <Reveal className="flex items-end justify-between gap-8 mb-11 flex-wrap">
               <div className="max-w-xl">
-                <h2 className="font-heading font-extrabold text-3xl sm:text-4xl tracking-tight mb-3">
+                <h2 className="font-heading font-extrabold text-3xl sm:text-4xl tracking-tight text-white mb-3">
                   MANEB examination results
                 </h2>
                 <p className="text-white/80 text-base leading-relaxed">
@@ -1024,7 +1024,7 @@ export default function LandingPage() {
                     ].map((card) => (
                       <div key={card.key} className="p-6">
                         <div className="flex items-center justify-between mb-4.5">
-                          <h3 className="font-heading font-bold text-sm">{card.key}</h3>
+                          <h3 className="font-heading font-bold text-sm text-white">{card.key}</h3>
                           {card.stat && (
                             <span className="font-mono text-[11.5px] text-brand-teal-light">
                               {card.year}

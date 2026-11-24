@@ -72,7 +72,7 @@ import * as settingsService   from '@/server/services/settingsService'
 import { getRasterSchoolLogo } from '@/server/services/schoolLogoService'
 import {
   PDF_COLORS as C, PT, createPdfDoc, drawCard, drawDocumentFooters, drawDocumentTitle, drawLetterhead, drawSignatory, drawStamp,
-  ellipsize, fillColor, fmtDate, gradeInk, put, resolveHeadTeacher, setFace, stampPlace, strokeColor, tint, tracked,
+  ellipsize, fillColor, fmtDate, gradeInk, put, resolveHeadTeacher, setFace, stampPlace, strokeColor, tint, tracked, withSignature,
   type GradeTier, type PdfBranding, type PdfSignatory,
 } from '@/server/services/pdfBranding'
 import { getGradePoints, listGradingScales } from '@/server/services/gradeService'
@@ -450,6 +450,8 @@ export async function generateAndUploadTranscript(
   studentId: string,
 ): Promise<{ fileId: string; url: string }> {
   const data   = await getTranscriptData(studentId)
-  const buffer = generateTranscriptPDF(data)
+  // The head's scanned signature is added here, where the PDF is built, so getTranscriptData() stays free of it.
+  const signed = { ...data, headTeacher: await withSignature(data.headTeacher, 'transcript') }
+  const buffer = generateTranscriptPDF(signed)
   return uploadTranscript(buffer, studentId)
 }

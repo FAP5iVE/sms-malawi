@@ -14,6 +14,7 @@ import { useAuthStore }        from '@/store/authStore'
 import { usePermissions }     from '@/hooks/usePermissions'
 import { useOwnStaffDetails, useUpdateOwnStaffDetails } from '@/hooks/useHR'
 import { UpdateOwnDetailsSchema } from '@shared/schemas/hr'
+import { SignatureSettings } from '@/components/settings/SignatureSettings'
 
 /**
  * Own phone and next of kin (hr.editOwnLimitedFields). Renders nothing for an
@@ -175,6 +176,8 @@ export function ProfileSettings() {
       </form>
 
       <OwnDetailsCard />
+
+      <SignatureSettings />
 
       <div className="pt-4 border-t border-base">
         <h3 className="font-heading font-semibold text-sm text-body mb-1">Change password</h3>

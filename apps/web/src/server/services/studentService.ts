@@ -235,7 +235,7 @@ export interface ApiStudentSummary {
   /** How many live classes this form has in the class's year (detail view only); 2 or more means show the stream. */
   classStreamCount?: number | null
   /** MANEB registration for the exam this student's form sits (JCE at Form 2, MSCE at Form 4); null for other forms. */
-  maneb?: { examType: 'JCE' | 'MSCE'; academicYear: string; registered: boolean; candidateNo: string | null } | null
+  maneb?: { examType: 'JCE' | 'MSCE'; academicYear: string; registered: boolean; candidateNo: string | null; resultsEntered: boolean } | null
   photoKey:        string | null
   hasFirebaseUid:  boolean
   riskLevel:       RiskLevel
@@ -709,7 +709,7 @@ export async function getById(
     ? await prisma.class.count({ where: { form: row.class.form, academicYear: row.class.academicYear, status: { not: 'ARCHIVED' } } })
     : null
 
-  const maneb = await manebRegistration.registrationSummaryForStudent(row.id, row.class)
+  const maneb = await manebRegistration.registrationSummaryForStudent(row.id, row.class, row.status)
 
   const assessment = (await riskService.assessStudents([row.id], await resolveRiskPeriod(period))).get(row.id)
   const risk       = riskFields(assessment, row.status, viewer)

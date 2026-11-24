@@ -94,7 +94,7 @@ import { PAYMENT_METHOD_LABELS } from '@shared/constants/malawi'
 import {
   PDF_COLORS as C, amountInWords, createPdfDoc, drawDocumentFooters, drawDocumentTitle, drawLetterhead,
   drawSignatory, drawStamp, ellipsize, fillColor, fitFontSize, fmtDate, getPdfBranding, money, put,
-  resolveFinanceSignatory, sectionLabel, setFace, strokeColor, tint, tracked, PT,
+  resolveFinanceSignatory, sectionLabel, setFace, strokeColor, tint, tracked, withSignature, PT,
   type PdfBranding, type PdfSignatory, type RGB,
 } from '@/server/services/pdfBranding'
 
@@ -273,7 +273,7 @@ async function loadReceiptContext(
     const paidToDate = [...applied.values()].reduce((a, v) => a + v, 0)
     const netDue = Number(pay.invoice.totalAmount)
 
-    const officer = await resolveFinanceSignatory(pay.recordedByUid, { anyRole: true })
+    const officer = await withSignature(await resolveFinanceSignatory(pay.recordedByUid, { anyRole: true }), 'receipt')
 
     return {
       ...base,
@@ -588,7 +588,7 @@ export async function generatePayslipPdf(
       where: { uid: data.staffUid },
       select: { employeeNo: true, jobTitle: true, department: true, departmentRef: { select: { name: true } } },
     }),
-    resolveFinanceSignatory(data.runByUid),
+    resolveFinanceSignatory(data.runByUid).then((s) => withSignature(s, 'payslip')),
   ])
   const earnings = data.earnings ?? (await reconstructEarnings(data.staffUid, month, year, data.grossSalary, data.leaveDeduction ?? 0))
   const pdfBuffer = buildPayslipPdf(b, {

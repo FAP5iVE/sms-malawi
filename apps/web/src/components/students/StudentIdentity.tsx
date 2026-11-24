@@ -14,15 +14,27 @@ import { useStudentMe } from '@/hooks/useStudents'
 import { statusTone, statusWord } from '@/lib/hills/statusWord'
 import { studentClassWithStream } from '@/lib/hills/studentClass'
 
+/** "MSCE registered", "MSCE registered, results awaited", "MSCE results in", "MSCE not registered". */
+export function manebWords(
+  maneb: { examType: string; registered: boolean; resultsEntered?: boolean } | null | undefined,
+  status: string | null | undefined,
+): string | null {
+  if (!maneb) return null
+  if (!maneb.registered) return `${maneb.examType} not registered`
+  if (maneb.resultsEntered) return `${maneb.examType} registered, results in`
+  if (status === 'AWAITING_MANEB_RESULTS') return `${maneb.examType} registered, results awaited`
+  return `${maneb.examType} registered`
+}
+
 function useIdentity() {
   const { data: me, isLoading } = useStudentMe()
-  if (!me) return { isLoading, status: null as string | null, tone: 'neutral' as const, classText: null as string | null, maneb: null }
+  if (!me) return { isLoading, status: null as string | null, tone: 'neutral' as const, classText: null as string | null, maneb: null as string | null }
   return {
     isLoading,
     status: statusWord(me.status),
     tone: statusTone(me.status),
     classText: studentClassWithStream(me),
-    maneb: me.maneb ?? null,
+    maneb: manebWords(me.maneb, me.status),
   }
 }
 
@@ -35,11 +47,7 @@ export function StudentIdentityLine() {
     <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm" data-testid="student-identity">
       <span className="font-heading font-semibold text-brand-navy">{classText ?? 'No class yet'}</span>
       <StatusText tone={tone}>{status}</StatusText>
-      {maneb && (
-        <span className="text-muted">
-          {maneb.examType} {maneb.registered ? 'registered' : 'not registered'}
-        </span>
-      )}
+      {maneb && <span className="text-muted">{maneb}</span>}
     </p>
   )
 }

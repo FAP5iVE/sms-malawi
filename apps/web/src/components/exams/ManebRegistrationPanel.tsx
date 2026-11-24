@@ -25,6 +25,7 @@ import {
   type ManebBoardRow, type ManebExamTypeKey,
 } from '@/hooks/useManebRegistration'
 import { chipClass } from '@/lib/hills/chip'
+import { statusWord } from '@/lib/hills/statusWord'
 import { formatDate } from '@/lib/reportFormat'
 
 type Filter = 'all' | 'registered' | 'not'
@@ -39,7 +40,7 @@ export function ManebRegistrationPanel({ academicYear, examType }: Props) {
   const canManage = can('exam.manageManebRecords')
   const canReopen = role === 'admin' || role === 'high_rank'
 
-  const { data: board, isLoading, error } = useManebBoard(academicYear, examType)
+  const { data: board, isLoading, error, refetch, isFetching } = useManebBoard(academicYear, examType)
   const bulk = useBulkRegisterManeb()
   const lock = useManebListLock()
 
@@ -104,7 +105,19 @@ export function ManebRegistrationPanel({ academicYear, examType }: Props) {
 
   if (isLoading) return <div className="skeleton h-40 rounded-xl" aria-hidden />
   if (error || !board) {
-    return <p role="alert" className="text-sm text-tone-coral">Could not load the candidate list. Try again in a moment.</p>
+    return (
+      <div role="alert" className="app-tint rounded-xl px-4 py-4 space-y-3">
+        <p className="text-sm font-heading font-semibold text-body">The candidate list could not be loaded.</p>
+        <p className="text-sm text-muted">
+          {error instanceof Error && error.message ? `${error.message}. ` : ''}
+          If this keeps happening after you try again, the latest database update for MANEB registration may not have been applied yet.
+          Ask the person who looks after the system to apply it.
+        </p>
+        <button type="button" className={MODAL_BTN_SECONDARY} disabled={isFetching} onClick={() => { void refetch() }}>
+          {isFetching ? 'Trying…' : 'Try again'}
+        </button>
+      </div>
+    )
   }
 
   const t = board.totals
@@ -143,7 +156,7 @@ export function ManebRegistrationPanel({ academicYear, examType }: Props) {
         </div>
       ) : canManage && t.registered > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-3 app-tint rounded-xl px-4 py-3">
-          <p className="text-sm text-body">When all marks are entered, close the list so nobody new can be added.</p>
+          <p className="text-sm text-body">The list closes by itself when every registered candidate has their marks entered. You can also close it sooner so nobody new is added.</p>
           <button type="button" className={MODAL_BTN_SECONDARY} onClick={() => setConfirmClose(true)}>
             <Lock className="w-4 h-4 mr-1.5" aria-hidden /> Close list
           </button>
@@ -206,13 +219,19 @@ export function ManebRegistrationPanel({ academicYear, examType }: Props) {
                     <span className="font-medium text-body">{r.name}</span>
                     <span className="block text-xs text-muted font-mono">{r.registrationNo}</span>
                   </td>
-                  <td className="px-4 py-3 text-muted">{r.className}</td>
+                  <td className="px-4 py-3 text-muted">
+                    {r.className}
+                    {r.studentStatus !== 'ACTIVE' && <span className="block text-xs">{statusWord(r.studentStatus)}</span>}
+                  </td>
                   <td className="px-4 py-3">
                     {r.registered
                       ? <StatusText tone="success">Registered</StatusText>
                       : r.withdrawn
                         ? <StatusText tone="neutral">Withdrawn</StatusText>
                         : <StatusText tone="warning">Not registered</StatusText>}
+                    {r.registered && (r.hasResult
+                      ? <span className="block text-xs text-muted mt-0.5">Results entered</span>
+                      : r.studentStatus === 'AWAITING_MANEB_RESULTS' && <span className="block text-xs text-muted mt-0.5">Results awaited</span>)}
                   </td>
                   <td className="px-4 py-3 font-mono text-xs">{r.registered ? (r.candidateNo ?? <span className="text-muted font-sans">Not issued yet</span>) : ''}</td>
                   <td className="px-4 py-3 text-xs">{r.registered ? (r.feePaid ? 'Paid' : 'Not paid') : ''}</td>

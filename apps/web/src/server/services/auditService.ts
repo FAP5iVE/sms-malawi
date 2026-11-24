@@ -269,6 +269,11 @@ export const ACTION_SEVERITY: Readonly<Record<string, Severity>> = {
   'exam.maneb_record_created':    SEVERITY.HIGH,
   'exam.maneb_record_updated':    SEVERITY.HIGH,
 
+  // ── Signatures
+  'signature.uploaded':           SEVERITY.HIGH,
+  'signature.removed':            SEVERITY.HIGH,
+  'signature.printed':            SEVERITY.LOW,
+
   // ── Settings
   'settings.updated':             SEVERITY.HIGH,
   'settings.batch_updated':       SEVERITY.CRITICAL,

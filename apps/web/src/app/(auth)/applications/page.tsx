@@ -151,7 +151,9 @@ function ApplicationsContent() {
       label:    'Actions',
       priority: 'important',
       render: (app) => (
-        <div className="flex items-center justify-end gap-2">
+        // The whole row opens the application (onRowClick). Without this stop, pressing Admit, Approve or Deny
+        // also navigated to the application page, which closed the admit dialog a moment after it opened.
+        <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
           {activeStatus === 'PENDING' && (canApprove || canDeny) && (
             <>
               {canApprove && (

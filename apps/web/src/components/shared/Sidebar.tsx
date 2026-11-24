@@ -61,6 +61,8 @@ import { useNavigation }         from '@/hooks/useNavigation'
 import { usePublicSchoolInfo }   from '@/hooks/usePublic'
 import {
   SIDEBAR_WIDTH_VARIANTS,
+  SIDEBAR_EXPANDED_WIDTH_PX,
+  SIDEBAR_COLLAPSED_WIDTH_PX,
   SIDEBAR_LABEL_VARIANTS,
   SIDEBAR_BADGE_VARIANTS,
   OVERLAY_VARIANTS,
@@ -149,7 +151,14 @@ export function Sidebar() {
   if (!role) return null
 
   // ── Framer Motion variant sets ─────────────────────────────────────────────
-  const widthVariants   = reducedMotionVariants(motionEnabled, SIDEBAR_WIDTH_VARIANTS)
+  // With reduced motion the width must still be set (instantly); the generic reduced-motion
+  // variants carry no width, which left the panel as wide as its longest label.
+  const widthVariants   = motionEnabled
+    ? SIDEBAR_WIDTH_VARIANTS
+    : {
+        expanded:  { width: SIDEBAR_EXPANDED_WIDTH_PX,  transition: { duration: 0 } },
+        collapsed: { width: SIDEBAR_COLLAPSED_WIDTH_PX, transition: { duration: 0 } },
+      }
   const labelVariants   = reducedMotionVariants(motionEnabled, SIDEBAR_LABEL_VARIANTS)
   const badgeVariants   = reducedMotionVariants(motionEnabled, SIDEBAR_BADGE_VARIANTS)
   const widthTransition = reducedMotionTransition(motionEnabled, SPRING.snappy)

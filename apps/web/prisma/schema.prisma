@@ -1395,6 +1395,23 @@ model ManebListLock {
   @@map("maneb_list_locks")
 }
 
+// A scanned signature image a staff member uploads once on their own profile. The bytes stay in the
+// database and are only read by the server when it draws a document; no API ever returns them.
+// uid is the Firebase uid, the same value StaffProfile.uid holds. Not a legal e-signature.
+model UserSignature {
+  id        String   @id @default(cuid())
+  uid       String   @unique
+  mime      String
+  data      Bytes
+  sizeBytes Int
+  width     Int
+  height    Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("user_signatures")
+}
+
 // ─── HR MODULE ────────────────────────────────────────────
 model GalleryPhoto {
   id           String   @id @default(cuid())

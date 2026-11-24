@@ -115,10 +115,11 @@ import * as auditService     from '@/server/services/auditService'
 import { getRasterSchoolLogo } from '@/server/services/schoolLogoService'
 import {
   createPdfDoc, drawCard, drawLetterhead, drawStamp, ellipsize, fillColor, fmtDate, gradeInk, put, resolveHeadTeacher,
-  resolveStaffSignatory, sectionLabel, setFace, stampPlace, strokeColor, tint, tracked,
-  PDF_COLORS as C, PT, type PdfBranding,
+  resolveStaffSignatory, sectionLabel, setFace, stampPlace, strokeColor, tint, tracked, drawSignatureImage,
+  PDF_COLORS as C, PT, type PdfBranding, type PdfSignatureImage,
 } from '@/server/services/pdfBranding'
 import type { jsPDF } from 'jspdf'
+import { loadSignatureImage } from '@/server/services/signatureService'
 import * as attendanceService from '@/server/services/attendanceService'
 import {
   FORM_NUMBERS, MSCE_AGGREGATE_BEST, MSCE_AGGREGATE_SUBJECT_COUNT, MSCE_AGGREGATE_WORST,
@@ -233,11 +234,28 @@ async function buildManebResult(
   }
 }
 
+/**
+ * The report card as the PDF writer needs it: the same data, plus the scanned signatures of the class
+ * teacher and the head when they have one. Only getReportCardData(…, { forPdf: true }) returns this.
+ */
+export type PdfReportCardData = ReportCardData & {
+  classTeacherSignature?: PdfSignatureImage
+  headTeacherSignature?: PdfSignatureImage
+}
+
+/** The scanned signatures to add for a PDF; an empty object for any other caller, so none reach a browser. */
+async function pdfSignatures(forPdf: boolean | undefined, classTeacherUid?: string, headUid?: string): Promise<Pick<PdfReportCardData, 'classTeacherSignature' | 'headTeacherSignature'>> {
+  if (!forPdf) return {}
+  const [ct, head] = await Promise.all([loadSignatureImage(classTeacherUid, 'report-card'), loadSignatureImage(headUid, 'report-card')])
+  return { ...(ct ? { classTeacherSignature: ct } : {}), ...(head ? { headTeacherSignature: head } : {}) }
+}
+
 export async function getReportCardData(
   studentId:    string,
   term:         1 | 2 | 3,
   academicYear: string,
-): Promise<ReportCardData> {
+  opts:         { forPdf?: boolean } = {},
+): Promise<PdfReportCardData> {
   const [student, identity, logo, headTeacherDirectory] = await Promise.all([
     prisma.student.findUniqueOrThrow({
       where:   { id: studentId },
@@ -307,6 +325,7 @@ export async function getReportCardData(
     ])
     return {
       ...baseFields,
+      ...(await pdfSignatures(opts.forPdf, classTeacherSig?.uid, headTeacherDirectory?.uid)),
       subjects:        [],
       classPosition:   0,
       classTotal:      0,
@@ -431,6 +450,7 @@ export async function getReportCardData(
 
   return {
     ...baseFields,
+    ...(await pdfSignatures(opts.forPdf, classTeacherSig?.uid, headSig?.uid)),
     subjects,
     gradingTrack,
     gradingScale,
@@ -589,7 +609,7 @@ function wrapLines(doc: jsPDF, text: string, widths: number[]): string[] {
  *  line moves left of it and the comment's last lines narrow to stay clear of it. */
 function drawSignCard(
   doc: jsPDF,
-  o: { x: number; y: number; w: number; h: number; title: string; comment: string | null; name: string; role: string | undefined; stampSide: boolean },
+  o: { x: number; y: number; w: number; h: number; title: string; comment: string | null; name: string; role: string | undefined; stampSide: boolean; signature?: PdfSignatureImage | undefined },
 ): void {
   // no outer box: the title, comment, name and signature sit on the page, divided by one hairline
   sectionLabel(doc, o.title, o.x, o.y + 5.2)
@@ -614,12 +634,13 @@ function drawSignCard(
     setFace(doc, 'body', 6.6, C.muted)
     put(doc, ellipsize(doc, o.role, o.w * 0.42), o.x, baseY - 2.4)
   }
+  if (o.signature) drawSignatureImage(doc, o.signature, { x: sigRight - 29, y: baseY - 3.4 - 8.6, w: 28, h: 8 })
   strokeColor(doc, C.muted)
   doc.setLineWidth(0.2)
   doc.line(sigRight - 30, baseY - 3.4, sigRight, baseY - 3.4)
 }
 
-export function generateReportCardPDF(data: ReportCardData): Buffer {
+export function generateReportCardPDF(data: PdfReportCardData): Buffer {
   const doc = createPdfDoc()
   const branding: PdfBranding = {
     schoolName:   data.schoolName,
@@ -897,11 +918,11 @@ export function generateReportCardPDF(data: ReportCardData): Buffer {
   const stampR = 10.5
   drawSignCard(doc, {
     x: M_X, y, w: cardW, h: SIGN_H, title: maneb ? 'Class teacher' : "Class teacher's comment",
-    comment: maneb ? null : data.classTeacherComment, name: data.classTeacher, role: data.classTeacherTitle, stampSide: false,
+    comment: maneb ? null : data.classTeacherComment, name: data.classTeacher, role: data.classTeacherTitle, stampSide: false, signature: data.classTeacherSignature,
   })
   drawSignCard(doc, {
     x: M_X + cardW + 4, y, w: cardW, h: SIGN_H, title: maneb ? 'Head teacher' : "Head teacher's comment",
-    comment: maneb ? null : data.headTeacherComment, name: data.headTeacher, role: data.headTeacherTitle, stampSide: true,
+    comment: maneb ? null : data.headTeacherComment, name: data.headTeacher, role: data.headTeacherTitle, stampSide: true, signature: data.headTeacherSignature,
   })
   drawStamp(doc, {
     cx: M_X + CW - stampR - 1, cy: y + SIGN_H - stampR - 1.2, r: stampR,
@@ -1025,7 +1046,7 @@ async function generateForStudent(
   term: 1 | 2 | 3,
   academicYear: string,
 ): Promise<BatchGenerationResult> {
-  const data   = await getReportCardData(student.id, term, academicYear)
+  const data   = await getReportCardData(student.id, term, academicYear, { forPdf: true })
   const buffer = generateReportCardPDF(data)
   const fileId = await uploadReportCard(buffer, academicYear, term, student.id)
   const url    = await getReportCardUrl(fileId)

@@ -79,7 +79,7 @@ export interface ApiStudent {
   classForm?: number | null
   classStream?: string | null
   classStreamCount?: number | null
-  maneb?: { examType: 'JCE' | 'MSCE'; academicYear: string; registered: boolean; candidateNo: string | null } | null
+  maneb?: { examType: 'JCE' | 'MSCE'; academicYear: string; registered: boolean; candidateNo: string | null; resultsEntered: boolean } | null
   status: string
   classId?: string
   class?: { id: string; name: string; form: number }
