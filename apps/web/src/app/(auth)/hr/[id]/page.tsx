@@ -440,7 +440,6 @@ function StaffProfileContent() {
               <div className="space-y-2.5">
                 {[
                   ['Category', staff.employmentCategory ? EMPLOYMENT_CATEGORY_LABELS[staff.employmentCategory] : '-'],
-                  ['Payroll No.', staff.payrollNo ?? '-'],
                   ['Highest Qualification', staff.highestQualification ? QUALIFICATION_LEVEL_LABELS[staff.highestQualification] : '-'],
                   ...(staff.qualificationProgram ? [['Programme Studied', staff.qualificationProgram]] : []),
                   ...(staff.exitReason

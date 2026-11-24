@@ -167,7 +167,7 @@ export function StaffForm({ onClose, staffId }: Props) {
             nextOfKinPhone: data.nextOfKinPhone, nextOfKinRelation: data.nextOfKinRelation,
             isTeaching: data.isTeaching, tcmRegistrationNo: data.tcmRegistrationNo,
             tcmLicenceNo: data.tcmLicenceNo, tcmLicenceExpiry: data.tcmLicenceExpiry,
-            employmentCategory: data.employmentCategory, payrollNo: data.payrollNo,
+            employmentCategory: data.employmentCategory,
             highestQualification: data.highestQualification,
             qualificationProgram: qualificationNeedsProgram(data.highestQualification) ? data.qualificationProgram : '',
             // Licence, training route and subjects are for teaching staff only;
@@ -467,8 +467,8 @@ export function StaffForm({ onClose, staffId }: Props) {
             </div>
           )}
 
-          {/* Qualifications and teaching. HR-only data. Employment category,
-              payroll number and highest qualification apply to every member of
+          {/* Qualifications and teaching. HR-only data. Employment category
+              and highest qualification apply to every member of
               staff (a diploma or degree also asks which programme was studied).
               The TCM licence, training route and subjects qualified to teach
               apply to teaching staff only, so they appear once "Teaching staff"
@@ -485,10 +485,6 @@ export function StaffForm({ onClose, staffId }: Props) {
                     <option value="">Not recorded</option>
                     {EMPLOYMENT_CATEGORIES.map((c) => <option key={c} value={c}>{EMPLOYMENT_CATEGORY_LABELS[c]}</option>)}
                   </select>
-                </div>
-                <div>
-                  <label className={lbl} htmlFor="sf-payrollNo">Payroll number (IPPE)</label>
-                  <input id="sf-payrollNo" {...register('payrollNo')} className={ic} autoComplete="off" />
                 </div>
                 <div>
                   <label className={lbl} htmlFor="sf-qual">Highest qualification</label>
@@ -906,7 +902,6 @@ function mapStaffToFormValues(s: ApiStaffDetail): Partial<StaffFormValues> {
     tcmLicenceNo:         s.tcmLicenceNo ?? '',
     tcmLicenceExpiry:     s.tcmLicenceExpiry?.slice(0, 10) ?? '',
     employmentCategory:   s.employmentCategory ?? '',
-    payrollNo:            s.payrollNo ?? '',
     highestQualification: s.highestQualification ?? '',
     qualificationProgram: s.qualificationProgram ?? '',
     trainingRoute:        s.trainingRoute ?? '',

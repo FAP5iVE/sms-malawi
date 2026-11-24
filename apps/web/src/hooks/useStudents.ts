@@ -147,7 +147,7 @@ export function useCreateStudent() {
   return useMutation({
     meta: { successMessage: 'Student created', failureTitle: 'Could not create student' },
     mutationFn: (data: CreateStudentInput) =>
-      apiFetch<ApiStudent>('/students', { method: 'POST', body: JSON.stringify(data) }),
+      apiFetch<ApiStudent & { tempPassword?: string }>('/students', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.students.all() }),
   })
 }

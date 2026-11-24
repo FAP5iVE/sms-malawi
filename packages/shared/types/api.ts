@@ -1126,7 +1126,6 @@ export interface ApiStaffDetail extends ApiStaffProfile {
   tcmLicenceNo?: string | null
   tcmLicenceExpiry?: string | null
   employmentCategory?: 'SCHOOL_EMPLOYED' | 'COMMUNITY_PAID' | 'VOLUNTEER' | 'OTHER' | null
-  payrollNo?: string | null
   highestQualification?: 'MSCE' | 'DIPLOMA' | 'DEGREE' | 'POSTGRADUATE' | 'OTHER' | null
   qualificationProgram?: string | null
   trainingRoute?: 'UNIVERSITY_EDUCATION_DEGREE' | 'EDUCATION_DIPLOMA' | 'TEACHER_CERTIFICATE' | 'ODL' | 'UNTRAINED' | 'OTHER' | null

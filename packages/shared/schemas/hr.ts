@@ -64,7 +64,6 @@ export const StaffComplianceShape = {
   tcmLicenceNo:         z.string().trim().max(40).optional(),
   tcmLicenceExpiry:     isoDate.optional().or(z.literal('')),
   employmentCategory:   z.enum(EMPLOYMENT_CATEGORIES).optional().or(z.literal('')),
-  payrollNo:            z.string().trim().max(40).optional(),
   highestQualification: z.enum(QUALIFICATION_LEVELS).optional().or(z.literal('')),
   // The programme studied, e.g. "Bachelor of Education". Asked for diploma and degree only.
   qualificationProgram: z.string().trim().max(120).optional(),

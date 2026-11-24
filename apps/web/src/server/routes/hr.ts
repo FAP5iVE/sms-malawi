@@ -202,8 +202,8 @@ hrRouter.delete('/:id/responsibilities/:responsibilityId', verifyAuth, requirePe
 const STAFF_IDENTITY_KEYS = [
   'dateOfBirth', 'nationality', 'homeDistrict', 'nrbNumber', 'tpin',
   'nextOfKinName', 'nextOfKinPhone', 'nextOfKinRelation',
-  // Compliance / payroll-adjacent fields are HR-only as well.
-  'payrollNo', 'tcmRegistrationNo', 'tcmLicenceNo', 'tcmLicenceExpiry',
+  // Compliance fields are HR-only as well.
+  'tcmRegistrationNo', 'tcmLicenceNo', 'tcmLicenceExpiry',
   'highestQualification', 'qualificationProgram', 'trainingRoute',
 ] as const
 

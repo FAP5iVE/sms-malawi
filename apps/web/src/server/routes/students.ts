@@ -364,7 +364,8 @@ studentsRouter.post(
       return
     }
 
-    // Admin / high_rank — direct create
+    // Admin / high_rank — direct create. The body carries a one-time tempPassword
+    // (when a login was created) so the form can show it, as the staff form does.
     const student = await studentService.create(
       {
         firstName, lastName, otherNames, dateOfBirth, sex, nationality,

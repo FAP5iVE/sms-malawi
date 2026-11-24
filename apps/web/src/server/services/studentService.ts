@@ -903,7 +903,7 @@ export async function create(
   input:       CreateStudentInput,
   actorUid:    string,
   actorRole:   UserRole
-): Promise<ApiStudentDetail> {
+): Promise<ApiStudentDetail & { tempPassword?: string }> {
   // NRB numbers are unique but optional: reject a clash BEFORE provisioning a
   // login so a duplicate can't leave an orphaned Firebase account behind.
   const nrbNumber = blankToNull(input.nrbNumber)
@@ -1071,7 +1071,9 @@ logger.info(
     // and returned by getById(), but never passed into this call.
     district:       created.district ?? null,
   })
-  return created
+  // Returned to the admin who created the student (same as hrService.createStaff)
+  // so the create form can show it if the welcome email does not arrive.
+  return tempPassword ? { ...created, tempPassword } : created
 }
 
 // ─────────────────────────────────────────────────────────

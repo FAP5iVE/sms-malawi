@@ -180,7 +180,7 @@ async function buildRetirement(dateOfBirth: Date | null): Promise<RetirementInfo
 const STAFF_SENSITIVE_FIELDS = [
   'dateOfBirth', 'nationality', 'homeDistrict', 'nrbNumber', 'tpin',
   'nextOfKinName', 'nextOfKinPhone', 'nextOfKinRelation', 'retirement',
-  'payrollNo', 'tcmRegistrationNo', 'tcmLicenceNo', 'tcmLicenceExpiry',
+  'tcmRegistrationNo', 'tcmLicenceNo', 'tcmLicenceExpiry',
   'highestQualification', 'qualificationProgram', 'trainingRoute',
   'exitReason', 'exitDate',
 ] as const
@@ -358,7 +358,6 @@ export async function updateStaff(
   if (input.tcmLicenceNo         !== undefined) { updateData.tcmLicenceNo         = blankToNull(input.tcmLicenceNo);           complianceChanged.push('tcmLicenceNo') }
   if (input.tcmLicenceExpiry     !== undefined) { updateData.tcmLicenceExpiry     = input.tcmLicenceExpiry ? new Date(input.tcmLicenceExpiry) : null; complianceChanged.push('tcmLicenceExpiry') }
   if (input.employmentCategory   !== undefined) { updateData.employmentCategory   = enumOrNull(input.employmentCategory);     complianceChanged.push('employmentCategory') }
-  if (input.payrollNo            !== undefined) { updateData.payrollNo            = blankToNull(input.payrollNo);              complianceChanged.push('payrollNo') }
   if (input.highestQualification !== undefined) { updateData.highestQualification = enumOrNull(input.highestQualification);   complianceChanged.push('highestQualification') }
   if (input.qualificationProgram !== undefined) { updateData.qualificationProgram = blankToNull(input.qualificationProgram);   complianceChanged.push('qualificationProgram') }
   if (input.trainingRoute        !== undefined) { updateData.trainingRoute        = enumOrNull(input.trainingRoute);           complianceChanged.push('trainingRoute') }
@@ -596,7 +595,6 @@ export async function createStaff(data: CreateStaffInput, actorUid: string) {
         tcmLicenceNo:         data.isTeaching ? blankToNull(data.tcmLicenceNo) : null,
         tcmLicenceExpiry:     data.isTeaching && data.tcmLicenceExpiry ? new Date(data.tcmLicenceExpiry) : null,
         employmentCategory:   data.employmentCategory ? data.employmentCategory : null,
-        payrollNo:            blankToNull(data.payrollNo),
         highestQualification: data.highestQualification ? data.highestQualification : null,
         qualificationProgram: qualificationNeedsProgram(data.highestQualification) ? blankToNull(data.qualificationProgram) : null,
         trainingRoute:        data.isTeaching && data.trainingRoute ? data.trainingRoute : null,

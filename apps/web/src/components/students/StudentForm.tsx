@@ -66,7 +66,7 @@ import { z }                        from 'zod'
 import { useForm }                  from 'react-hook-form'
 import { zodResolver }              from '@hookform/resolvers/zod'
 import { AnimatePresence, motion }  from 'framer-motion'
-import { Check, ChevronLeft, ChevronRight, Loader2, User, X, AlertCircle } from 'lucide-react'
+import { Check, CheckCircle2, ChevronLeft, ChevronRight, Copy, Loader2, User, X, AlertCircle } from 'lucide-react'
 import Image                        from 'next/image'
 import { toast }                    from 'sonner'
 import { CreateStudentSchema, UpdateWelfareSchema, SupportNeedInputSchema } from '@shared/schemas/student'
@@ -80,6 +80,7 @@ import type { CreateStudentInput }  from '@shared/schemas/student'
 type StudentFormValues = z.input<typeof CreateStudentSchema>
 import type { ApiStudent }          from '@shared/types/api'
 import { useCreateStudent, useUpdateStudent, useStudent } from '@/hooks/useStudents'
+import { Modal, MODAL_BTN_PRIMARY } from '@/components/shared/Modal'
 import { usePermissions }           from '@/hooks/usePermissions'
 import { apiFetch }                 from '@/lib/api-client'
 import { StudentFeeStructure } from '@/components/students/StudentFeeStructure'
@@ -349,6 +350,9 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
   const [currentStep, setCurrentStep] = useState(0)
   const [direction, setDirection]     = useState<1 | -1>(1)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  // Set after a successful create when the server returned a temporary password.
+  const [created, setCreated] = useState<{ name: string; email: string; tempPassword: string } | null>(null)
+  const [copied, setCopied]   = useState(false)
 
   // Unsaved-changes warning — the same rule and wording as the staff form (the
   // shared dialog, lib/hills/unsaved.ts): once anything has been entered, the X,
@@ -405,7 +409,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
   })
 
   useEffect(() => {
-    if (!visible) return
+    if (!visible || created) return
     const onKeyDown = (e: KeyboardEvent) => {
       // A picker inside the form may call preventDefault() on Escape to close itself first.
       if (e.key !== 'Escape' || e.defaultPrevented) return
@@ -414,7 +418,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
     }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
-  }, [visible])
+  }, [visible, created])
 
   /** Marks the form as typed in; fired by input events bubbling up from any field. */
   function handleFormInput(e: React.FormEvent<HTMLFormElement>) {
@@ -424,6 +428,17 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
   function handlePhotoChange(file: File, preview: string) {
     setPhotoFile(file)
     setPhotoPreview(preview)
+  }
+
+  async function copyPassword() {
+    if (!created) return
+    try {
+      await navigator.clipboard.writeText(created.tempPassword)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      /* clipboard unavailable: the password can be selected by hand */
+    }
   }
 
   async function handleNext() {
@@ -526,7 +541,15 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
         onSuccess: async (student) => {
           await saveWelfare(student.id, welfareRequests)
           await uploadPhotoIfNeeded(student.id)
-          handleClose()
+          if (student.tempPassword) {
+            setCreated({
+              name:         `${data.firstName} ${data.lastName}`.trim(),
+              email:        data.email,
+              tempPassword: student.tempPassword,
+            })
+          } else {
+            handleClose()
+          }
         },
         onError: (err) => {
           setSubmitError(err instanceof Error ? err.message : 'Failed to create student. Please try again.')
@@ -630,6 +653,53 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
   // as AnnouncementForm.tsx/StaffForm.tsx: escapes the page-transition
   // wrapper's stacking context/containing-block entirely.
   if (typeof document === 'undefined') return null
+
+  // After a successful create, show the temporary password in a dialog (same as
+  // the staff form). The form is unmounted; Done closes everything.
+  if (created) {
+    return (
+      <Modal
+        title="Student account created"
+        onClose={onClose}
+        size="m"
+        footer={
+          <button type="button" onClick={onClose} className={MODAL_BTN_PRIMARY}>
+            Done
+          </button>
+        }
+      >
+        <div className="space-y-4">
+          <div className="flex items-start gap-2 text-sm text-body bg-status-success/10 rounded-xl px-4 py-3">
+            <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" aria-hidden />
+            <span>
+              {created.name}&apos;s account was created. A welcome email with the login
+              details was sent to <strong>{created.email}</strong>. If it does not
+              arrive, give the temporary password below to the student.
+            </span>
+          </div>
+          <div>
+            <span className="block text-xs font-semibold text-muted mb-1.5">Temporary password</span>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 bg-page border border-base rounded-xl px-4 py-3 text-sm break-all">
+                {created.tempPassword}
+              </code>
+              <button
+                type="button"
+                onClick={copyPassword}
+                className="shrink-0 border border-base rounded-xl px-3 py-3 text-xs hover:bg-page min-h-11 flex items-center gap-1.5"
+              >
+                <Copy className="w-3.5 h-3.5" aria-hidden />
+                {copied ? 'Copied' : 'Copy'}
+              </button>
+            </div>
+            <p className="text-xs text-muted mt-1.5">
+              The student will be asked to change this at first login.
+            </p>
+          </div>
+        </div>
+      </Modal>
+    )
+  }
 
   // ═══════════════════════════════════════════════════════════════════════════
   // MOBILE RENDER — bottom sheet + stepped navigation
