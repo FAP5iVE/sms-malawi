@@ -24,6 +24,7 @@ import { PlacementStatusBadge } from '@/components/placements/PlacementStatusBad
 import { ListPager } from '@/components/shared/ListPager'
 import { usePagedRows } from '@/lib/hills/usePagedRows'
 import type { ApiUniversityPlacement } from '@shared/types/api'
+import { institutionKey, resolveUniversity } from '@shared/constants/universities'
 
 function studentName(row: ApiUniversityPlacement): string {
   if (!row.student) return row.studentId
@@ -56,18 +57,37 @@ export function PlacementRegistryPanel() {
     return uni?.programs.find((p) => p.id === row.placedProgrammeId)?.faculty ?? null
   }
 
+  // An institution can be stored as a catalogue id, an abbreviation or a full name. Every row is
+  // compared by its resolved institution key, so filtering by "MUST" also finds a record typed
+  // as "Malawi University of Science and Technology", and the other way round.
+  const otherInstitutions = useMemo(() => {
+    const catalogueKeys = new Set(catalogue.map((u) => u.id))
+    const found = new Map<string, string>()
+    for (const row of placements) {
+      const key = institutionKey(row.placedUniversityId, row.placedUniversityName)
+      if (key && !catalogueKeys.has(key) && !found.has(key)) {
+        found.set(key, (row.placedUniversityName ?? row.placedUniversityId ?? '').trim())
+      }
+    }
+    return [...found.entries()].sort((a, b) => a[1].localeCompare(b[1]))
+  }, [placements, catalogue])
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     return placements.filter((row) => {
-      if (universityFilter !== 'ALL' && row.placedUniversityId !== universityFilter) return false
+      if (universityFilter !== 'ALL' && institutionKey(row.placedUniversityId, row.placedUniversityName) !== universityFilter) return false
       if (genderFilter !== 'ALL' && row.student?.sex !== genderFilter) return false
       if (!q) return true
+      const uni = resolveUniversity(row.placedUniversityId) ?? resolveUniversity(row.placedUniversityName)
       const haystack = [
         studentName(row),
         row.student?.candidateNo,
         row.placedProgrammeName,
         row.placedProgrammeId,
         row.placedUniversityName,
+        // Full name and abbreviation both match, whichever one the record was saved with.
+        uni?.name,
+        uni?.shortName,
       ].filter(Boolean).join(' ').toLowerCase()
       return haystack.includes(q)
     })
@@ -142,9 +162,12 @@ export function PlacementRegistryPanel() {
           onChange={(e) => setUniversityFilter(e.target.value)}
           className="border border-base rounded-xl px-3 py-2 text-sm bg-surface shrink-0"
         >
-          <option value="ALL">All Universities ({catalogue.length})</option>
+          <option value="ALL">All Universities</option>
           {catalogue.map((u) => (
-            <option key={u.id} value={u.id}>{u.shortName ?? u.name}</option>
+            <option key={u.id} value={u.id}>{u.shortName ? `${u.shortName} (${u.name})` : u.name}</option>
+          ))}
+          {otherInstitutions.map(([key, label]) => (
+            <option key={key} value={key}>{label}</option>
           ))}
         </select>
         <select

@@ -140,11 +140,10 @@ function buildApplicationCreateData(data: ApplicationInput) {
     homeLanguage:      data.homeLanguage?.trim() || null,
     // National ID is optional; '' (an empty input) is "not provided".
     nrbNumber:         data.nrbNumber?.trim() || null,
-    // Home & Admission. admissionType stays null unless the applicant chose one:
-    // conversion then derives it from the form applied for.
-    residenceType:     data.residenceType ?? null,
-    travelMinutes:     data.travelMinutes ?? null,
-    admissionType:     data.admissionType ?? null,
+    // Home: where the applicant currently stays. The admission type is not asked on the
+    // application; staff choose it when they admit the applicant.
+    physicalAddress:   data.physicalAddress?.trim() || null,
+    admissionType:     null,
     // Welfare / health / special needs (sensitive). orphanStatus falls back to
     // UNKNOWN - an unanswered question is never recorded as "not an orphan".
     orphanStatus:      data.orphanStatus ?? 'UNKNOWN',

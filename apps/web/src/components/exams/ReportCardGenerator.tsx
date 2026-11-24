@@ -46,6 +46,7 @@
  */
 
 import { useState, useCallback }       from 'react'
+import { useQuery, useQueryClient }   from '@tanstack/react-query'
 import { motion }                     from 'framer-motion'
 import { toast }                        from 'sonner'
 import {
@@ -69,7 +70,7 @@ import {
 }                                       from '@/lib/motion'
 import { apiFetch }                     from '@/lib/api-client'
 import { openPdfPreview, downloadProtectedFile } from '@/lib/pdfPreview'
-import type { BatchGenerationResult }   from '@/server/services/reportCardService'
+import type { BatchGenerationResult, ReportCommentSheet, ReportCommentKind } from '@/server/services/reportCardService'
 import { useClasses }                   from '@/hooks/useClasses'
 import { useEffectiveViewingPeriod }     from '@/hooks/useViewingPeriod'
 
@@ -220,6 +221,117 @@ function StudentResultRow({
           </button>
         )}
       </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COMMENT SHEET: class teacher + head teacher comments for the chosen class and term.
+// The class teacher (the class's assigned teacher) writes the first comment, the head
+// teacher (high rank / admin) the second. Everyone else sees them read-only.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function CommentSheet({ classId, term, academicYear }: { classId: string; term: 1 | 2 | 3; academicYear: string }) {
+  const qc = useQueryClient()
+  const queryKey = ['exams', 'report-comments', classId, term, academicYear] as const
+  const { data: sheet, isLoading, isError } = useQuery({
+    queryKey,
+    queryFn: () => apiFetch<ReportCommentSheet>(
+      `/exams/report-comments/${classId}/${term}?academicYear=${encodeURIComponent(academicYear)}`,
+    ),
+    enabled: !!classId && !!academicYear,
+  })
+  // Unsaved edits, keyed `${studentId}:${kind}`; a key is absent once saved or untouched.
+  const [drafts, setDrafts] = useState<Record<string, string>>({})
+  const [savingKey, setSavingKey] = useState<string | null>(null)
+
+  async function save(studentId: string, kind: ReportCommentKind, text: string) {
+    const key = `${studentId}:${kind}`
+    setSavingKey(key)
+    try {
+      await apiFetch(`/exams/report-comments/${studentId}`, {
+        method: 'PUT',
+        body:   JSON.stringify({ academicYear, term, kind, comment: text }),
+      })
+      toast.success('Comment saved')
+      setDrafts((d) => { const next = { ...d }; delete next[key]; return next })
+      await qc.invalidateQueries({ queryKey })
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Could not save this comment.')
+    } finally {
+      setSavingKey(null)
+    }
+  }
+
+  if (isLoading) return <div className="skeleton h-40 rounded-xl" aria-hidden />
+  if (isError || !sheet) {
+    return <p className="text-sm text-tone-coral">Could not load the comments for this class.</p>
+  }
+
+  const canWriteAny = sheet.canClassTeacher || sheet.canHeadTeacher
+
+  function field(row: ReportCommentSheet['rows'][number], kind: ReportCommentKind, label: string, allowed: boolean) {
+    const key = `${row.studentId}:${kind}`
+    const saved = kind === 'CLASS_TEACHER' ? row.classTeacherComment : row.headTeacherComment
+    const value = drafts[key] ?? saved
+    const dirty = drafts[key] !== undefined && drafts[key] !== saved
+    return (
+      <div>
+        <label htmlFor={`rc-${key}`} className="block text-xs font-heading font-semibold text-muted mb-1">{label}</label>
+        <textarea
+          id={`rc-${key}`}
+          value={value}
+          onChange={(e) => setDrafts((d) => ({ ...d, [key]: e.target.value }))}
+          rows={2}
+          maxLength={600}
+          disabled={!allowed || !row.hasResults}
+          placeholder={allowed ? 'Write a comment for the report card' : '-'}
+          className="w-full border border-base rounded-xl px-3 py-2 text-sm bg-page text-body resize-none disabled:opacity-70"
+        />
+        {allowed && row.hasResults && dirty && (
+          <button
+            type="button"
+            onClick={() => save(row.studentId, kind, value)}
+            disabled={savingKey === key}
+            className="mt-1.5 min-h-[36px] px-3 rounded-lg text-xs font-heading font-semibold bg-brand-deep text-white disabled:opacity-60"
+          >
+            {savingKey === key ? 'Saving…' : 'Save comment'}
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <h3 className="font-heading font-semibold text-base text-brand-navy">Report card comments</h3>
+        <p className="text-xs text-muted mt-0.5">
+          {canWriteAny
+            ? `${sheet.canClassTeacher ? "You are this class's teacher: write the class teacher's comment. " : ''}${sheet.canHeadTeacher ? "You can write the head teacher's comment. " : ''}Comments appear on the report card when it is generated.`
+            : "Only the class teacher and the head teacher can write these comments. You can read what has been entered."}
+        </p>
+      </div>
+      {sheet.rows.length === 0 ? (
+        <p className="text-sm text-muted">No active students in this class.</p>
+      ) : (
+        <div className="border border-base rounded-xl overflow-hidden">
+          {sheet.rows.map((row) => (
+            <div key={row.studentId} className="p-3 space-y-2 border-b border-base last:border-0">
+              <p className="text-sm font-heading font-medium text-body">
+                {row.fullName} <span className="text-xs text-muted font-normal">{row.registrationNo}</span>
+              </p>
+              {!row.hasResults && (
+                <p className="text-xs text-tone-amber">Results for this term are not computed yet, so a comment cannot be added.</p>
+              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {field(row, 'CLASS_TEACHER', "Class teacher's comment", sheet.canClassTeacher)}
+                {field(row, 'HEAD_TEACHER', "Head teacher's comment", sheet.canHeadTeacher)}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -441,6 +553,11 @@ export function ReportCardGenerator() {
         <div className="text-center py-16 text-muted text-sm border border-dashed border-base rounded-xl">
           Select a class, then click Generate All to create report cards for the period shown above.
         </div>
+      )}
+
+      {/* Class teacher / head teacher comments for the selected class */}
+      {classId && effectiveAcademicYear && (
+        <CommentSheet classId={classId} term={term} academicYear={effectiveAcademicYear} />
       )}
     </div>
   )

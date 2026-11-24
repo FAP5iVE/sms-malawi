@@ -40,6 +40,7 @@ import {
 import * as appService    from '@/server/services/applicationService'
 import * as studentService from '@/server/services/studentService'
 import { sendError } from '@/server/lib/sendError'
+import { ADMISSION_TYPES, type AdmissionTypeValue } from '@shared/constants/malawi'
 
 export const applicationsRouter = Router()
 
@@ -162,14 +163,19 @@ applicationsRouter.post(
   requirePermission('application.convertToStudent'),
   async (req, res) => {
     const id = String(req.params.id)
-    const { classId, createLoginAccount } = req.body as {
+    const { classId, createLoginAccount, admissionType } = req.body as {
       classId?:            string
       createLoginAccount?: boolean
+      admissionType?:      string
+    }
+    if (admissionType !== undefined && !(ADMISSION_TYPES as readonly string[]).includes(admissionType)) {
+      return res.status(400).json({ error: 'Invalid admission type' })
     }
 
     const result = await studentService.createFromApplication({
       applicationId: id,
       classId,
+      admissionType: admissionType as AdmissionTypeValue | undefined,
       actorUid:  req.user!.uid,
       actorRole: req.user!.role,
       createLoginAccount,

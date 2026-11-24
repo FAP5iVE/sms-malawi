@@ -5,8 +5,8 @@
  *   applicant could tell us is lost at admission:
  *   1. Personal: Village (after District and T/A) and an optional National ID
  *      (NRB / birth certificate number); both Malawian-applicant fields, like District.
- *   2. Academic step gains the full "Home & Admission" group: where the learner
- *      stays, travel time, admission type, previous school, reason for transfer.
+ *   2. Academic step has a "Home & Admission" group: physical address (where the learner
+ *      stays now), previous school, reason for transfer. Admission type is chosen by staff at admission.
  *   3. New optional "Welfare" step (before Review): orphan status, vulnerability,
  *      health / medical alert and special needs. The labels match the student
  *      profile ("Special needs", not "Support needs").
@@ -148,11 +148,6 @@ import {
   FORM_LABELS,
   RELIGIONS,
   HOME_LANGUAGES,
-  RESIDENCE_TYPES,
-  RESIDENCE_TYPE_LABELS,
-  ADMISSION_TYPES,
-  ADMISSION_TYPE_LABELS,
-  TRAVEL_MINUTES_MAX,
   ORPHAN_STATUSES,
   ORPHAN_STATUS_LABELS,
   SUPPORT_NEED_TYPES,
@@ -248,10 +243,6 @@ function GroupHeading({ children }: { children: React.ReactNode }) {
   )
 }
 
-// A blank <select> means "not answered": send undefined, never '' (which is not a
-// valid enum value and would fail validation).
-const blankToUndefined = (v: unknown) => (v === '' || v == null ? undefined : v)
-
 // -- MULTI-STEP CONFIG ---------------------------------------------------------
 const STEPS = [
   { label: 'Personal', icon: User },
@@ -310,7 +301,7 @@ export default function ApplyPage() {
   const STEP_FIELDS: (keyof ApplicationInput)[][] = [
     ['firstName', 'surname', 'dateOfBirth', 'sex', 'nationality', 'nrbNumber'],
     ['address', 'countryCode', 'phone', 'email'],
-    ['classApplying', 'academicYear', 'travelMinutes'],
+    ['classApplying', 'academicYear', 'physicalAddress'],
     ['guardianName', 'guardianRelationship', 'guardianCountryCode', 'guardianPhone'],
     ['vulnerabilityNote', 'medicalAlert'],
     [],
@@ -622,7 +613,7 @@ export default function ApplyPage() {
                 />
                 <div className="hills-apply__fields">
                   <Field
-                    label="Physical / Postal Address"
+                    label="Postal Address"
                     required
                     error={errors.address?.message}
                     className="col-span-full"
@@ -631,7 +622,7 @@ export default function ApplyPage() {
                       {...register('address')}
                       rows={2}
                       className={`${inputCls} resize-none ${errors.address ? inputError : inputBase}`}
-                      placeholder="Village, Traditional Authority, District"
+                      placeholder="e.g. P.O. Box 123, Blantyre"
                     />
                   </Field>
                   <Field label="Phone Number" required error={errors.phone?.message} className="col-span-full">
@@ -704,50 +695,18 @@ export default function ApplyPage() {
                   </Field>
 
                   <GroupHeading>Home &amp; Admission</GroupHeading>
-                  <Field label="Where the Applicant Stays" error={errors.residenceType?.message} hint="Optional">
-                    <select
-                      {...register('residenceType', { setValueAs: blankToUndefined })}
-                      className={`${inputCls} ${inputBase}`}
-                      defaultValue=""
-                    >
-                      <option value="">Not stated</option>
-                      {RESIDENCE_TYPES.map((t) => (
-                        <option key={t} value={t}>{RESIDENCE_TYPE_LABELS[t]}</option>
-                      ))}
-                    </select>
-                  </Field>
                   <Field
-                    label="Travel Time to School (minutes, one way)"
-                    error={errors.travelMinutes?.message}
-                    hint="Optional"
+                    label="Physical Address"
+                    error={errors.physicalAddress?.message}
+                    hint="Optional. Where the applicant is staying now"
+                    className="col-span-full"
                   >
-                    <input
-                      {...register('travelMinutes', {
-                        setValueAs: (v) => (v === '' || v == null || Number.isNaN(Number(v)) ? null : Number(v)),
-                      })}
-                      type="number"
-                      inputMode="numeric"
-                      min={0}
-                      max={TRAVEL_MINUTES_MAX}
-                      className={`${inputCls} ${errors.travelMinutes ? inputError : inputBase}`}
-                      placeholder="e.g. 45"
+                    <textarea
+                      {...register('physicalAddress')}
+                      rows={2}
+                      className={`${inputCls} resize-none ${errors.physicalAddress ? inputError : inputBase}`}
+                      placeholder="e.g. Area 47, Sector 3, Lilongwe"
                     />
-                  </Field>
-                  <Field
-                    label="Admission Type"
-                    error={errors.admissionType?.message}
-                    hint="Leave blank and the school will decide from the form applied for"
-                  >
-                    <select
-                      {...register('admissionType', { setValueAs: blankToUndefined })}
-                      className={`${inputCls} ${inputBase}`}
-                      defaultValue=""
-                    >
-                      <option value="">Not sure</option>
-                      {ADMISSION_TYPES.map((t) => (
-                        <option key={t} value={t}>{ADMISSION_TYPE_LABELS[t]}</option>
-                      ))}
-                    </select>
                   </Field>
                   <Field
                     label="Previous School"
@@ -854,7 +813,7 @@ export default function ApplyPage() {
                       {...register('guardianAddress')}
                       rows={2}
                       className={`${inputCls} resize-none ${inputBase}`}
-                      placeholder="Village, Traditional Authority, District"
+                      placeholder="e.g. P.O. Box 123, Blantyre"
                     />
                   </Field>
                 </div>
@@ -1048,9 +1007,7 @@ export default function ApplyPage() {
                   {
                     heading: 'Home & Admission',
                     rows: [
-                      ['Stays', values.residenceType ? RESIDENCE_TYPE_LABELS[values.residenceType] : ''],
-                      ['Travel to School', values.travelMinutes != null ? `${values.travelMinutes} min` : ''],
-                      ['Admission', values.admissionType ? ADMISSION_TYPE_LABELS[values.admissionType] : 'Decided by the school'],
+                      ['Physical address', values.physicalAddress ?? ''],
                       ['Previous School', values.previousSchool ?? ''],
                       ['Reason for Transfer', values.reasonForTransfer ?? ''],
                     ],

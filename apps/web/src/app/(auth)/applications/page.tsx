@@ -44,6 +44,7 @@ import { ModuleTabs } from '@/components/shared/ModuleTabs'
 import type { TabItem } from '@/components/shared/ModuleTabs'
 import { usePermissions } from '@/hooks/usePermissions'
 import { AdmitStudentDialog } from '@/components/applications/AdmitStudentDialog'
+import type { AdmissionTypeValue } from '@shared/constants/malawi'
 import { CheckCircle, XCircle, UserPlus, Inbox } from 'lucide-react'
 
 type ApplicationStatusValue = (typeof ApplicationStatusSchema.options)[number]
@@ -101,14 +102,14 @@ function ApplicationsContent() {
   // The application being admitted; set by the Admit button, cleared when the dialog closes.
   const [admitting, setAdmitting] = useState<ApiApplication | null>(null)
 
-  function handleConvert(id: string, classId?: string) {
+  function handleConvert(id: string, classId: string | undefined, admissionType: AdmissionTypeValue) {
     setActionError(null)
     // Universal credential flow: admitting an applicant provisions their login
     // from the email on their application — a generated password is emailed and
     // must be reset on first sign-in. If the applicant has no email on file the
     // backend returns a clear 400, surfaced below.
     convert(
-      { id, classId, createLoginAccount: true },
+      { id, classId, admissionType, createLoginAccount: true },
       {
         onSuccess: () => setAdmitting(null),
         onError: (err) => setActionError(err instanceof Error ? err.message : 'Failed to admit applicant as student.'),
@@ -292,7 +293,7 @@ function ApplicationsContent() {
           busy={converting}
           error={actionError}
           onClose={() => { if (!converting) setAdmitting(null) }}
-          onConfirm={(classId) => handleConvert(admitting.id, classId)}
+          onConfirm={(classId, admissionType) => handleConvert(admitting.id, classId, admissionType)}
         />
       )}
       </ModuleSurface>

@@ -201,6 +201,11 @@ export default function ChangePasswordPage() {
       // made by the call above.
       const refreshed = await user.getIdTokenResult(true)
       // Each role's own home: a parent has no /dashboard.
+      // A new student goes on to the registration form before the dashboard.
+      if (refreshed.claims.registrationPending === true) {
+        router.replace('/complete-registration')
+        return
+      }
       router.replace(homePathForRole(typeof refreshed.claims.role === 'string' ? refreshed.claims.role : null))
     } catch (err: unknown) {
       const code = (err as { code?: string }).code ?? ''

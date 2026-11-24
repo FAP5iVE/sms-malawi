@@ -3600,3 +3600,64 @@ export function getAllPrograms(): Array<{ university: University; program: Unive
     university.programs.map((program) => ({ university, program })),
   )
 }
+
+// ─────────────────────────────────────────────────────────
+//  INSTITUTION NAME RESOLUTION
+//  A placement stores its institution either as a catalogue id ('must') or, for a
+//  private/foreign or hand-typed entry, as free text. The same institution therefore turns up as
+//  an id, an abbreviation ("MUST") or a full name. These helpers map any of those to the one
+//  catalogue university, so filters, search and counts treat them as the same institution.
+// ─────────────────────────────────────────────────────────
+
+function normaliseInstitutionText(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+}
+
+/**
+ * Resolve a catalogue id, abbreviation or full name (case, punctuation and "&"/"and" insensitive,
+ * and tolerant of extra words such as "Mzuzu University (MZUNI)") to a catalogue university.
+ * Returns undefined when it is not a catalogue institution (private / foreign / unknown).
+ */
+export function resolveUniversity(idOrName: string | null | undefined): University | undefined {
+  if (!idOrName) return undefined
+  const text = normaliseInstitutionText(idOrName)
+  if (!text) return undefined
+
+  const exact = UNIVERSITIES.find(
+    (u) =>
+      normaliseInstitutionText(u.id) === text ||
+      (u.shortName ? normaliseInstitutionText(u.shortName) === text : false) ||
+      normaliseInstitutionText(u.name) === text,
+  )
+  if (exact) return exact
+
+  const padded = ` ${text} `
+  // Longest full name first, so a name that contains another is never matched by the shorter one.
+  const byName = [...UNIVERSITIES]
+    .sort((a, b) => b.name.length - a.name.length)
+    .find((u) => padded.includes(` ${normaliseInstitutionText(u.name)} `))
+  if (byName) return byName
+
+  return UNIVERSITIES.find(
+    (u) => u.shortName && padded.includes(` ${normaliseInstitutionText(u.shortName)} `),
+  )
+}
+
+/**
+ * One stable key for a placement's institution: the catalogue id when it resolves (whether the
+ * record holds the id, the abbreviation or the full name), otherwise `free:<normalised name>`.
+ * Returns null when no institution is recorded.
+ */
+export function institutionKey(
+  placedUniversityId: string | null | undefined,
+  placedUniversityName: string | null | undefined,
+): string | null {
+  const uni = resolveUniversity(placedUniversityId) ?? resolveUniversity(placedUniversityName)
+  if (uni) return uni.id
+  const free = normaliseInstitutionText(placedUniversityName ?? placedUniversityId ?? '')
+  return free ? `free:${free}` : null
+}

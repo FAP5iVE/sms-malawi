@@ -390,6 +390,53 @@ examsRouter.post('/compute', verifyAuth, requirePermission('exam.computeResults'
     }
   })
 
+// GET /exams/report-comments/:classId/:term?academicYear= — the class's comment sheet (staff only).
+// PUT /exams/report-comments/:studentId — save one comment (class teacher or head teacher).
+// Who may write which comment is decided in reportCardService (class teacher = the class's
+// assigned teacher; head teacher = high_rank / admin).
+examsRouter.get('/report-comments/:classId/:term', verifyAuth,
+  requireRole(['admin', 'high_rank', 'exam_officer', 'academic', 'hr', 'finance', 'library', 'lower_rank']),
+  async (req, res) => {
+    const term = Number(req.params.term)
+    const academicYear = String(req.query.academicYear ?? '')
+    if (![1, 2, 3].includes(term) || !academicYear) {
+      return res.status(400).json({ error: 'A term (1-3) and academicYear are required.' })
+    }
+    try {
+      return res.json(await reportCardService.getCommentSheet(
+        String(req.params.classId), term as 1 | 2 | 3, academicYear, { uid: req.user!.uid, role: req.user!.role },
+      ))
+    } catch (err) {
+      return sendError(res, err, { tags: { module: 'exams', route: 'report-comments-sheet' } })
+    }
+  })
+
+examsRouter.put('/report-comments/:studentId', verifyAuth,
+  requireRole(['admin', 'high_rank', 'exam_officer', 'academic', 'hr', 'finance', 'library', 'lower_rank']),
+  async (req, res) => {
+    const { academicYear, term, kind, comment } = req.body as {
+      academicYear?: string; term?: number; kind?: string; comment?: string
+    }
+    if (!academicYear || ![1, 2, 3].includes(Number(term))) {
+      return res.status(400).json({ error: 'A term (1-3) and academicYear are required.' })
+    }
+    if (kind !== 'CLASS_TEACHER' && kind !== 'HEAD_TEACHER') {
+      return res.status(400).json({ error: 'kind must be CLASS_TEACHER or HEAD_TEACHER.' })
+    }
+    if (typeof comment !== 'string' || comment.length > 600) {
+      return res.status(400).json({ error: 'A comment of at most 600 characters is required (blank clears it).' })
+    }
+    try {
+      await reportCardService.saveComment(
+        { studentId: String(req.params.studentId), term: Number(term) as 1 | 2 | 3, academicYear, kind, comment },
+        { uid: req.user!.uid, role: req.user!.role },
+      )
+      return res.json({ ok: true })
+    } catch (err) {
+      return sendError(res, err, { tags: { module: 'exams', route: 'report-comments-save' } })
+    }
+  })
+
 // GET /exams/report-card/:studentId — download a generated report card.
 // Ownership is resolved via the student's real Student.firebaseUid, not by
 // comparing req.user.uid (a Firebase UID) directly against the route's

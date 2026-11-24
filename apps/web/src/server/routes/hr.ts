@@ -508,5 +508,9 @@ hrRouter.post('/performance', verifyAuth, requireRole([...REVIEWERS]),
   async (req, res) => {
     const parsed = PerformanceNoteSchema.safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
-    return res.status(201).json(await hrService.addPerformanceNote(parsed.data, req.user!.uid))
+    try {
+      return res.status(201).json(await hrService.addPerformanceNote(parsed.data, req.user!.uid, req.user!.role))
+    } catch (err) {
+      return sendError(res, err, { defaultStatus: 400, fallbackMessage: 'Could not save this performance note.', tags: { module: 'hr' } })
+    }
   })

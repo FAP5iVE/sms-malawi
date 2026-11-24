@@ -102,6 +102,7 @@ const PUBLIC_PATHS = [
   '/forgot-password',
   '/reset-password',   // [SEO FIX] emailed reset links land here while signed out
   '/change-password',
+  '/complete-registration',   // students' first-login registration form (needs a signed-in session client-side)
   '/privacy',
   '/terms',
   // [PRODUCTION FIX 2026-07-28] All seven of the landing-page redesign's new

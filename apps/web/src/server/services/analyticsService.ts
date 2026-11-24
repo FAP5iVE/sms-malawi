@@ -53,7 +53,7 @@ import type { ExpenseCategory, ApplicationStatus } from '@prisma/client'
 import { subDays, subMonths, startOfDay, endOfDay, format, startOfWeek, endOfWeek, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, startOfMonth, endOfMonth } from 'date-fns'
 import { getAttendanceSummaryForTerm, getTermDateRange } from '@/server/services/attendanceService'
 import { getPassingGrades, isPassingClassification, isDistinctionGrade, type ExamTypeKey } from '@/server/services/gradeService'
-import { findUniversity } from '@shared/constants/universities'
+import { findUniversity, institutionKey } from '@shared/constants/universities'
 import type { ApiPayrollBreakdownPoint } from '@shared/types/api'
 import { loadBudgetPosition } from '@/server/services/analytics/financeAnalytics'
 import {
@@ -1969,14 +1969,17 @@ export async function getPlacementAnalytics(academicYear: string): Promise<Place
   let male = 0
   let female = 0
   const uniCounts = new Map<string, number>()
+  const freeNames = new Map<string, string>()
 
   for (const p of placements) {
     if (p.status === 'CONFIRMED') {
       confirmedCount += 1
       if (p.student.sex === 'MALE') male += 1
       else if (p.student.sex === 'FEMALE') female += 1
-      const key = p.placedUniversityId ?? (p.placedUniversityName ? `free:${p.placedUniversityName}` : 'unknown')
+      // The same institution can be saved as an id, an abbreviation or a full name: count it once.
+      const key = institutionKey(p.placedUniversityId, p.placedUniversityName) ?? 'unknown'
       uniCounts.set(key, (uniCounts.get(key) ?? 0) + 1)
+      if (key.startsWith('free:') && p.placedUniversityName && !freeNames.has(key)) freeNames.set(key, p.placedUniversityName.trim())
     } else if (p.status === 'PENDING_APPROVAL') {
       pendingApprovalCount += 1
     } else if (p.status === 'REJECTED') {
@@ -1989,7 +1992,7 @@ export async function getPlacementAnalytics(academicYear: string): Promise<Place
       const uni = findUniversity(key)
       return {
         universityId: key,
-        universityName: uni?.name ?? (key.startsWith('free:') ? key.slice(5) : key),
+        universityName: uni?.name ?? freeNames.get(key) ?? (key.startsWith('free:') ? key.slice(5) : key),
         count,
       }
     })

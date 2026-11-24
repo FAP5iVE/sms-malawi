@@ -8,9 +8,12 @@
  *   pre-selects the one with the fewest. A form with one class shows a single confirmed line; a
  *   form with no classes lets the school admit without one and place the student later.
  *   The server also checks that the class is live and in the right form.
+ *   It also asks for the admission type (new intake / transferred in / returnee), which is no longer
+ *   collected on the application form. Pre-selected from the form applied for.
  */
 import { useMemo, useState } from 'react'
 import type { ApiApplication } from '@shared/types/api'
+import { ADMISSION_TYPES, ADMISSION_TYPE_LABELS, type AdmissionTypeValue } from '@shared/constants/malawi'
 import { Modal, MODAL_BTN_PRIMARY, MODAL_BTN_SECONDARY } from '@/components/shared/Modal'
 import { useClasses } from '@/hooks/useClasses'
 import { useEffectiveViewingPeriod } from '@/hooks/useViewingPeriod'
@@ -21,7 +24,7 @@ interface Props {
   error: string | null
   onClose: () => void
   /** classId is undefined only when the form has no class at all. */
-  onConfirm: (classId: string | undefined) => void
+  onConfirm: (classId: string | undefined, admissionType: AdmissionTypeValue) => void
 }
 
 export function AdmitStudentDialog({ application, busy, error, onClose, onConfirm }: Props) {
@@ -40,6 +43,10 @@ export function AdmitStudentDialog({ application, busy, error, onClose, onConfir
     [options],
   )
   const [picked, setPicked] = useState<string | null>(null)
+  // Form 2+ applicants are usually moving in from another school; Form 1 is the normal intake.
+  const [admissionType, setAdmissionType] = useState<AdmissionTypeValue>(
+    application.admissionType ?? (form >= 2 ? 'TRANSFER_IN' : 'NEW_INTAKE'),
+  )
   const chosen = picked ?? fewest?.id ?? null
   const needsChoice = options.length > 0
   const only = options.length === 1 ? options[0] : undefined
@@ -52,7 +59,7 @@ export function AdmitStudentDialog({ application, busy, error, onClose, onConfir
       onClose={onClose}
       busy={busy}
       size="m"
-      onSubmit={(e) => { e.preventDefault(); if (!needsChoice || chosen) onConfirm(chosen ?? undefined) }}
+      onSubmit={(e) => { e.preventDefault(); if (!needsChoice || chosen) onConfirm(chosen ?? undefined, admissionType) }}
       footer={
         <>
           <button type="button" className={MODAL_BTN_SECONDARY} onClick={onClose} disabled={busy}>Cancel</button>
@@ -102,6 +109,20 @@ export function AdmitStudentDialog({ application, busy, error, onClose, onConfir
           })}
         </fieldset>
       )}
+      <div className="mt-4">
+        <label htmlFor="admit-type" className="block text-sm text-body mb-1.5">Admission type</label>
+        <select
+          id="admit-type"
+          value={admissionType}
+          onChange={(e) => setAdmissionType(e.target.value as AdmissionTypeValue)}
+          className="w-full min-h-[44px] border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body"
+          disabled={busy}
+        >
+          {ADMISSION_TYPES.map((t) => (
+            <option key={t} value={t}>{ADMISSION_TYPE_LABELS[t]}</option>
+          ))}
+        </select>
+      </div>
       {error && <p role="alert" className="mt-3 text-sm text-tone-coral">{error}</p>}
     </Modal>
   )

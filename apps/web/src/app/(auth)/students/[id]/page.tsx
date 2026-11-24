@@ -52,7 +52,7 @@ import { useAuthStore } from '@/store/authStore'
 import { StudentForm } from '@/components/students/StudentForm'
 import { StudentRiskBadge } from '@/components/shared/StudentRiskBadge'
 import { PrintableReportCard } from '@/components/shared/PrintableReportCard'
-import { formatMWK, RESIDENCE_TYPE_LABELS, ADMISSION_TYPE_LABELS, EXIT_REASON_LABELS } from '@shared/constants/malawi'
+import { formatMWK, ADMISSION_TYPE_LABELS, EXIT_REASON_LABELS } from '@shared/constants/malawi'
 import { usePermissions } from '@/hooks/usePermissions'
 import { ArrowLeft, Pencil, Printer, FileText, Loader2, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
@@ -190,7 +190,7 @@ function ProfileContent() {
                   rows={[
                     ['Phone', student.phone],
                     ['Email', student.email],
-                    ['Address', student.address],
+                    ['Postal address', student.address],
                     ['Village', student.village],
                     ['Traditional authority', student.traditionalAuthority],
                     ['District', student.district],
@@ -202,8 +202,7 @@ function ProfileContent() {
                 <h2 className={sectionHeading}>Home and admission</h2>
                 <FactList
                   rows={[
-                    ['Stays', student.residenceType ? RESIDENCE_TYPE_LABELS[student.residenceType] : null],
-                    ['Travel to school', student.travelMinutes != null ? `${student.travelMinutes} min` : null],
+                    ['Physical address', student.physicalAddress],
                     ['Admission', ADMISSION_TYPE_LABELS[student.admissionType ?? 'NEW_INTAKE']],
                     ['Previous school', student.previousSchool],
                     ['Reason for transfer', student.reasonForTransfer],

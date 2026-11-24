@@ -21,7 +21,6 @@ import { RoleGuard } from '@/components/shared/RoleGuard'
 import { usePermissions } from '@/hooks/usePermissions'
 import { StatusText, type StatusTone } from '@/components/shared/StatusText'
 import {
-  RESIDENCE_TYPE_LABELS,
   ADMISSION_TYPE_LABELS,
   ORPHAN_STATUS_LABELS,
   SUPPORT_NEED_LABELS,
@@ -137,9 +136,8 @@ function ApplicationDetailContent() {
 
       {/* Home & Admission */}
       <Section title="Home & Admission">
-        <Field label="Stays" value={app.residenceType ? RESIDENCE_TYPE_LABELS[app.residenceType] : null} />
-        <Field label="Travel to school" value={app.travelMinutes != null ? `${app.travelMinutes} min` : null} />
-        <Field label="Admission" value={app.admissionType ? ADMISSION_TYPE_LABELS[app.admissionType] : 'Decided at admission'} />
+        <Field label="Physical address" value={app.physicalAddress} />
+        <Field label="Admission" value={app.admissionType ? ADMISSION_TYPE_LABELS[app.admissionType] : 'Chosen when admitting'} />
         <Field label="Previous school" value={app.previousSchool} />
         <Field label="Reason for transfer" value={app.reasonForTransfer} />
       </Section>

@@ -366,6 +366,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return
       }
 
+      // ── First-login registration ─────────────────────────
+      // New student accounts must fill in the registration form once, right after
+      // their password change. Same shape as the guard above: no store update until done.
+      if (claims.registrationPending === true) {
+        setCookie(SESSION_COOKIE, user.uid)
+        router.replace('/complete-registration')
+        return
+      }
+
       const role     = (claims.role     ?? null) as UserRole | null
       const subtitle = (claims.subtitle ?? null) as string   | null
       // alpha_admin: strict boolean-true check on the verified token claim.

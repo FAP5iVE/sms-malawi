@@ -42,17 +42,7 @@ export const HOME_LANGUAGES = [
   'Other',
 ] as const
 
-// ── Student residence / admission ────────────────────────────────────────────
-export const RESIDENCE_TYPES = ['DAY_HOME', 'BOARDER', 'LODGING', 'WITH_RELATIVE'] as const
-export type ResidenceTypeValue = (typeof RESIDENCE_TYPES)[number]
-
-export const RESIDENCE_TYPE_LABELS: Record<ResidenceTypeValue, string> = {
-  DAY_HOME:      'Day scholar (lives at home)',
-  BOARDER:       'Boarder',
-  LODGING:       'Lodging / rented room',
-  WITH_RELATIVE: 'Stays with a relative',
-}
-
+// ── Student admission ────────────────────────────────────────────────────────
 export const ADMISSION_TYPES = ['NEW_INTAKE', 'TRANSFER_IN', 'RETURNEE'] as const
 export type AdmissionTypeValue = (typeof ADMISSION_TYPES)[number]
 
@@ -61,9 +51,6 @@ export const ADMISSION_TYPE_LABELS: Record<AdmissionTypeValue, string> = {
   TRANSFER_IN: 'Transferred in',
   RETURNEE:    'Returnee (readmitted)',
 }
-
-/** Travel time bounds (minutes, one way). Zod uses these; the form mirrors them. */
-export const TRAVEL_MINUTES_MAX = 600
 
 /** NRB number: length only. The format is NOT enforced until verified with NRB. */
 export const NRB_NUMBER_MIN = 5

@@ -36,6 +36,7 @@ import {
   SupportNeedInputSchema,
   UpdateSupportNeedSchema,
   StudentExitSchema,
+  StudentSelfRegistrationSchema,
 } from '@shared/schemas/student'
 import type { StudentStatus, Sex }     from '@prisma/client'
 import { sendError } from '@/server/lib/sendError'
@@ -201,6 +202,30 @@ studentsRouter.get(
 //  GET /students/me
 //  Student-role self-lookup — derives studentId from firebaseUid.
 // ─────────────────────────────────────────────────────────
+
+// PATCH /students/me/registration: first-login registration form (student role only).
+// Whitelisted low-risk fields only; see StudentSelfRegistrationSchema.
+studentsRouter.patch(
+  '/me/registration',
+  requirePermission('student.viewOwn'),
+  async (req: Request, res: Response) => {
+    if (req.user?.role !== 'student') {
+      res.status(400).json({ error: 'This endpoint is for student role only.' })
+      return
+    }
+    const parsed = StudentSelfRegistrationSchema.safeParse(req.body)
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid registration details.' })
+      return
+    }
+    try {
+      await studentService.completeOwnRegistration(req.user.uid, parsed.data)
+    } catch (err) {
+      return sendError(res, err, { defaultStatus: 400, tags: { module: 'students' } })
+    }
+    res.json({ ok: true })
+  }
+)
 
 studentsRouter.get(
   '/me',

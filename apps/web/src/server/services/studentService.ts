@@ -49,7 +49,7 @@ import {
   type Sex,
 } from '@prisma/client'
 import type { UserRole } from '@shared/types/roles'
-import type { ResidenceTypeValue, AdmissionTypeValue, ExitReasonValue } from '@shared/constants/malawi'
+import type { AdmissionTypeValue, ExitReasonValue } from '@shared/constants/malawi'
 import { SUPPORT_NEED_TYPES, type SupportNeedTypeValue, idNumberParts, nextIdSequence, formatIdNumber } from '@shared/constants/malawi'
 import type { ApiStudentGuardian } from '@shared/types/api'
 import type {
@@ -59,6 +59,7 @@ import type {
   SupportNeedInput,
   UpdateSupportNeedInput,
   StudentExitInput,
+  StudentSelfRegistrationInput,
 } from '@shared/schemas/student'
 import type { ApiStudentWelfare, ApiSupportNeed, ApiWelfareSummary } from '@shared/types/api'
 import * as algolia from '@/server/services/algoliaService'
@@ -179,11 +180,6 @@ async function recordGraduationOutcome(studentId: string): Promise<void> {
   }
 }
 
-/** Whole-minute travel time, or null. */
-function travelOrNull(v: number | null | undefined): number | null {
-  return v == null ? null : Math.round(v)
-}
-
 // ─────────────────────────────────────────────────────────
 //  RISK
 //  The old fee-only heuristic that lived here (computeRiskLevel — latest
@@ -268,8 +264,7 @@ export interface ApiStudentDetail extends ApiStudentSummary {
   traditionalAuthority: string | null
   religion:             string | null
   homeLanguage:         string | null
-  residenceType:        ResidenceTypeValue | null
-  travelMinutes:        number | null
+  physicalAddress:      string | null
   admissionType:        AdmissionTypeValue
   previousSchool:       string | null
   reasonForTransfer:    string | null
@@ -357,8 +352,7 @@ export interface CreateStudentInput {
   traditionalAuthority?: string
   religion?:             string
   homeLanguage?:         string
-  residenceType?:        ResidenceTypeValue
-  travelMinutes?:        number | null
+  physicalAddress?:      string
   admissionType?:        AdmissionTypeValue
   previousSchool?:       string
   reasonForTransfer?:    string
@@ -386,8 +380,7 @@ export interface UpdateStudentInput {
   traditionalAuthority?: string
   religion?:             string
   homeLanguage?:         string
-  residenceType?:        ResidenceTypeValue
-  travelMinutes?:        number | null
+  physicalAddress?:      string
   admissionType?:        AdmissionTypeValue
   previousSchool?:       string
   reasonForTransfer?:    string
@@ -423,6 +416,67 @@ export interface LinkFirebaseUidInput {
  *   }
  *   // Now use student.id safely
  */
+/**
+ * First-login registration form. A student may change ONLY the low-risk fields in
+ * StudentSelfRegistrationSchema; identity fields are never touched here. NRB can be added only
+ * when none is recorded. Clears the `registrationPending` claim (merging, never replacing, the
+ * other claims) so the next token lets the student into the app.
+ */
+export async function completeOwnRegistration(
+  firebaseUid: string,
+  input: StudentSelfRegistrationInput,
+): Promise<void> {
+  const student = await prisma.student.findUnique({
+    where:  { firebaseUid },
+    select: {
+      id: true, nrbNumber: true, traditionalAuthority: true, village: true, religion: true,
+      homeLanguage: true, address: true, physicalAddress: true, phone: true,
+      previousSchool: true, reasonForTransfer: true,
+    },
+  })
+  if (!student) {
+    throw Object.assign(new Error('No student record is linked to your account.'), { status: 403 })
+  }
+
+  const data: Prisma.StudentUpdateInput = { registrationCompletedAt: new Date() }
+  if (input.traditionalAuthority !== undefined) data.traditionalAuthority = blankToNull(input.traditionalAuthority)
+  if (input.village              !== undefined) data.village              = blankToNull(input.village)
+  if (input.religion             !== undefined) data.religion             = blankToNull(input.religion)
+  if (input.homeLanguage         !== undefined) data.homeLanguage         = blankToNull(input.homeLanguage)
+  if (input.address              !== undefined) data.address              = blankToNull(input.address)
+  if (input.physicalAddress      !== undefined) data.physicalAddress      = blankToNull(input.physicalAddress)
+  if (input.phone                !== undefined) data.phone                = blankToNull(input.phone)
+  if (input.previousSchool       !== undefined) data.previousSchool       = blankToNull(input.previousSchool)
+  if (input.reasonForTransfer    !== undefined) data.reasonForTransfer    = blankToNull(input.reasonForTransfer)
+  if (!student.nrbNumber && input.nrbNumber) {
+    const nrb = blankToNull(input.nrbNumber)
+    await assertNrbAvailable(nrb, student.id)
+    data.nrbNumber = nrb
+  }
+
+  try {
+    await prisma.student.update({ where: { id: student.id }, data })
+  } catch (err) {
+    if (isNrbCollision(err)) {
+      throw Object.assign(new Error('That NRB number is already recorded for another student.'), { status: 409 })
+    }
+    throw err
+  }
+
+  const authApp = admin.auth(getAdminApp())
+  const existing = await authApp.getUser(firebaseUid)
+  await authApp.setCustomUserClaims(firebaseUid, { ...existing.customClaims, registrationPending: false })
+
+  await auditService.log({
+    action:     'student.selfRegistration',
+    entityType: 'Student',
+    entityId:   student.id,
+    actorUid:   firebaseUid,
+    actorRole:  'student',
+    metadata:   { fields: Object.keys(data).filter((k) => k !== 'registrationCompletedAt' && k !== 'nrbNumber') },
+  })
+}
+
 export async function resolveStudentFromUid(
   firebaseUid: string
 ): Promise<{ id: string; classId: string | null; status: StudentStatus } | null> {
@@ -621,8 +675,7 @@ export async function getById(
       traditionalAuthority: true,
       religion:             true,
       homeLanguage:         true,
-      residenceType:        true,
-      travelMinutes:        true,
+      physicalAddress:      true,
       admissionType:        true,
       previousSchool:       true,
       reasonForTransfer:    true,
@@ -682,8 +735,7 @@ export async function getById(
     traditionalAuthority: row.traditionalAuthority,
     religion:             row.religion,
     homeLanguage:         row.homeLanguage,
-    residenceType:        row.residenceType,
-    travelMinutes:        row.travelMinutes,
+    physicalAddress:      row.physicalAddress,
     admissionType:        row.admissionType,
     previousSchool:       row.previousSchool,
     reasonForTransfer:    row.reasonForTransfer,
@@ -789,6 +841,8 @@ export async function provisionStudentAuthAccount(params: {
     role:                   'student',
     subtitle:               'Student',
     requiresPasswordChange: true,
+    // After the password change the student must complete the registration form once.
+    registrationPending:    true,
   })
 
   logger.info({ firebaseUid: fbUser.uid, email: params.email }, '[studentService] Firebase account provisioned for student')
@@ -918,8 +972,7 @@ export async function create(
           traditionalAuthority: blankToNull(input.traditionalAuthority),
           religion:             blankToNull(input.religion),
           homeLanguage:         blankToNull(input.homeLanguage),
-          residenceType:        input.residenceType ?? null,
-          travelMinutes:        travelOrNull(input.travelMinutes),
+          physicalAddress:      blankToNull(input.physicalAddress),
           admissionType:        input.admissionType ?? 'NEW_INTAKE',
           previousSchool:       blankToNull(input.previousSchool),
           reasonForTransfer:    blankToNull(input.reasonForTransfer),
@@ -1038,7 +1091,7 @@ export async function update(
       firstName: true, lastName: true, otherNames: true,
       classId: true, status: true, photoKey: true,
       nrbNumber: true, traditionalAuthority: true, religion: true,
-      homeLanguage: true, residenceType: true, travelMinutes: true,
+      homeLanguage: true, physicalAddress: true,
       admissionType: true, previousSchool: true, reasonForTransfer: true,
     },
   })
@@ -1079,8 +1132,7 @@ export async function update(
   if (input.traditionalAuthority !== undefined) updateData.traditionalAuthority = blankToNull(input.traditionalAuthority)
   if (input.religion             !== undefined) updateData.religion             = blankToNull(input.religion)
   if (input.homeLanguage         !== undefined) updateData.homeLanguage         = blankToNull(input.homeLanguage)
-  if (input.residenceType        !== undefined) updateData.residenceType        = input.residenceType
-  if (input.travelMinutes        !== undefined) updateData.travelMinutes        = travelOrNull(input.travelMinutes)
+  if (input.physicalAddress      !== undefined) updateData.physicalAddress      = blankToNull(input.physicalAddress)
   if (input.admissionType        !== undefined) updateData.admissionType        = input.admissionType
   if (input.previousSchool       !== undefined) updateData.previousSchool       = blankToNull(input.previousSchool)
   if (input.reasonForTransfer    !== undefined) updateData.reasonForTransfer    = blankToNull(input.reasonForTransfer)
@@ -1406,6 +1458,8 @@ function parseApplicationSupportNeeds(
 export interface ConvertApplicationInput {
   applicationId:   string
   classId?:        string
+  /** Chosen by staff in the admit dialog. Falls back to the form applied for when omitted. */
+  admissionType?:  AdmissionTypeValue
   actorUid:        string
   actorRole:       UserRole
   /**
@@ -1440,7 +1494,7 @@ export interface ConvertApplicationResult {
 export async function createFromApplication(
   input: ConvertApplicationInput
 ): Promise<ConvertApplicationResult> {
-  const { applicationId, classId, actorUid, actorRole, createLoginAccount } = input
+  const { applicationId, classId, admissionType, actorUid, actorRole, createLoginAccount } = input
 
   // ── 1. Fetch application
   const app = await prisma.application.findUnique({
@@ -1568,13 +1622,11 @@ export async function createFromApplication(
             previousSchool:       app.previousSchool,
             reasonForTransfer:    app.reasonForTransfer,
             nrbNumber,
-            residenceType:        app.residenceType,
-            travelMinutes:        app.travelMinutes,
-            // The applicant's own answer wins. When they left it blank: joining
-            // Form 2 or above means a learner moving in from elsewhere; Form 1
-            // is the normal intake. RETURNEE is otherwise set by staff when a
-            // learner who left is readmitted.
-            admissionType:        app.admissionType ?? (app.applyingForForm >= 2 ? 'TRANSFER_IN' : 'NEW_INTAKE'),
+            physicalAddress:      app.physicalAddress,
+            // Staff choose the admission type when admitting. If a caller omits it, fall back to
+            // any value already on the application (older applications), then to the form
+            // applied for: Form 2+ is a learner moving in from elsewhere, Form 1 is the normal intake.
+            admissionType:        admissionType ?? app.admissionType ?? (app.applyingForForm >= 2 ? 'TRANSFER_IN' : 'NEW_INTAKE'),
             // Welfare, health and special needs captured on the application.
             orphanStatus:         app.orphanStatus,
             isVulnerable:         app.isVulnerable,

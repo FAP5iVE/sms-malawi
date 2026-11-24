@@ -22,7 +22,8 @@
 import { useParams } from 'next/navigation'
 import { useState } from 'react'
 import Link from 'next/link'
-import { useStaffProfile } from '@/hooks/useHR'
+import { useStaffProfile, useAddPerformanceNote } from '@/hooks/useHR'
+import { useEffectiveViewingPeriod } from '@/hooks/useViewingPeriod'
 import { usePermissions } from '@/hooks/usePermissions'
 import { StaffResponsibilities } from '@/components/hr/StaffResponsibilities'
 import { TerminateStaffModal } from '@/components/hr/TerminateStaffModal'
@@ -38,7 +39,7 @@ import { PermissionGuard } from '@/components/shared/PermissionGuard'
 import { StaffForm } from '@/components/hr/StaffForm'
 import { ROLE_LABELS } from '@shared/types/roles'
 import type { ApiStaffDetail } from '@shared/types/api'
-import { ArrowLeft, Pencil } from 'lucide-react'
+import { ArrowLeft, Pencil, Star } from 'lucide-react'
 
 const REVIEWERS = ['admin', 'hr', 'high_rank'] as const
 
@@ -58,6 +59,138 @@ function formatMonths(months: number): string {
     rem ? `${rem} mo` : '',
   ].filter(Boolean)
   return parts.join(' ')
+}
+
+function Stars({ value, size = 'w-3.5 h-3.5' }: { value: number; size?: string }) {
+  return (
+    <span className="inline-flex" role="img" aria-label={`${value} out of 5`}>
+      {[1, 2, 3, 4, 5].map((n) => (
+        <Star key={n} className={`${size} ${n <= Math.round(value) ? 'fill-current text-tone-amber' : 'text-muted'}`} aria-hidden />
+      ))}
+    </span>
+  )
+}
+
+/**
+ * Staff performance: average rating, the full list of rating notes (who wrote each, which
+ * year and term), and a form to add a new rating and comment. Uses the existing POST /hr/performance.
+ */
+function PerformanceSection({ staffId, notes }: { staffId: string; notes: ApiStaffDetail['performanceNotes'] }) {
+  const period = useEffectiveViewingPeriod()
+  const add = useAddPerformanceNote()
+  const [yearInput, setYearInput] = useState<string | null>(null)
+  const [termInput, setTermInput] = useState<number | null>(null)
+  const [rating, setRating] = useState(0)
+  const [comment, setComment] = useState('')
+  const [formError, setFormError] = useState<string | null>(null)
+
+  const year = yearInput ?? period.academicYear
+  const term = termInput ?? period.term
+  const average = notes.length ? notes.reduce((s, n) => s + n.rating, 0) / notes.length : null
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!year || !term) { setFormError('Pick the academic year and term.'); return }
+    if (rating < 1) { setFormError('Choose a rating from 1 to 5 stars.'); return }
+    if (comment.trim().length < 10) { setFormError('Write a comment of at least 10 characters.'); return }
+    setFormError(null)
+    add.mutate(
+      { staffId, academicYear: year, term, rating, notes: comment.trim() },
+      { onSuccess: () => { setRating(0); setComment('') } },
+    )
+  }
+
+  return (
+    <div className="pt-5">
+      <div className="flex items-center justify-between mb-3 gap-3">
+        <p className="font-heading font-semibold text-xs text-muted">Performance</p>
+        {average !== null && (
+          <span className="flex items-center gap-2 text-xs text-muted">
+            <Stars value={average} />
+            <span className="font-semibold text-body">{average.toFixed(1)}/5</span>
+            <span>· {notes.length} {notes.length === 1 ? 'rating' : 'ratings'}</span>
+          </span>
+        )}
+      </div>
+
+      <form onSubmit={submit} className="bg-page rounded-xl p-3 space-y-3 mb-4">
+        <div className="flex flex-wrap gap-3">
+          <label className="text-xs text-muted flex flex-col gap-1">
+            Academic year
+            <input
+              value={year ?? ''}
+              onChange={(e) => setYearInput(e.target.value)}
+              placeholder="e.g. 2026"
+              className="border border-base rounded-xl px-3 py-2 text-sm bg-surface text-body min-h-[44px] w-32"
+            />
+          </label>
+          <label className="text-xs text-muted flex flex-col gap-1">
+            Term
+            <select
+              value={term ?? ''}
+              onChange={(e) => setTermInput(Number(e.target.value))}
+              className="border border-base rounded-xl px-3 py-2 text-sm bg-surface text-body min-h-[44px]"
+            >
+              {[1, 2, 3].map((t) => <option key={t} value={t}>Term {t}</option>)}
+            </select>
+          </label>
+          <div className="text-xs text-muted flex flex-col gap-1">
+            Rating
+            <div className="flex items-center min-h-[44px]" role="radiogroup" aria-label="Rating">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  role="radio"
+                  aria-checked={rating === n}
+                  aria-label={`${n} star${n > 1 ? 's' : ''}`}
+                  onClick={() => setRating(n)}
+                  className="p-1.5"
+                >
+                  <Star className={`w-6 h-6 ${n <= rating ? 'fill-current text-tone-amber' : 'text-muted'}`} aria-hidden />
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <textarea
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+          rows={3}
+          maxLength={1000}
+          placeholder="Comment on this staff member's performance (min. 10 characters)"
+          className="w-full border border-base rounded-xl px-3 py-2.5 text-sm bg-surface text-body resize-none"
+        />
+        {formError && <p role="alert" className="text-xs text-tone-coral">{formError}</p>}
+        <button
+          type="submit"
+          disabled={add.isPending}
+          className="px-4 py-2.5 rounded-xl bg-brand-navy text-white text-sm font-medium min-h-[44px] disabled:opacity-60"
+        >
+          {add.isPending ? 'Saving…' : 'Save rating'}
+        </button>
+      </form>
+
+      {notes.length === 0 ? (
+        <p className="text-sm text-muted">No performance ratings recorded yet.</p>
+      ) : (
+        <div className="space-y-3">
+          {notes.map((note) => (
+            <div key={note.id} className="bg-page rounded-xl p-3">
+              <div className="flex items-center justify-between text-xs text-muted mb-1 gap-3">
+                <span>{note.academicYear} · Term {note.term}</span>
+                <Stars value={note.rating} />
+              </div>
+              <p className="text-sm text-body">{note.notes}</p>
+              <p className="text-xs text-muted mt-1.5">
+                {note.authorName ?? 'Reviewer'} · {new Date(note.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function StaffProfilePage() {
@@ -378,25 +511,8 @@ function StaffProfileContent() {
           </div>
         )}
 
-        {/* Recent performance notes */}
-        {staff.performanceNotes.length > 0 && (
-          <div className="pt-5">
-            <p className="font-heading font-semibold text-xs text-muted mb-3">
-              Recent performance notes
-            </p>
-            <div className="space-y-3">
-              {staff.performanceNotes.map((note) => (
-                <div key={note.id} className="bg-page rounded-xl p-3">
-                  <div className="flex items-center justify-between text-xs text-muted mb-1">
-                    <span>{note.academicYear} · Term {note.term}</span>
-                    <span className="font-semibold">{note.rating}/5</span>
-                  </div>
-                  <p className="text-sm text-body">{note.notes}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Performance: rate, comment, and see the history */}
+        <PerformanceSection staffId={staff.id} notes={staff.performanceNotes} />
       </div>
 
       {editing && <StaffForm staffId={id} onClose={() => setEditing(false)} />}

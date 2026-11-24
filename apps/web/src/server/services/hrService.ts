@@ -206,12 +206,19 @@ export async function getStaffProfile(id: string) {
       leaveBalances: { where: { year: todayInMalawi().getUTCFullYear() }, orderBy: { leaveType: 'asc' } },
       leaveRequests: { orderBy: { createdAt: 'desc' }, take: 10 },
       loans: { where: { status: { in: ['APPROVED','DISBURSED','REPAYING'] } } },
-      performanceNotes: { orderBy: { createdAt: 'desc' }, take: 5 },
+      performanceNotes: { orderBy: { createdAt: 'desc' }, take: 50 },
       qualifiedSubjects: { orderBy: { subject: 'asc' }, select: { subject: true } },
       responsibilities: { orderBy: [{ endDate: { sort: 'asc', nulls: 'first' } }, { startDate: 'desc' }] },
     },
   })
-  return { ...profile, retirement: await buildRetirement(profile.dateOfBirth) }
+  // Show who wrote each performance note (the author is stored as a Firebase UID).
+  const authorUids = [...new Set(profile.performanceNotes.map((n) => n.authorUid))]
+  const authors = authorUids.length
+    ? await prisma.staffProfile.findMany({ where: { uid: { in: authorUids } }, select: { uid: true, firstName: true, lastName: true } })
+    : []
+  const authorName = new Map(authors.map((a) => [a.uid, `${a.firstName} ${a.lastName}`]))
+  const performanceNotes = profile.performanceNotes.map((n) => ({ ...n, authorName: authorName.get(n.authorUid) ?? null }))
+  return { ...profile, performanceNotes, retirement: await buildRetirement(profile.dateOfBirth) }
 }
 
 // [PRODUCTION FIX] Salary was never actually settable anywhere — see this
@@ -1335,8 +1342,20 @@ export async function recordLoanRepayment(loanId: string, amount: number) {
 }
 
 // ─── PERFORMANCE NOTES ───────────────────────────────────
-export async function addPerformanceNote(data: PerformanceNoteInput, actorUid: string) {
-  return prisma.performanceNote.create({ data: { ...data, authorUid: actorUid } })
+export async function addPerformanceNote(data: PerformanceNoteInput, actorUid: string, actorRole: string) {
+  const staff = await prisma.staffProfile.findUnique({ where: { id: data.staffId }, select: { uid: true } })
+  if (!staff) throw Object.assign(new Error('Staff member not found.'), { status: 404 })
+  // Nobody rates their own performance.
+  if (staff.uid === actorUid) {
+    throw Object.assign(new Error('You cannot rate your own performance.'), { status: 403 })
+  }
+  const note = await prisma.performanceNote.create({ data: { ...data, authorUid: actorUid } })
+  await auditService.log({
+    action: 'hr.performance.add', entityType: 'PerformanceNote', entityId: note.id,
+    actorUid, actorRole,
+    metadata: { staffId: data.staffId, academicYear: data.academicYear, term: data.term, rating: data.rating },
+  })
+  return note
 }
 
 export async function getContractExpiryAlert(daysAhead: number) {

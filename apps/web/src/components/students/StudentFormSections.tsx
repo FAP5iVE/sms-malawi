@@ -4,14 +4,14 @@
  * [CHANGE TYPE]: TARGETED EDIT (2026-11-04, student form brought level with the application form)
  *   - Personal: Village now sits after District and T/A (it was under Contact as
  *     "Home Village"); NRB follows it.
- *   - Academic: "Home & Admission" is one group (stays, travel time, admission type,
+ *   - Academic: "Home & Admission" is one group (physical address, admission type,
  *     previous school, reason for transfer), as on the profile and the /apply form.
  *     "Home & Travel" no longer lives under Contact.
  *   - New WelfareSection (orphan status, vulnerability, health / medical alert,
  *     special needs). It owns no form state: StudentForm keeps the draft and saves it
  *     through the welfare endpoints after the student exists, so welfare data never
  *     bypasses student.editWelfare or the audit log.
- *   - residenceType / admissionType selects send undefined, not '', for "not recorded"
+ *   - the admissionType select sends undefined, not '', for "not recorded"
  *     ('' is not a valid enum value and blocked the form).
  *
  * apps/web/src/components/students/StudentFormSections.tsx — Phase C5
@@ -61,11 +61,8 @@ import {
   MALAWI_DISTRICTS,
   RELIGIONS,
   HOME_LANGUAGES,
-  RESIDENCE_TYPES,
-  RESIDENCE_TYPE_LABELS,
   ADMISSION_TYPES,
   ADMISSION_TYPE_LABELS,
-  TRAVEL_MINUTES_MAX,
   ORPHAN_STATUSES,
   ORPHAN_STATUS_LABELS,
   SUPPORT_NEED_TYPES,
@@ -97,9 +94,6 @@ export const inputCls =
   'focus:outline-none focus:ring-2 focus:ring-brand-teal/25 focus:border-brand-teal ' +
   'transition-all font-sans'
 
-/** A blank <select> means "not recorded": send undefined, never '' (not a valid enum value). */
-const blankToUndefined = (v: unknown) => (v === '' || v == null ? undefined : v)
-
 // ─────────────────────────────────────────────────────────────────────────────
 // NATIONALITY OPTIONS
 // ─────────────────────────────────────────────────────────────────────────────
@@ -115,7 +109,7 @@ export const STEP_FIELDS: ReadonlyArray<ReadonlyArray<keyof StudentFormValues>> 
   // Step 1 — Personal
   ['firstName', 'lastName', 'otherNames', 'dateOfBirth', 'sex', 'nationality', 'district', 'traditionalAuthority', 'village', 'nrbNumber', 'religion', 'homeLanguage'],
   // Step 2 — Academic + Home & Admission
-  ['classId', 'status', 'residenceType', 'travelMinutes', 'admissionType', 'previousSchool', 'reasonForTransfer'],
+  ['classId', 'status', 'physicalAddress', 'admissionType', 'previousSchool', 'reasonForTransfer'],
   // Step 3 — Contact + Guardian (email is the login identifier; guardian
   // fields are required by CreateStudentSchema — omitting them here was what
   // let the final submit fail silently, since handleSubmit blocked on unshown
@@ -383,37 +377,18 @@ export function AcademicSection({ register, errors, selectedClassId }: SectionPr
 
       <FieldDivider title="Home and admission" />
 
-      {/* Where the learner stays and how far they travel. */}
-      <Field label="Where the student stays" error={errors.residenceType?.message}>
-        <select
-          {...register('residenceType', { setValueAs: blankToUndefined })}
-          className={inputCls}
-          defaultValue=""
-        >
-          <option value="">Not recorded</option>
-          {RESIDENCE_TYPES.map((t) => (
-            <option key={t} value={t}>{RESIDENCE_TYPE_LABELS[t]}</option>
-          ))}
-        </select>
-      </Field>
-
-      <Field label="Travel Time to School (minutes, one way)" error={errors.travelMinutes?.message}>
-        <input
-          {...register('travelMinutes', {
-            setValueAs: (v) => (v === '' || v == null || Number.isNaN(Number(v)) ? null : Number(v)),
-          })}
-          type="number"
-          inputMode="numeric"
-          min={0}
-          max={TRAVEL_MINUTES_MAX}
-          className={inputCls}
-          placeholder="45"
+      {/* Where the learner is staying now (free text). The postal address is under Contact. */}
+      <Field label="Physical address" error={errors.physicalAddress?.message} className="col-span-full">
+        <textarea
+          {...register('physicalAddress')}
+          className={`${inputCls} resize-none`}
+          rows={2}
+          placeholder="e.g. Area 47, Sector 3, Lilongwe"
         />
       </Field>
 
-      {/* How the learner joined. Applications convert to NEW_INTAKE (Form 1) or
-          TRANSFER_IN (Form 2+) automatically unless the applicant chose; RETURNEE
-          is set here by staff. */}
+      {/* How the learner joined. Chosen by staff when the application is admitted
+          (defaults to NEW_INTAKE for Form 1, TRANSFER_IN for Form 2+); RETURNEE is set here by staff. */}
       <Field label="Admission type" error={errors.admissionType?.message}>
         <select {...register('admissionType')} className={inputCls} defaultValue="NEW_INTAKE">
           {ADMISSION_TYPES.map((t) => (
@@ -486,7 +461,7 @@ export function ContactSection({ register, errors }: SectionProps) {
 
       {/* Address — spans full width */}
       <Field
-        label="Postal / physical address"
+        label="Postal address"
         error={errors.address?.message}
         className="col-span-full"
       >
@@ -494,7 +469,7 @@ export function ContactSection({ register, errors }: SectionProps) {
           {...register('address')}
           className={`${inputCls} resize-none`}
           rows={3}
-          placeholder="Postal or physical address"
+          placeholder="e.g. P.O. Box 123, Blantyre"
         />
       </Field>
 

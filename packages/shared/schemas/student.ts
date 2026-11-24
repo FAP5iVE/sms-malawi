@@ -26,9 +26,7 @@
 import { z } from 'zod'
 import {
   MALAWI_SUBJECTS,
-  RESIDENCE_TYPES,
   ADMISSION_TYPES,
-  TRAVEL_MINUTES_MAX,
   ORPHAN_STATUSES,
   SUPPORT_NEED_TYPES,
   EXIT_REASONS,
@@ -66,8 +64,8 @@ export const StudentDemographicsShape = {
   traditionalAuthority: optionalText(100),
   religion:             optionalText(60),
   homeLanguage:         optionalText(60),
-  residenceType:        z.enum(RESIDENCE_TYPES).optional(),
-  travelMinutes:        z.number().int().min(0).max(TRAVEL_MINUTES_MAX).nullable().optional(),
+  // Where the student currently stays (free text). `address` is the postal address.
+  physicalAddress:      optionalText(300),
   admissionType:        z.enum(ADMISSION_TYPES).optional(),
   previousSchool:       optionalText(200),
   reasonForTransfer:    optionalText(500),
@@ -158,6 +156,23 @@ export const CreateStudentSchema = z.object({
   ...StudentDemographicsShape,
 })
 
+// First-login registration form (student self-service). ONLY low-risk fields: identity fields
+// (name, email, date of birth, sex, nationality, district, guardian) are deliberately absent, so
+// a student cannot change them here. Unknown keys are stripped by zod.
+export const StudentSelfRegistrationSchema = z.object({
+  traditionalAuthority: optionalText(100),
+  village:              optionalText(100),
+  religion:             optionalText(60),
+  homeLanguage:         optionalText(60),
+  address:              optionalText(300),
+  physicalAddress:      optionalText(300),
+  phone:                optionalText(30),
+  previousSchool:       optionalText(200),
+  reasonForTransfer:    optionalText(500),
+  nrbNumber:            nrbNumberField,
+})
+export type StudentSelfRegistrationInput = z.infer<typeof StudentSelfRegistrationSchema>
+
 export const UpdateStudentSchema = CreateStudentSchema.partial().extend({
   status: StudentStatusSchema.optional(),
 })
@@ -215,10 +230,9 @@ export const ApplicationSchema = z.object({
   homeLanguage: optionalText(60),
   // National ID (NRB / birth certificate) - optional; same length rule as the student.
   nrbNumber: nrbNumberField,
-  // Home & Admission - all optional. A blank <select> is sent as undefined by the form.
-  residenceType: z.enum(RESIDENCE_TYPES).optional(),
-  travelMinutes: z.number().int().min(0).max(TRAVEL_MINUTES_MAX).nullable().optional(),
-  admissionType: z.enum(ADMISSION_TYPES).optional(),
+  // Home: where the applicant currently stays (free text, optional). The admission type is
+  // NOT asked on the application; staff choose it when they admit the applicant.
+  physicalAddress: optionalText(300),
   // Welfare, health and special needs - all optional and sensitive. Stored on the
   // application, shown only to student.viewWelfare roles, copied to the student
   // on admission (see studentService.createFromApplication).

@@ -65,8 +65,8 @@ export interface ApiStudent {
   traditionalAuthority?: string | null
   religion?: string | null
   homeLanguage?: string | null
-  residenceType?: 'DAY_HOME' | 'BOARDER' | 'LODGING' | 'WITH_RELATIVE' | null
-  travelMinutes?: number | null
+  /** Where the student currently stays (free text). `address` is the postal address. */
+  physicalAddress?: string | null
   admissionType?: 'NEW_INTAKE' | 'TRANSFER_IN' | 'RETURNEE'
   previousSchool?: string | null
   reasonForTransfer?: string | null
@@ -344,8 +344,7 @@ export interface ApiApplication {
   applyingForForm: number
   academicYear?: string | null
   // Home & Admission
-  residenceType?: 'DAY_HOME' | 'BOARDER' | 'LODGING' | 'WITH_RELATIVE' | null
-  travelMinutes?: number | null
+  physicalAddress?: string | null
   admissionType?: 'NEW_INTAKE' | 'TRANSFER_IN' | 'RETURNEE' | null
   previousSchool?: string | null
   reasonForTransfer?: string | null
@@ -1159,6 +1158,7 @@ export interface ApiStaffDetail extends ApiStaffProfile {
     rating: number
     notes: string
     authorUid: string
+    authorName?: string | null
     createdAt: string
   }[]
 }

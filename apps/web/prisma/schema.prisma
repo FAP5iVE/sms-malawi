@@ -43,8 +43,8 @@ model Student {
   traditionalAuthority String?                  // free text for now; a per-district lookup can follow
   religion             String?
   homeLanguage         String?
-  residenceType        ResidenceType?
-  travelMinutes        Int?                     // one-way travel time to school, minutes
+  physicalAddress      String?                  // where the student currently stays (free text); `address` is the postal address
+  registrationCompletedAt DateTime?             // set when the student submits the first-login registration form
   admissionType        AdmissionType  @default(NEW_INTAKE)
   previousSchool       String?
   reasonForTransfer    String?
@@ -169,13 +169,6 @@ enum SupportNeedType {
   LEARNING_DIFFICULTY
   ALBINISM
   OTHER
-}
-
-enum ResidenceType {
-  DAY_HOME
-  BOARDER
-  LODGING
-  WITH_RELATIVE
 }
 
 enum AdmissionType {
@@ -408,9 +401,8 @@ model Application {
   homeLanguage     String?
   // ── Carried onto the Student when the application is converted ───────────
   nrbNumber        String?                  // optional; NOT unique here (the Student column is)
-  residenceType    ResidenceType?
-  travelMinutes    Int?
-  admissionType    AdmissionType?           // null = derived from applyingForForm at conversion
+  physicalAddress  String?                  // where the applicant currently stays (free text)
+  admissionType    AdmissionType?           // chosen by staff when admitting; null on new applications
   // Welfare / health / special needs: sensitive child data. Served to the UI only
   // for roles holding student.viewWelfare (the applications routes strip these
   // fields otherwise) and copied to the Student + student_support_needs on admission.

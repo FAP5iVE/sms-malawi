@@ -111,6 +111,7 @@ import { prisma }            from '@/lib/prisma'
 import { logger }            from '@/lib/logger'
 import { uploadFile, getSignedViewUrl, FILE_PREFIX } from '@/lib/storage'
 import * as settingsService  from '@/server/services/settingsService'
+import * as auditService     from '@/server/services/auditService'
 import { getRasterSchoolLogo } from '@/server/services/schoolLogoService'
 import {
   createPdfDoc, drawCard, drawLetterhead, drawStamp, ellipsize, fillColor, fmtDate, gradeInk, put, resolveHeadTeacher,
@@ -1153,4 +1154,136 @@ export async function generateSingleReportCard(
       error:          err instanceof Error ? err.message : 'Unknown error',
     }
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REPORT CARD COMMENTS (class teacher + head teacher)
+// The card already READS these (see getReportCardData: the class teacher's comment is the one
+// written by the class's assigned teacher, the head teacher's is the other one). This is the write
+// side, so the comments can actually be entered before the cards are generated.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type ReportCommentKind = 'CLASS_TEACHER' | 'HEAD_TEACHER'
+
+export interface ReportCommentRow {
+  studentId:           string
+  registrationNo:      string
+  fullName:            string
+  /** False when the term's results have not been computed yet, so no comment can be attached. */
+  hasResults:          boolean
+  classTeacherComment: string
+  headTeacherComment:  string
+}
+
+export interface ReportCommentSheet {
+  canClassTeacher: boolean
+  canHeadTeacher:  boolean
+  rows:            ReportCommentRow[]
+}
+
+const HEAD_COMMENT_ROLES = ['admin', 'high_rank']
+
+/** Who may write which comment for a class. The class teacher is the class's assigned teacher. */
+function commentRights(actor: { uid: string; role: string }, classTeacherId: string | null) {
+  const isClassTeacher = !!classTeacherId && actor.uid === classTeacherId
+  return {
+    canClassTeacher: isClassTeacher,
+    // The head's comment is any comment NOT written by the class teacher (that is how the card
+    // reads it), so a class teacher cannot also write it.
+    canHeadTeacher:  HEAD_COMMENT_ROLES.includes(actor.role) && !isClassTeacher,
+  }
+}
+
+export async function getCommentSheet(
+  classId: string,
+  term: 1 | 2 | 3,
+  academicYear: string,
+  actor: { uid: string; role: string },
+): Promise<ReportCommentSheet> {
+  const cls = await prisma.class.findUnique({ where: { id: classId }, select: { teacherId: true } })
+  if (!cls) throw Object.assign(new Error('Class not found.'), { status: 404 })
+
+  const students = await prisma.student.findMany({
+    where:   { classId, status: 'ACTIVE' },
+    select:  { id: true, registrationNo: true, firstName: true, lastName: true },
+    orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+  })
+  const termResults = await prisma.termResult.findMany({
+    where:  { studentId: { in: students.map((s) => s.id) }, term, academicYear },
+    select: { id: true, studentId: true },
+  })
+  const resultByStudent = new Map(termResults.map((r) => [r.studentId, r.id]))
+  const comments = termResults.length
+    ? await prisma.teacherComment.findMany({
+        where:   { termResultId: { in: termResults.map((r) => r.id) } },
+        orderBy: { createdAt: 'asc' },
+      })
+    : []
+
+  const rows: ReportCommentRow[] = students.map((s) => {
+    const termResultId = resultByStudent.get(s.id)
+    const mine = comments.filter((c) => c.termResultId === termResultId)
+    return {
+      studentId:           s.id,
+      registrationNo:      s.registrationNo,
+      fullName:            `${s.firstName} ${s.lastName}`,
+      hasResults:          !!termResultId,
+      classTeacherComment: mine.find((c) => c.authorUid === cls.teacherId)?.comment ?? '',
+      headTeacherComment:  mine.find((c) => c.authorUid !== cls.teacherId)?.comment ?? '',
+    }
+  })
+
+  return { ...commentRights(actor, cls.teacherId), rows }
+}
+
+/** Save (or clear, when blank) one comment on one student's term result. */
+export async function saveComment(
+  input: { studentId: string; term: 1 | 2 | 3; academicYear: string; kind: ReportCommentKind; comment: string },
+  actor: { uid: string; role: string },
+): Promise<void> {
+  const student = await prisma.student.findUnique({
+    where:  { id: input.studentId },
+    select: { class: { select: { teacherId: true } } },
+  })
+  if (!student) throw Object.assign(new Error('Student not found.'), { status: 404 })
+  const classTeacherId = student.class?.teacherId ?? null
+
+  const rights = commentRights(actor, classTeacherId)
+  if (input.kind === 'CLASS_TEACHER' && !rights.canClassTeacher) {
+    throw Object.assign(new Error("Only this class's teacher can write the class teacher's comment."), { status: 403 })
+  }
+  if (input.kind === 'HEAD_TEACHER' && !rights.canHeadTeacher) {
+    throw Object.assign(new Error("Only the head teacher (high rank or admin) can write the head teacher's comment."), { status: 403 })
+  }
+
+  const termResult = await prisma.termResult.findFirst({
+    where:  { studentId: input.studentId, term: input.term, academicYear: input.academicYear },
+    select: { id: true },
+  })
+  if (!termResult) {
+    throw Object.assign(new Error("This term's results have not been computed for this student yet."), { status: 409 })
+  }
+
+  const text = input.comment.trim()
+  const existing = await prisma.teacherComment.findFirst({
+    where: {
+      termResultId: termResult.id,
+      authorUid:    input.kind === 'CLASS_TEACHER' ? actor.uid : { not: classTeacherId ?? '' },
+    },
+    orderBy: { createdAt: 'asc' },
+  })
+
+  if (!text) {
+    if (existing) await prisma.teacherComment.delete({ where: { id: existing.id } })
+  } else if (existing) {
+    await prisma.teacherComment.update({ where: { id: existing.id }, data: { comment: text, authorUid: actor.uid } })
+  } else {
+    await prisma.teacherComment.create({ data: { termResultId: termResult.id, authorUid: actor.uid, comment: text } })
+  }
+
+  await auditService.log({
+    action: 'exams.reportComment.save', entityType: 'TeacherComment', entityId: termResult.id,
+    actorUid: actor.uid, actorRole: actor.role,
+    metadata: { studentId: input.studentId, term: input.term, academicYear: input.academicYear, kind: input.kind, cleared: !text },
+  })
 }

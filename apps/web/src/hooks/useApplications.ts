@@ -79,10 +79,10 @@ export function useConvertToStudent() {
   const qc = useQueryClient()
   return useMutation({
     meta: { successMessage: 'Applicant enrolled as a student', failureTitle: 'Could not enrol the applicant' },
-    mutationFn: ({ id, classId, createLoginAccount }: { id: string; classId?: string; createLoginAccount?: boolean }) =>
+    mutationFn: ({ id, classId, createLoginAccount, admissionType }: { id: string; classId?: string; createLoginAccount?: boolean; admissionType?: 'NEW_INTAKE' | 'TRANSFER_IN' | 'RETURNEE' }) =>
       apiFetch<ApiConvertApplicationResult>(`/applications/${id}/convert`, {
         method: 'POST',
-        body: JSON.stringify({ classId, createLoginAccount }),
+        body: JSON.stringify({ classId, createLoginAccount, admissionType }),
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.applications.all() })
