@@ -18,6 +18,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type {
   ApiFinanceSummary, ApiInvoice, ApiExpense, ApiScholarship, ApiDebtsSummary,
   ApiStudentCredit, ApiFeeStructure, ApiStudentFeeCommitment, ApiBulkInvoiceResult,
+  ApiStudentBillingStandingResponse,
 } from '@shared/types/api'
 import type {
   RecordPaymentInput, CreateExpenseInput, CreateBudgetInput,
@@ -79,6 +80,24 @@ export function useInvoices(
       return allInvoices
     },
     enabled,
+  })
+}
+
+// [2026-11-24] The "who to bill" list under the student search bar on Invoice
+// Entry & Allocation: every ACTIVE student with what they owe across all terms
+// and years, and how long the oldest unpaid invoice has been overdue. Lives
+// under the ['finances'] key prefix, so recording a payment or generating an
+// invoice (both invalidate queryKeys.finances.all()) refreshes it with no extra
+// wiring. Ordering, filtering and paging are done on the client (see
+// InvoicesTab.tsx) because the whole list is one small payload.
+export function useStudentBillingStanding(academicYear: string, term: number, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.finances.billingStanding(academicYear, term),
+    queryFn: () =>
+      apiFetch<ApiStudentBillingStandingResponse>(
+        `/finances/billing-standing?academicYear=${encodeURIComponent(academicYear)}&term=${term}`
+      ),
+    enabled: enabled && !!academicYear && !!term,
   })
 }
 

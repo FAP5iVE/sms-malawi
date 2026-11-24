@@ -56,6 +56,15 @@
  *   deep-links are retired along with the modals they used to open — bulk
  *   generation is now its own top-level tab (see finances/page.tsx).
  *
+ *
+ * [2026-11-24 ADDITION]: a "Students to bill" list under the student search
+ *   bar (only while no student is selected). Every ACTIVE student, ordered so
+ *   the longest overdue come first, with a standing filter (all / overdue / not
+ *   yet due / not billed this term / fully paid), a sort and a class filter,
+ *   paged with the app's standard pager. Picking a row does exactly what picking
+ *   a search result does (selectStudent). The search bar, its two-character
+ *   minimum and its dropdown are unchanged. Data: useStudentBillingStanding()
+ *   (GET /finances/billing-standing). Decisions: apps/web/docs/invoice-student-list.md
  * [DEPENDS ON]: useFinances.ts, useStudents.ts, usePermissions.ts,
  *   InvoiceNotes.tsx (preserved, unchanged, re-mounted here)
  */
@@ -74,10 +83,11 @@ import {
   useFetchReceipt,
   useStudentBalance,
   useStudentCredits,
+  useStudentBillingStanding,
 } from '@/hooks/useFinances'
 import { ApiError } from '@/lib/api-client'
 import { formatMWK, FEE_CATEGORY_LABELS, PAYMENT_METHOD_OPTIONS, PAYMENT_METHOD_LABELS } from '@shared/constants/malawi'
-import type { ApiInvoice, ApiFeeStructure } from '@shared/types/api'
+import type { ApiInvoice, ApiFeeStructure, ApiStudentBillingStanding } from '@shared/types/api'
 import { InvoiceNotes } from '@/components/finances/InvoiceNotes'
 import { StudentPortalStatementTab } from '@/components/finances/StudentPortalStatementTab'
 import {
@@ -98,6 +108,8 @@ import { Modal, MODAL_BTN_SECONDARY } from '@/components/shared/Modal'
 import { StatusText } from '@/components/shared/StatusText'
 import { statusTone, statusWord } from '@/lib/hills/statusWord'
 import { studentClassLabel } from '@/lib/hills/studentClass'
+import { ListPager } from '@/components/shared/ListPager'
+import { usePagedRows } from '@/lib/hills/usePagedRows'
 
 type PaymentMethodValue = (typeof PAYMENT_METHOD_OPTIONS)[number]['value']
 
@@ -135,6 +147,277 @@ interface SubmitFlow {
 const round2 = (n: number): number => Math.round(n * 100) / 100
 
 // ─────────────────────────────────────────────────────────────────────────
+// "STUDENTS TO BILL" LIST — ranking and filtering rules (pure functions)
+// ─────────────────────────────────────────────────────────────────────────
+
+type StandingFilter = 'ALL' | 'OVERDUE' | 'NOT_YET_DUE' | 'NOT_BILLED' | 'PAID_UP'
+type StandingSort = 'LONGEST_OVERDUE' | 'LARGEST_BALANCE' | 'NEWEST_DUE' | 'NAME'
+
+// Where a student stands, as ONE of four exclusive states. The default order
+// follows this: overdue first, then owing but not yet due, then students who
+// owe nothing but have no invoice this term (the cashier may still need to
+// bill them), then fully paid students last.
+type Standing = 'OVERDUE' | 'NOT_YET_DUE' | 'NOT_BILLED' | 'PAID_UP'
+
+function standingOf(r: ApiStudentBillingStanding): Standing {
+  if (r.totalOwed > 0) return r.daysOverdue > 0 ? 'OVERDUE' : 'NOT_YET_DUE'
+  return r.billedThisTerm ? 'PAID_UP' : 'NOT_BILLED'
+}
+
+const STANDING_RANK: Record<Standing, number> = { OVERDUE: 0, NOT_YET_DUE: 1, NOT_BILLED: 2, PAID_UP: 3 }
+
+// "Not billed this term" is about the term on screen only, so it also matches a
+// student who is overdue from an earlier term and has no invoice for this one.
+function matchesStanding(r: ApiStudentBillingStanding, f: StandingFilter): boolean {
+  if (f === 'ALL') return true
+  if (f === 'NOT_BILLED') return !r.billedThisTerm
+  return standingOf(r) === f
+}
+
+function compareName(a: ApiStudentBillingStanding, b: ApiStudentBillingStanding): number {
+  return (
+    a.lastName.localeCompare(b.lastName, undefined, { sensitivity: 'base' }) ||
+    a.firstName.localeCompare(b.firstName, undefined, { sensitivity: 'base' }) ||
+    a.registrationNo.localeCompare(b.registrationNo, undefined, { numeric: true })
+  )
+}
+
+// ISO strings from one server share a format, so plain string comparison orders them.
+function compareIso(a: string | null, b: string | null): number {
+  return (a ?? '') < (b ?? '') ? -1 : (a ?? '') > (b ?? '') ? 1 : 0
+}
+
+function sortStandings(rows: ApiStudentBillingStanding[], sort: StandingSort): ApiStudentBillingStanding[] {
+  const out = [...rows]
+  out.sort((a, b) => {
+    if (sort === 'NAME') return compareName(a, b)
+    if (sort === 'LARGEST_BALANCE') {
+      return b.totalOwed - a.totalOwed || b.daysOverdue - a.daysOverdue || compareName(a, b)
+    }
+    if (sort === 'NEWEST_DUE') {
+      // Students who owe something, latest due date first; everyone owing nothing after them.
+      const aOwes = a.totalOwed > 0
+      const bOwes = b.totalOwed > 0
+      if (aOwes !== bOwes) return aOwes ? -1 : 1
+      return compareIso(b.latestDueDate, a.latestDueDate) || b.totalOwed - a.totalOwed || compareName(a, b)
+    }
+    // LONGEST_OVERDUE (the default)
+    const sa = standingOf(a)
+    const sb = standingOf(b)
+    if (sa !== sb) return STANDING_RANK[sa] - STANDING_RANK[sb]
+    if (sa === 'OVERDUE') {
+      return b.daysOverdue - a.daysOverdue || b.totalOwed - a.totalOwed || compareName(a, b)
+    }
+    if (sa === 'NOT_YET_DUE') {
+      // Soonest due date first: those about to become overdue are next in line.
+      return compareIso(a.oldestDueDate, b.oldestDueDate) || b.totalOwed - a.totalOwed || compareName(a, b)
+    }
+    return compareName(a, b)
+  })
+  return out
+}
+
+const STANDING_FILTER_LABEL: Record<StandingFilter, string> = {
+  ALL: 'All students',
+  OVERDUE: 'Overdue',
+  NOT_YET_DUE: 'Owing, not yet due',
+  NOT_BILLED: 'Not billed this term',
+  PAID_UP: 'Fully paid',
+}
+
+const STANDING_SORT_LABEL: Record<StandingSort, string> = {
+  LONGEST_OVERDUE: 'Longest overdue first',
+  LARGEST_BALANCE: 'Largest balance first',
+  NEWEST_DUE: 'Newest due date first',
+  NAME: 'Name A to Z',
+}
+
+const shortDate = (iso: string): string =>
+  new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
+
+function StudentBillingList({
+  academicYear,
+  term,
+  filter,
+  sort,
+  classFilter,
+  onFilter,
+  onSort,
+  onClassFilter,
+  onSelect,
+}: {
+  academicYear: string
+  term: number
+  filter: StandingFilter
+  sort: StandingSort
+  classFilter: string
+  onFilter: (f: StandingFilter) => void
+  onSort: (s: StandingSort) => void
+  onClassFilter: (c: string) => void
+  onSelect: (studentId: string) => void
+}) {
+  const { data, isLoading, isError, refetch, isFetching } = useStudentBillingStanding(academicYear, term)
+  const all = useMemo(() => data?.students ?? [], [data])
+
+  const classOptions = useMemo(
+    () =>
+      [...new Set(all.map((r) => r.className).filter((c): c is string => !!c))].sort((a, b) =>
+        a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+      ),
+    [all]
+  )
+  // The class filter applies first so the counts beside each standing match
+  // what picking that standing would show.
+  const inClass = useMemo(
+    () => (classFilter ? all.filter((r) => r.className === classFilter) : all),
+    [all, classFilter]
+  )
+  const counts = useMemo(() => {
+    const c: Record<StandingFilter, number> = { ALL: inClass.length, OVERDUE: 0, NOT_YET_DUE: 0, NOT_BILLED: 0, PAID_UP: 0 }
+    for (const r of inClass) {
+      const st = standingOf(r)
+      // OVERDUE, NOT_YET_DUE and PAID_UP are exclusive standings. NOT_BILLED
+      // is a separate question (no invoice this term) and spans standings, so
+      // it is counted on its own rather than through standingOf().
+      if (st !== 'NOT_BILLED') c[st] += 1
+      if (!r.billedThisTerm) c.NOT_BILLED += 1
+    }
+    return c
+  }, [inClass])
+
+  const rows = useMemo(
+    () => sortStandings(inClass.filter((r) => matchesStanding(r, filter)), sort),
+    [inClass, filter, sort]
+  )
+  const paging = usePagedRows(rows, { resetKey: `${filter}|${sort}|${classFilter}` })
+
+  const selectCls = 'w-full border border-base rounded-lg px-3 py-2 text-sm bg-surface min-h-11'
+
+  return (
+    <div className="mt-5 space-y-3">
+      <div>
+        <h3 className="font-heading text-sm font-semibold text-body">Students to bill</h3>
+        <p className="text-xs text-muted mt-0.5">
+          Select a student to bill them or record a payment. Balances cover every term and year.
+        </p>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div>
+          <label htmlFor="standing-filter" className="text-xs text-muted mb-1 block">Show</label>
+          <select
+            id="standing-filter"
+            value={filter}
+            onChange={(e) => onFilter(e.target.value as StandingFilter)}
+            className={selectCls}
+          >
+            {(Object.keys(STANDING_FILTER_LABEL) as StandingFilter[]).map((k) => (
+              <option key={k} value={k}>
+                {STANDING_FILTER_LABEL[k]} ({counts[k]})
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="standing-sort" className="text-xs text-muted mb-1 block">Order by</label>
+          <select
+            id="standing-sort"
+            value={sort}
+            onChange={(e) => onSort(e.target.value as StandingSort)}
+            className={selectCls}
+          >
+            {(Object.keys(STANDING_SORT_LABEL) as StandingSort[]).map((k) => (
+              <option key={k} value={k}>{STANDING_SORT_LABEL[k]}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="standing-class" className="text-xs text-muted mb-1 block">Class</label>
+          <select
+            id="standing-class"
+            value={classFilter}
+            onChange={(e) => onClassFilter(e.target.value)}
+            className={selectCls}
+          >
+            <option value="">All classes</option>
+            {classOptions.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="py-6 flex items-center justify-center gap-2 text-sm text-muted">
+          <Loader2 className="w-4 h-4 animate-spin" /> Loading students…
+        </div>
+      ) : isError ? (
+        <div className="py-6 text-center text-sm">
+          <p className="font-medium text-body">Could not load the student list.</p>
+          <button
+            type="button"
+            onClick={() => void refetch()}
+            disabled={isFetching}
+            className="mt-2 text-sm font-medium text-tone-teal app-action disabled:opacity-50"
+          >
+            Try again
+          </button>
+        </div>
+      ) : rows.length === 0 ? (
+        <p className="py-6 text-center text-sm text-muted">No students match this filter.</p>
+      ) : (
+        <>
+          <ul className="divide-y divide-base border-y border-base">
+            {paging.visible.map((r) => {
+              const st = standingOf(r)
+              const owes = r.totalOwed > 0
+              return (
+                <li key={r.studentId}>
+                  <button
+                    type="button"
+                    onClick={() => onSelect(r.studentId)}
+                    className="w-full text-left px-3 py-3 min-h-11 hover:bg-page flex items-start justify-between gap-3"
+                  >
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium text-body truncate">
+                        {r.firstName} {r.lastName}
+                      </span>
+                      <span className="block text-xs text-muted truncate">
+                        {r.registrationNo} &middot; {studentClassLabel(r, 'Unassigned')}
+                      </span>
+                      {owes && r.oldestDueDate && (
+                        <span className="block text-xs text-muted">
+                          {st === 'OVERDUE' ? 'Oldest invoice due' : 'Due'} {shortDate(r.oldestDueDate)}
+                          {!r.billedThisTerm ? ' · Not billed this term' : ''}
+                        </span>
+                      )}
+                    </span>
+                    <span className="shrink-0 text-right">
+                      {owes && (
+                        <span className="block text-sm font-semibold text-body tabular">{formatMWK(r.totalOwed)}</span>
+                      )}
+                      {st === 'OVERDUE' && (
+                        <StatusText tone="danger">
+                          Overdue {r.daysOverdue} {r.daysOverdue === 1 ? 'day' : 'days'}
+                        </StatusText>
+                      )}
+                      {st === 'NOT_YET_DUE' && <StatusText tone="warning">Not yet due</StatusText>}
+                      {st === 'NOT_BILLED' && <StatusText tone="info">Not billed this term</StatusText>}
+                      {st === 'PAID_UP' && <StatusText tone="success">Fully paid</StatusText>}
+                    </span>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+          <ListPager paging={paging} />
+        </>
+      )}
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // ENTRY POINT — routes staff to Invoice Entry & Allocation, students to
 // the dedicated Student Portal Statement screen (this used to be a small
 // temporary bridge component pending that screen's build; now replaced
@@ -166,6 +449,12 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
     searchParams.get('studentId')
   )
   const [studentSearch, setStudentSearch] = useState('')
+  // The "Students to bill" list's controls live here, not in the list, so they
+  // survive picking a student and pressing Change -- a cashier working down one
+  // class's overdue students keeps their place instead of resetting each time.
+  const [standingFilter, setStandingFilter] = useState<StandingFilter>('ALL')
+  const [standingSort, setStandingSort] = useState<StandingSort>('LONGEST_OVERDUE')
+  const [standingClass, setStandingClass] = useState('')
 
   const [rows, setRows] = useState<Row[]>([])
   const [rowsInitializedFor, setRowsInitializedFor] = useState<string | null>(null)
@@ -650,42 +939,59 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
             Bill to (select student)
           </label>
           {!selectedStudent ? (
-            <div className="relative">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-              <input
-                value={studentSearch}
-                onChange={(e) => setStudentSearch(e.target.value)}
-                placeholder="Search by name or number…"
-                className="w-full border border-base rounded-lg pl-9 pr-3 py-2.5 text-sm bg-page min-h-11"
-              />
-              {studentSearch.length >= 2 && (
-                <div className="absolute z-10 mt-1 w-full bg-surface border border-base rounded-lg shadow-lg max-h-64 overflow-y-auto">
-                  {searchLoading ? (
-                    <div className="p-3 flex items-center gap-2 text-sm text-muted">
-                      <Loader2 className="w-4 h-4 animate-spin" /> Searching…
-                    </div>
-                  ) : searchResults.length === 0 ? (
-                    <p className="p-3 text-sm text-muted">No students found.</p>
-                  ) : (
-                    searchResults.map((s) => (
-                      <button
-                        key={s.id}
-                        type="button"
-                        onClick={() => selectStudent(s.id)}
-                        className="w-full text-left px-3 py-2.5 hover:bg-page border-b border-base last:border-0"
-                      >
-                        <p className="text-sm font-medium text-body">
-                          {s.firstName} {s.lastName}
-                        </p>
-                        <p className="text-xs text-muted">
-                          {s.registrationNo} &middot; {studentClassLabel(s, 'Unassigned')}
-                        </p>
-                      </button>
-                    ))
-                  )}
-                </div>
+            <>
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+                <input
+                  value={studentSearch}
+                  onChange={(e) => setStudentSearch(e.target.value)}
+                  placeholder="Search by name or number…"
+                  className="w-full border border-base rounded-lg pl-9 pr-3 py-2.5 text-sm bg-page min-h-11"
+                />
+                {studentSearch.length >= 2 && (
+                  <div className="absolute z-10 mt-1 w-full bg-surface border border-base rounded-lg shadow-lg max-h-64 overflow-y-auto">
+                    {searchLoading ? (
+                      <div className="p-3 flex items-center gap-2 text-sm text-muted">
+                        <Loader2 className="w-4 h-4 animate-spin" /> Searching…
+                      </div>
+                    ) : searchResults.length === 0 ? (
+                      <p className="p-3 text-sm text-muted">No students found.</p>
+                    ) : (
+                      searchResults.map((s) => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => selectStudent(s.id)}
+                          className="w-full text-left px-3 py-2.5 hover:bg-page border-b border-base last:border-0"
+                        >
+                          <p className="text-sm font-medium text-body">
+                            {s.firstName} {s.lastName}
+                          </p>
+                          <p className="text-xs text-muted">
+                            {s.registrationNo} &middot; {studentClassLabel(s, 'Unassigned')}
+                          </p>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+              {/* Hidden as soon as a pick is made (the chosen student is still
+                  loading for a moment), so the click visibly does something. */}
+              {!selectedStudentId && (
+                <StudentBillingList
+                  academicYear={academicYear}
+                  term={term}
+                  filter={standingFilter}
+                  sort={standingSort}
+                  classFilter={standingClass}
+                  onFilter={setStandingFilter}
+                  onSort={setStandingSort}
+                  onClassFilter={setStandingClass}
+                  onSelect={selectStudent}
+                />
               )}
-            </div>
+            </>
           ) : (
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div>

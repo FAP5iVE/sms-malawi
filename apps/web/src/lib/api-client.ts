@@ -328,6 +328,8 @@ export const queryKeys = {
     invoices: (filters: Record<string, unknown>) =>
       ['finances', 'invoices', filters] as const,
     invoice: (id: string) => ['finances', 'invoice', id] as const,
+    billingStanding: (year: string, term: number) =>
+      ['finances', 'billing-standing', year, term] as const,
     balance: (studentId: string, academicYear: string) =>
       ['finances', 'balance', studentId, academicYear] as const,
     invoiceNotes: (invoiceId: string) =>

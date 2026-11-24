@@ -54,6 +54,12 @@
 //     updateStudentFeeCommitmentStatus() (new) — the Finance Fee
 //     Structure workstation's "Enrolled Add-ons" / "Edit Add-on
 //     Commitments" action.
+//
+// [2026-11-24 ADDITION] Invoice Entry & Allocation "who to bill" list:
+//   - listStudentBillingStanding() (new, at the end of this file) — one row
+//     per ACTIVE student with what they owe across every term and year, how
+//     long the oldest unpaid invoice has been overdue, and whether they are
+//     already billed for the term on screen. Read-only; nothing here writes.
 import { prisma } from '@/lib/prisma'
 import type { Prisma } from '@prisma/client'
 import { logger } from '@/lib/logger'
@@ -73,6 +79,8 @@ import * as settingsService from '@/server/services/settingsService'
 import { SETTING_KEYS } from '@shared/types/settings'
 import { withInvoiceNumber } from '@/server/services/invoiceNumberService'
 import { summariseInvoices } from '@/server/services/analytics/financeLogic'
+import { daysBetween } from '@/server/services/reporting/kpi'
+import type { ApiStudentBillingStandingResponse } from '@shared/types/api'
 
 export async function checkBalanceGate(
   studentId: string,
@@ -948,4 +956,112 @@ export async function updateStudentFeeCommitmentStatus(
   })
   logger.info({ event: 'studentFeeCommitment.statusChanged', id, status: data.status })
   return commitment
+}
+
+// ─── INVOICE ENTRY "WHO TO BILL" LIST ────────────────────────────────────────
+//
+// One row per ACTIVE student (the same set the student search on that screen
+// offers), summarising what they owe across ALL terms and years -- arrears
+// carried from an earlier term are exactly the "overdue for a very long time"
+// cases the list must put first, and a query scoped to the term on screen would
+// hide them.
+//
+// "Overdue" = an invoice that still has a balance and whose due date has
+// passed. It is read from the due date, not from Invoice.status: the OVERDUE
+// status is only set when the late-penalty job runs, so an invoice a month past
+// due can still say UNPAID or PARTIAL. This is the same definition the
+// receivables aging report uses (analytics/financeAging.ts), so the two screens
+// can never disagree about who is overdue. Days are counted from the OLDEST
+// unpaid overdue invoice, because that is how long the family has really been
+// behind.
+//
+// Credits (StudentCredit) are deliberately not netted off: they are applied to
+// the next invoice at generation time, and the balances here are the invoice
+// balances the cashier will actually see after selecting the student.
+export async function listStudentBillingStanding(
+  academicYear: string,
+  term: number,
+  asOf: Date = new Date(),
+): Promise<ApiStudentBillingStandingResponse> {
+  const [students, owing, billed] = await Promise.all([
+    prisma.student.findMany({
+      where: { status: 'ACTIVE' },
+      select: {
+        id: true,
+        registrationNo: true,
+        firstName: true,
+        lastName: true,
+        class: { select: { name: true, form: true, stream: true } },
+      },
+    }),
+    prisma.invoice.findMany({
+      where: { balance: { gt: 0 }, student: { status: 'ACTIVE' } },
+      select: { studentId: true, balance: true, dueDate: true },
+    }),
+    prisma.invoice.findMany({
+      where: { academicYear, term, student: { status: 'ACTIVE' } },
+      select: { studentId: true },
+    }),
+  ])
+
+  interface Owed {
+    total: number
+    overdue: number
+    count: number
+    oldestDue: Date
+    latestDue: Date
+    daysOverdue: number
+  }
+  const owedByStudent = new Map<string, Owed>()
+  for (const inv of owing) {
+    const balance = Number(inv.balance)
+    if (!(balance > 0)) continue
+    const days = daysBetween(inv.dueDate, asOf)
+    const cur = owedByStudent.get(inv.studentId)
+    if (!cur) {
+      owedByStudent.set(inv.studentId, {
+        total: balance,
+        overdue: days > 0 ? balance : 0,
+        count: 1,
+        oldestDue: inv.dueDate,
+        latestDue: inv.dueDate,
+        daysOverdue: Math.max(0, days),
+      })
+      continue
+    }
+    cur.total += balance
+    if (days > 0) cur.overdue += balance
+    cur.count += 1
+    if (inv.dueDate < cur.oldestDue) cur.oldestDue = inv.dueDate
+    if (inv.dueDate > cur.latestDue) cur.latestDue = inv.dueDate
+    if (days > cur.daysOverdue) cur.daysOverdue = days
+  }
+
+  const billedIds = new Set(billed.map((b) => b.studentId))
+  const money = (n: number) => Math.round(n * 100) / 100
+
+  return {
+    asOf: asOf.toISOString(),
+    academicYear,
+    term,
+    students: students.map((st) => {
+      const owed = owedByStudent.get(st.id)
+      return {
+        studentId: st.id,
+        registrationNo: st.registrationNo,
+        firstName: st.firstName,
+        lastName: st.lastName,
+        className: st.class?.name ?? null,
+        classForm: st.class?.form ?? null,
+        classStream: st.class?.stream ?? null,
+        totalOwed: owed ? money(owed.total) : 0,
+        overdueAmount: owed ? money(owed.overdue) : 0,
+        owingInvoices: owed?.count ?? 0,
+        daysOverdue: owed?.daysOverdue ?? 0,
+        oldestDueDate: owed ? owed.oldestDue.toISOString() : null,
+        latestDueDate: owed ? owed.latestDue.toISOString() : null,
+        billedThisTerm: billedIds.has(st.id),
+      }
+    }),
+  }
 }

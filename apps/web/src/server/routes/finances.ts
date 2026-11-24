@@ -63,6 +63,10 @@
  *      nothing ever posted to. POST /library-fines now validates with
  *      CreateLibraryFineSchema instead of a raw type assertion (it no
  *      longer accepts a client-supplied firestoreDocId at all).
+ * [2026-11-24]:
+ *  11. Added GET /billing-standing, calling feeService.listStudentBillingStanding()
+ *      -- the read-only data behind the "who to bill" list under the student
+ *      search bar on Invoice Entry & Allocation. Same role set as GET /invoices.
  */
 
 import 'server-only'
@@ -359,6 +363,20 @@ financesRouter.get('/invoices', verifyAuth, requireRole([...FINANCE_ROLES]), asy
     page:  safePage,
     pages: Math.max(Math.ceil(total / safePageSize), 1),
   })
+})
+
+// [2026-11-24] Invoice Entry & Allocation -- "who to bill" list. One row per
+// ACTIVE student with what they owe across all terms/years and how long the
+// oldest unpaid invoice has been overdue; academicYear/term (default: the
+// current period) only decide the `billedThisTerm` flag. Read-only, and gated
+// exactly like GET /invoices above, whose data it summarises.
+financesRouter.get('/billing-standing', verifyAuth, requireRole([...FINANCE_ROLES]), async (req, res) => {
+  try {
+    const { academicYear, term } = await settingsService.resolvePeriod(req.query)
+    res.json(await feeService.listStudentBillingStanding(academicYear, term))
+  } catch (err: unknown) {
+    return sendError(res, err, { tags: { module: 'finances', route: 'billing-standing' } })
+  }
 })
 
 // [PRODUCTION FIX] Single-invoice fetch with line items — needed when

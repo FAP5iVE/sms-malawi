@@ -495,6 +495,43 @@ export interface ApiBulkInvoiceResult {
   students: ApiBulkInvoiceStudentResult[]
 }
 
+// [2026-11-24] Invoice Entry & Allocation -- the "who to bill" list under the
+// student search bar. One row per ACTIVE student, summarising what they owe
+// across EVERY term and year (not just the one on screen), so arrears carried
+// from earlier terms are not hidden. "Overdue" means an invoice with a balance
+// whose due date has passed -- the same definition the receivables aging
+// report uses (financeAging.ts) -- not the OVERDUE status flag, which is only
+// set once the late-penalty job has run.
+export interface ApiStudentBillingStanding {
+  studentId: string
+  registrationNo: string
+  firstName: string
+  lastName: string
+  className: string | null
+  classForm: number | null
+  classStream: string | null
+  /** Sum of balances on all invoices with money still owing (all terms and years). */
+  totalOwed: number
+  /** The part of totalOwed on invoices already past their due date. */
+  overdueAmount: number
+  /** How many invoices still carry a balance. */
+  owingInvoices: number
+  /** Days past the due date of the OLDEST unpaid overdue invoice; 0 when nothing is overdue. */
+  daysOverdue: number
+  /** Earliest / latest due date among invoices still owing (ISO), or null when nothing is owed. */
+  oldestDueDate: string | null
+  latestDueDate: string | null
+  /** Whether an invoice already exists for the term the screen is showing. */
+  billedThisTerm: boolean
+}
+
+export interface ApiStudentBillingStandingResponse {
+  asOf: string
+  academicYear: string
+  term: number
+  students: ApiStudentBillingStanding[]
+}
+
 export interface ApiInvoiceNote {
   id: string
   invoiceId: string

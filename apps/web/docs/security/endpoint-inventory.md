@@ -8,9 +8,9 @@ Every server entry point, extracted from source by `test/security/endpointInvent
 
 | Measure | Count |
 |---|---:|
-| Express endpoints (mounted under `/api`) | 610 |
+| Express endpoints (mounted under `/api`) | 611 |
 | — mutations (non-GET) | 281 |
-| — with a role/permission gate | 521 (251 mutations) |
+| — with a role/permission gate | 522 (251 mutations) |
 | — signed-in only, with a declared policy | 64 |
 | — public (no identity) | 25 |
 | — declared `cron-or-admin` | 1 |
@@ -343,6 +343,7 @@ Columns: **Client IDs** = path params plus `body` / `query` when the handler rea
 |  | GET | `/api/finances/accounting/ledger/:code` | `requireRole([...FINANCE_ROLES])` |  | :code, query |
 |  | GET | `/api/finances/accounting/trial-balance` | `requireRole([...FINANCE_ROLES])` |  | — |
 |  | GET | `/api/finances/balance/:studentId` | `requireRole([admin, finance, high_rank, student])` |  | :studentId, query |
+|  | GET | `/api/finances/billing-standing` | `requireRole([...FINANCE_ROLES])` |  | query |
 |  | GET | `/api/finances/budget` | `requireRole([...FINANCE_ROLES, high_rank])` |  | query |
 | ● | POST | `/api/finances/budget` | `requireRole([...FINANCE_ROLES])` |  | body |
 |  | GET | `/api/finances/budget-windows` | `requireAnyPermission([finance.viewBudget, procurement.createRequisition])` |  | query |
