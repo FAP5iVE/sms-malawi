@@ -9,6 +9,8 @@ import { useState, useEffect } from 'react'
 import { StatusText } from '@/components/shared/StatusText'
 import { Loader2, Save, Plus, X } from 'lucide-react'
 import { apiFetch }            from '@/lib/api-client'
+import { useAuthStore }        from '@/store/authStore'
+import { FeatureRollout }      from '@/components/settings/finance/FeatureRollout'
 import type { PayeBracket }    from '@shared/types/settings'
 
 const inputCls = 'w-full min-h-[44px] border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25'
@@ -24,7 +26,7 @@ interface FinanceConfig {
   receipt_prefix:             string
 }
 
-export function FinanceSettings() {
+function FinanceGeneralSettings() {
   const [config,  setConfig]  = useState<FinanceConfig>({
     fee_reminder_days_before:  '3',
     late_payment_penalty_pct:  '5',
@@ -236,6 +238,54 @@ export function FinanceSettings() {
           {saved && <StatusText tone="success" size="md">Saved</StatusText>}
         </div>
       </form>
+    </div>
+  )
+}
+
+type FinanceSection = 'general' | 'rollout'
+
+/**
+ * Settings → Finance. Gains an internal sub-navigation (Finance Hardening
+ * Plan, Part 5 §4.1); only sections that exist are listed — each later phase
+ * adds its own entry when its screen ships.
+ *   General          — admin, finance (unchanged; its API is admin/finance only)
+ *   Feature rollout  — admin (read-only), finance (proposes), high_rank (approves)
+ */
+export function FinanceSettings() {
+  const role = useAuthStore((s) => s.role)
+  const superUser = useAuthStore((s) => s.superUser)
+
+  const showGeneral = superUser || role === 'admin' || role === 'finance'
+  const sections: { id: FinanceSection; label: string }[] = [
+    ...(showGeneral ? [{ id: 'general' as const, label: 'General' }] : []),
+    { id: 'rollout' as const, label: 'Feature rollout' },
+  ]
+  const [picked, setPicked] = useState<FinanceSection | null>(null)
+  const active: FinanceSection = picked && sections.some((s) => s.id === picked)
+    ? picked
+    : (sections[0]?.id ?? 'rollout')
+
+  return (
+    <div className="space-y-6">
+      {sections.length > 1 && (
+        <div role="tablist" aria-label="Finance settings" className="flex gap-2 border-b border-base">
+          {sections.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              role="tab"
+              aria-selected={active === s.id}
+              onClick={() => setPicked(s.id)}
+              className={`min-h-[44px] px-4 text-sm font-heading font-semibold border-b-2 -mb-px transition-colors ${
+                active === s.id ? 'border-brand-teal text-brand-navy' : 'border-transparent text-muted hover:text-body'
+              }`}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {active === 'general' ? <FinanceGeneralSettings /> : <FeatureRollout />}
     </div>
   )
 }

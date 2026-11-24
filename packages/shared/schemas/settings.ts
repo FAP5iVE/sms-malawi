@@ -9,7 +9,12 @@
  * [DEPENDS ON]: none
  */
 import { z } from 'zod'
-import { SETTING_KEYS, type SettingKey } from '../types/settings'
+import {
+  SETTING_KEYS,
+  FINANCE_V2_FLAG_KEYS,
+  type SettingKey,
+  type FinanceV2Module,
+} from '../types/settings'
 import { validateIdFormat } from '../constants/malawi/registration'
 
 // ─────────────────────────────────────────────────────────
@@ -104,6 +109,26 @@ const dayOfMonthSchema = z
   .int()
   .min(1, 'Day must be at least 1')
   .max(28, 'Day cannot exceed 28 (safe for all months)')
+
+// ── Finance v2 rollout (D-28)
+const financeV2ModuleSchema = z.enum(
+  Object.keys(FINANCE_V2_FLAG_KEYS) as [FinanceV2Module, ...FinanceV2Module[]],
+)
+
+const financeV2ProposalSchema = z.object({
+  module:        financeV2ModuleSchema,
+  enabled:       z.boolean(),
+  reason:        z.string().trim().min(1).max(500),
+  proposedByUid: z.string().min(1),
+  proposedAt:    z.string().min(1),
+})
+
+/** { [module]: proposal } — a record, so there is at most one per module. */
+const financeV2ProposalsSchema = z.record(z.string(), financeV2ProposalSchema)
+  .refine(
+    (rec) => Object.entries(rec).every(([k, v]) => k === v.module),
+    'Each proposal must be stored under its own module name',
+  )
 
 // ─────────────────────────────────────────────────────────
 //  FULL SETTING VALUE SCHEMA MAP
@@ -229,6 +254,19 @@ export const SETTING_VALUE_SCHEMAS: { readonly [K in SettingKey]: z.ZodType } = 
     nonNegativeIntSchema('Grace period days').max(90),
   [SETTING_KEYS.FINANCE_INSTALLMENT_OPTIONS]:
     installmentOptionsSchema,
+
+  // ── Finance — v2 rollout flags (booleans) and the pending-proposal record
+  [SETTING_KEYS.FINANCE_V2_LEDGER_ENGINE]:     z.boolean(),
+  [SETTING_KEYS.FINANCE_V2_ACCOUNTS_REGISTRY]: z.boolean(),
+  [SETTING_KEYS.FINANCE_V2_RECEIVABLES]:       z.boolean(),
+  [SETTING_KEYS.FINANCE_V2_EXPENSES]:          z.boolean(),
+  [SETTING_KEYS.FINANCE_V2_PAYROLL]:           z.boolean(),
+  [SETTING_KEYS.FINANCE_V2_LOANS]:             z.boolean(),
+  [SETTING_KEYS.FINANCE_V2_FINES]:             z.boolean(),
+  [SETTING_KEYS.FINANCE_V2_RECONCILIATION]:    z.boolean(),
+  [SETTING_KEYS.FINANCE_V2_REPORTS]:           z.boolean(),
+  [SETTING_KEYS.FINANCE_V2_PERMISSIONS]:       z.boolean(),
+  [SETTING_KEYS.FINANCE_V2_PROPOSALS]:         financeV2ProposalsSchema,
 
   // ── Finance — payroll
   [SETTING_KEYS.FINANCE_PAYROLL_RUN_DAY]:

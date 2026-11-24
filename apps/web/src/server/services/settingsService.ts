@@ -18,9 +18,18 @@ import 'server-only'
 
 import { prisma } from '@/lib/prisma'
 import { getRedis } from '@/lib/redis'
+import type { Prisma } from '@prisma/client'
 import { logger } from '@/lib/logger'
+import * as auditService from '@/server/services/auditService'
+import { assertNotSelfReview } from '@/server/lib/selfReview'
+import type { UserRole } from '@shared/types/roles'
 import {
   SETTING_KEYS,
+  FINANCE_V2_FLAG_KEYS,
+  FINANCE_V2_MODULES,
+  type FinanceV2Module,
+  type FinanceV2Proposal,
+  type FinanceV2Proposals,
   SETTING_META,
   SETTING_CATEGORIES,
   type SettingKey,
@@ -649,4 +658,285 @@ export async function getCommonSettings() {
     SETTING_KEYS.APP_CURRENCY_LOCALE,
     SETTING_KEYS.APP_MAINTENANCE_MODE,
   ])
+}
+
+// ─────────────────────────────────────────────────────────
+//  FINANCE v2 ROLLOUT FLAGS  (Finance Hardening Plan — D-28, P0-03)
+//
+//  One flag per module: `finance.v2.<module>`, default OFF. A module runs its
+//  v1 code path until its go-live gate has passed and a flag flip has been
+//  proposed by Finance and approved by High Rank (Part 6 §7).
+//
+//  Reading:  `const flags = await getFinanceV2Flags()` ONCE at the top of a
+//            request, then `await isFinanceV2('payroll', flags)` wherever the
+//            branch is needed — a request never sees two different answers.
+//  Changing: only through proposeFinanceV2Change → decideFinanceV2Proposal.
+//            The generic settings routes never write these keys.
+// ─────────────────────────────────────────────────────────
+
+export type FinanceV2Flags = Record<FinanceV2Module, boolean>
+
+/** All ten flags in one cached read (one `getMany`). */
+export async function getFinanceV2Flags(): Promise<FinanceV2Flags> {
+  const keys = FINANCE_V2_MODULES.map((m) => FINANCE_V2_FLAG_KEYS[m])
+  const vals = await getMany(keys)
+  const flags = {} as FinanceV2Flags
+  for (const m of FINANCE_V2_MODULES) {
+    // Strictly `=== true`: anything unexpected is treated as OFF (fail to v1).
+    flags[m] = vals[FINANCE_V2_FLAG_KEYS[m]] === true
+  }
+  return flags
+}
+
+/**
+ * Is this module's v2 path switched on? Pass the snapshot from
+ * getFinanceV2Flags() so one request reads the flags once; without a
+ * snapshot it reads (cached) on its own.
+ */
+export async function isFinanceV2(
+  module: FinanceV2Module,
+  snapshot?: FinanceV2Flags,
+): Promise<boolean> {
+  const flags = snapshot ?? (await getFinanceV2Flags())
+  return flags[module] === true
+}
+
+export interface FinanceV2RolloutRow {
+  module: FinanceV2Module
+  enabled: boolean
+  /** When a person last changed this flag; null if it has never been changed (default OFF). */
+  lastChangedAt: string | null
+  lastChangedByUid: string | null
+  /** Display name of lastChangedByUid, when a staff profile exists for it. */
+  lastChangedByName: string | null
+  pending: (FinanceV2Proposal & { proposedByName: string | null }) | null
+}
+
+/**
+ * Current state of every module for the Feature rollout screen. Reads the
+ * database directly (not the cache) so the screen is never stale.
+ */
+export async function getFinanceV2Rollout(): Promise<FinanceV2RolloutRow[]> {
+  const flagKeys = FINANCE_V2_MODULES.map((m) => FINANCE_V2_FLAG_KEYS[m])
+  const rows = await prisma.systemSettings.findMany({
+    where: { key: { in: [...flagKeys, SETTING_KEYS.FINANCE_V2_PROPOSALS] } },
+  })
+  const byKey = new Map(rows.map((r) => [r.key, r]))
+  const proposals = parseValue(
+    SETTING_KEYS.FINANCE_V2_PROPOSALS,
+    byKey.get(SETTING_KEYS.FINANCE_V2_PROPOSALS)?.value,
+  )
+
+  // One lookup for every person named on the screen.
+  const uids = new Set<string>()
+  for (const m of FINANCE_V2_MODULES) {
+    const r = byKey.get(FINANCE_V2_FLAG_KEYS[m])
+    if (r?.updatedByUid) uids.add(r.updatedByUid)
+    const p = proposals[m]
+    if (p) uids.add(p.proposedByUid)
+  }
+  const profiles = uids.size
+    ? await prisma.staffProfile.findMany({
+        where: { uid: { in: [...uids] } },
+        select: { uid: true, firstName: true, lastName: true },
+      })
+    : []
+  const nameOf = new Map(profiles.map((p) => [p.uid, `${p.firstName} ${p.lastName}`.trim()]))
+
+  return FINANCE_V2_MODULES.map((module) => {
+    const key = FINANCE_V2_FLAG_KEYS[module]
+    const row = byKey.get(key)
+    const enabled = row ? parseValue(key, row.value) === true : false
+    // A row seeded by seedDefaults() has no updatedByUid: nobody changed it.
+    const changed = row && row.updatedByUid ? row : null
+    const pending = proposals[module]
+    return {
+      module,
+      enabled,
+      lastChangedAt: changed ? changed.updatedAt.toISOString() : null,
+      lastChangedByUid: changed ? changed.updatedByUid : null,
+      lastChangedByName: changed?.updatedByUid ? nameOf.get(changed.updatedByUid) ?? null : null,
+      pending: pending
+        ? { ...pending, proposedByName: nameOf.get(pending.proposedByUid) ?? null }
+        : null,
+    }
+  })
+}
+
+function rolloutError(message: string, status: number): Error {
+  return Object.assign(new Error(message), { status })
+}
+
+/**
+ * Serialises every proposal read-modify-write on the proposals row. The row
+ * is created if missing, then locked FOR UPDATE for the rest of the
+ * transaction, so two concurrent proposals/decisions queue behind each other
+ * and only one can claim a given proposal.
+ */
+async function withLockedProposals<T>(
+  fn: (
+    tx: Prisma.TransactionClient,
+    proposals: FinanceV2Proposals,
+  ) => Promise<T>,
+): Promise<T> {
+  const key = SETTING_KEYS.FINANCE_V2_PROPOSALS
+  const meta = SETTING_META[key]
+  return prisma.$transaction(async (tx) => {
+    await tx.systemSettings.upsert({
+      where: { key },
+      update: {},
+      create: {
+        key,
+        value: {},
+        description: meta.description,
+        category: meta.category,
+        isPublic: meta.isPublic,
+        updatedByUid: null,
+      },
+    })
+    const locked = await tx.$queryRaw<Array<{ value: unknown }>>`
+      SELECT "value" FROM "system_settings" WHERE "key" = ${key} FOR UPDATE
+    `
+    const proposals = parseValue(key, locked[0]?.value)
+    return fn(tx, proposals)
+  })
+}
+
+async function saveProposals(
+  tx: Prisma.TransactionClient,
+  proposals: FinanceV2Proposals,
+  actorUid: string,
+): Promise<void> {
+  await tx.systemSettings.update({
+    where: { key: SETTING_KEYS.FINANCE_V2_PROPOSALS },
+    data: { value: proposals as object, updatedByUid: actorUid },
+  })
+}
+
+export interface FinanceV2Actor {
+  uid: string
+  role: UserRole
+}
+
+/**
+ * Finance proposes switching a module's flag. One pending proposal per
+ * module; a proposal that would not change anything is refused.
+ */
+export async function proposeFinanceV2Change(
+  input: { module: FinanceV2Module; enabled: boolean; reason: string },
+  actor: FinanceV2Actor,
+): Promise<FinanceV2Proposal> {
+  const fm = input.module
+  if (!FINANCE_V2_MODULES.includes(fm)) {
+    throw rolloutError(`Unknown finance module "${String(fm)}".`, 400)
+  }
+  const reason = (input.reason ?? '').trim()
+  if (!reason) throw rolloutError('A reason is required for every flag change.', 400)
+  if (reason.length > 500) throw rolloutError('The reason must be 500 characters or fewer.', 400)
+
+  const flagKey = FINANCE_V2_FLAG_KEYS[fm]
+  const current = (await getFinanceV2Rollout()).find((r) => r.module === fm)
+  if (current && current.enabled === input.enabled) {
+    throw rolloutError(
+      `Finance v2 "${fm}" is already ${input.enabled ? 'ON' : 'OFF'}.`,
+      409,
+    )
+  }
+
+  const proposal = await withLockedProposals(async (tx, proposals) => {
+    if (proposals[fm]) {
+      throw rolloutError(`A change for "${fm}" is already waiting for approval.`, 409)
+    }
+    const created: FinanceV2Proposal = {
+      module: fm,
+      enabled: input.enabled,
+      reason,
+      proposedByUid: actor.uid,
+      proposedAt: new Date().toISOString(),
+    }
+    await saveProposals(tx, { ...proposals, [fm]: created }, actor.uid)
+    return created
+  })
+
+  await cacheDelete(SETTING_KEYS.FINANCE_V2_PROPOSALS)
+  await auditService.log({
+    action: 'finance.flag_proposed',
+    entityType: 'FinanceV2Flag',
+    entityId: flagKey,
+    actorUid: actor.uid,
+    actorRole: actor.role,
+    metadata: { context: { module: fm, requestedState: input.enabled, reason } },
+  })
+  logger.info({ module: fm, enabled: input.enabled, actorUid: actor.uid }, '[settingsService] Finance v2 flag change proposed')
+  return proposal
+}
+
+/**
+ * High Rank approves or rejects a pending proposal. The proposer can never
+ * decide their own proposal (segregation of duties). Approval flips the flag
+ * and clears the proposal in ONE transaction; rejection only clears it.
+ */
+export async function decideFinanceV2Proposal(
+  input: { module: FinanceV2Module; decision: 'APPROVE' | 'REJECT'; note?: string },
+  actor: FinanceV2Actor,
+): Promise<{ module: FinanceV2Module; enabled: boolean; decision: 'APPROVE' | 'REJECT' }> {
+  const fm = input.module
+  if (!FINANCE_V2_MODULES.includes(fm)) {
+    throw rolloutError(`Unknown finance module "${String(fm)}".`, 400)
+  }
+  const flagKey = FINANCE_V2_FLAG_KEYS[fm]
+  const flagMeta = SETTING_META[flagKey]
+
+  const decided = await withLockedProposals(async (tx, proposals) => {
+    const pending = proposals[fm]
+    if (!pending) {
+      throw rolloutError(`There is no pending change for "${fm}" (it may already have been decided).`, 409)
+    }
+    assertNotSelfReview(pending.proposedByUid, actor.uid, 'feature-flag change')
+
+    const { [fm]: _removed, ...rest } = proposals
+    void _removed
+    await saveProposals(tx, rest, actor.uid)
+
+    if (input.decision === 'APPROVE') {
+      await tx.systemSettings.upsert({
+        where: { key: flagKey },
+        update: { value: pending.enabled, updatedByUid: actor.uid },
+        create: {
+          key: flagKey,
+          value: pending.enabled,
+          description: flagMeta.description,
+          category: flagMeta.category,
+          isPublic: flagMeta.isPublic,
+          updatedByUid: actor.uid,
+        },
+      })
+    }
+    return pending
+  })
+
+  await cacheDelete(SETTING_KEYS.FINANCE_V2_PROPOSALS)
+  if (input.decision === 'APPROVE') await cacheDelete(flagKey)
+
+  await auditService.log({
+    action: input.decision === 'APPROVE' ? 'finance.flag_approved' : 'finance.flag_rejected',
+    entityType: 'FinanceV2Flag',
+    entityId: flagKey,
+    actorUid: actor.uid,
+    actorRole: actor.role,
+    metadata: {
+      context: {
+        module: fm,
+        requestedState: decided.enabled,
+        proposedByUid: decided.proposedByUid,
+        proposalReason: decided.reason,
+        ...(input.note ? { decisionNote: input.note } : {}),
+      },
+    },
+  })
+  logger.info(
+    { module: fm, decision: input.decision, actorUid: actor.uid },
+    '[settingsService] Finance v2 flag proposal decided',
+  )
+  return { module: fm, enabled: decided.enabled, decision: input.decision }
 }

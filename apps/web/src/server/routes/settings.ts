@@ -40,6 +40,9 @@
  *   PATCH      /settings/grading-scales/:id — Admin, High Rank: update single row
  *   POST       /settings/grading-scales/reset — Admin: reset all to MANEB defaults
  *   GET/PATCH  /settings/finance            — Admin, Finance: fee / payroll preferences
+ *   GET        /settings/finance/rollout    — Admin (read), Finance, High Rank: v2 flag state
+ *   POST       /settings/finance/rollout/propose          — Finance: propose a flag change
+ *   POST       /settings/finance/rollout/:module/decision — High Rank: approve / reject
  *   GET/PATCH  /settings/hr                 — Admin, HR, High Rank: department/job-title taxonomy
  *   GET/PATCH  /settings/library            — Admin, Library: borrowing / fine rules
  *   GET/PATCH  /settings/classroom          — Academic: classroom preferences (per-user)
@@ -66,10 +69,10 @@ import {
 }                            from '@/server/services/gradeService'
 import * as settingsService  from '@/server/services/settingsService'
 import * as hrService          from '@/server/services/hrService'
-import { SETTING_KEYS, SETTING_META } from '@shared/types/settings'
+import { SETTING_KEYS, SETTING_META, FINANCE_V2_MODULES } from '@shared/types/settings'
 import { validateCaConfig } from '@shared/constants/exams'
 import { validateIdFormat } from '@shared/constants/malawi/registration'
-import type { SettingKey, DepartmentTitles } from '@shared/types/settings'
+import type { SettingKey, DepartmentTitles, FinanceV2Module } from '@shared/types/settings'
 import { logger }            from '@/lib/logger'
 import { sendError } from '@/server/lib/sendError'
 import { createDirectUploadTicket, FILE_PREFIX, getPublicViewUrl } from '@/lib/storage'
@@ -378,6 +381,80 @@ settingsRouter
     }
     return res.json({ ok: true })
   })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FINANCE v2 ROLLOUT  (Finance Hardening Plan — D-28 / P0-03)
+// ─────────────────────────────────────────────────────────────────────────────
+//   GET  /settings/finance/rollout                   — admin (read-only), finance, high_rank
+//   POST /settings/finance/rollout/propose           — finance proposes a flag change
+//   POST /settings/finance/rollout/:module/decision  — high_rank approves / rejects
+// Flags are never writable through the generic settings routes above; the
+// proposer can never decide their own proposal (enforced in settingsService).
+
+const RolloutModuleSchema = z.enum(
+  FINANCE_V2_MODULES as [FinanceV2Module, ...FinanceV2Module[]],
+)
+
+const RolloutProposeSchema = z.object({
+  module:  RolloutModuleSchema,
+  enabled: z.boolean(),
+  reason:  z.string().trim().min(1, 'A reason is required.').max(500),
+})
+
+const RolloutDecisionSchema = z.object({
+  decision: z.enum(['APPROVE', 'REJECT']),
+  note:     z.string().trim().max(500).optional(),
+})
+
+settingsRouter.get(
+  '/finance/rollout',
+  requireRole(['admin', 'finance', 'high_rank']),
+  async (_req, res) => {
+    try {
+      return res.json({ modules: await settingsService.getFinanceV2Rollout() })
+    } catch (err) {
+      return sendError(res, err, { defaultStatus: 500, fallbackMessage: 'Could not load the rollout state.', tags: { module: 'settings' } })
+    }
+  },
+)
+
+settingsRouter.post(
+  '/finance/rollout/propose',
+  requireRole(['finance']),
+  async (req, res) => {
+    const parsed = RolloutProposeSchema.safeParse(req.body)
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid request.' })
+    try {
+      const proposal = await settingsService.proposeFinanceV2Change(
+        parsed.data,
+        { uid: req.user!.uid, role: req.user!.role },
+      )
+      return res.status(201).json({ proposal })
+    } catch (err) {
+      return sendError(res, err, { defaultStatus: 500, fallbackMessage: 'Could not record the proposal.', tags: { module: 'settings' } })
+    }
+  },
+)
+
+settingsRouter.post(
+  '/finance/rollout/:module/decision',
+  requireRole(['high_rank']),
+  async (req, res) => {
+    const mod = RolloutModuleSchema.safeParse(req.params['module'])
+    if (!mod.success) return res.status(400).json({ error: 'Unknown finance module.' })
+    const parsed = RolloutDecisionSchema.safeParse(req.body)
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid request.' })
+    try {
+      const result = await settingsService.decideFinanceV2Proposal(
+        { module: mod.data, ...parsed.data },
+        { uid: req.user!.uid, role: req.user!.role },
+      )
+      return res.json(result)
+    } catch (err) {
+      return sendError(res, err, { defaultStatus: 500, fallbackMessage: 'Could not record the decision.', tags: { module: 'settings' } })
+    }
+  },
+)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HR SETTINGS  (admin | hr | high_rank) — production fix, 2026-07-27

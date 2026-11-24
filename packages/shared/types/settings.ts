@@ -240,6 +240,26 @@ export const SETTING_KEYS = {
   // typed accessor for receiptService.ts to actually read.
   RECEIPT_PREFIX:                 'receipt_prefix',
 
+  // ── Finance — v2 rollout flags (Finance Hardening Plan, D-28 / P0-03)
+  // Every flag defaults to OFF so v1 behaviour is unchanged until a
+  // module's go-live gate has passed. The key strings are the plan's own
+  // `finance.v2.<module>` names (Part 4 §1.8; `permissions` per Part 5 §1.3 /
+  // P1-10). Flags are changed only through the propose/approve workflow in
+  // settingsService (Finance proposes, High Rank approves) — never through
+  // the generic settings routes.
+  FINANCE_V2_LEDGER_ENGINE:       'finance.v2.ledgerEngine',
+  FINANCE_V2_ACCOUNTS_REGISTRY:   'finance.v2.accountsRegistry',
+  FINANCE_V2_RECEIVABLES:         'finance.v2.receivables',
+  FINANCE_V2_EXPENSES:            'finance.v2.expenses',
+  FINANCE_V2_PAYROLL:             'finance.v2.payroll',
+  FINANCE_V2_LOANS:               'finance.v2.loans',
+  FINANCE_V2_FINES:               'finance.v2.fines',
+  FINANCE_V2_RECONCILIATION:      'finance.v2.reconciliation',
+  FINANCE_V2_REPORTS:             'finance.v2.reports',
+  FINANCE_V2_PERMISSIONS:         'finance.v2.permissions',
+  // Pending flag-change proposals: { [module]: FinanceV2Proposal }.
+  FINANCE_V2_PROPOSALS:           'finance.v2.proposals',
+
   // ── Library
   LIBRARY_LOAN_PERIOD_STUDENT:    'library_loan_period_student',
   LIBRARY_LOAN_PERIOD_STAFF:      'library_loan_period_staff',
@@ -291,6 +311,42 @@ export const SETTING_KEYS = {
 
 /** Union type of all setting key strings. */
 export type SettingKey = typeof SETTING_KEYS[keyof typeof SETTING_KEYS]
+
+// ─────────────────────────────────────────────────────────
+//  FINANCE v2 ROLLOUT FLAGS  (Finance Hardening Plan, D-28)
+// ─────────────────────────────────────────────────────────
+
+/** Module → the SETTING_KEYS entry holding its `finance.v2.<module>` flag. */
+export const FINANCE_V2_FLAG_KEYS = {
+  ledgerEngine:     SETTING_KEYS.FINANCE_V2_LEDGER_ENGINE,
+  accountsRegistry: SETTING_KEYS.FINANCE_V2_ACCOUNTS_REGISTRY,
+  receivables:      SETTING_KEYS.FINANCE_V2_RECEIVABLES,
+  expenses:         SETTING_KEYS.FINANCE_V2_EXPENSES,
+  payroll:          SETTING_KEYS.FINANCE_V2_PAYROLL,
+  loans:            SETTING_KEYS.FINANCE_V2_LOANS,
+  fines:            SETTING_KEYS.FINANCE_V2_FINES,
+  reconciliation:   SETTING_KEYS.FINANCE_V2_RECONCILIATION,
+  reports:          SETTING_KEYS.FINANCE_V2_REPORTS,
+  permissions:      SETTING_KEYS.FINANCE_V2_PERMISSIONS,
+} as const
+
+export type FinanceV2Module = keyof typeof FINANCE_V2_FLAG_KEYS
+
+/** Display order for the Feature rollout screen (matches Part 4 §1.8, then permissions). */
+export const FINANCE_V2_MODULES = Object.keys(FINANCE_V2_FLAG_KEYS) as FinanceV2Module[]
+
+/** One pending request to switch a module's flag on or off. */
+export interface FinanceV2Proposal {
+  module: FinanceV2Module
+  /** The state being requested. */
+  enabled: boolean
+  reason: string
+  proposedByUid: string
+  proposedAt: string // ISO-8601
+}
+
+/** At most one pending proposal per module. */
+export type FinanceV2Proposals = Partial<Record<FinanceV2Module, FinanceV2Proposal>>
 
 // ─────────────────────────────────────────────────────────
 //  SETTING CATEGORIES
@@ -390,6 +446,19 @@ export interface SettingValueMap {
   readonly [SETTING_KEYS.FINANCE_PAYE_BRACKETS]:     PayeBracket[]
   readonly [SETTING_KEYS.STAFF_LOAN_INTEREST_RATE]:  number // annual percentage
   readonly [SETTING_KEYS.RECEIPT_PREFIX]:            string
+
+  // ── Finance — v2 rollout flags
+  readonly [SETTING_KEYS.FINANCE_V2_LEDGER_ENGINE]:     boolean
+  readonly [SETTING_KEYS.FINANCE_V2_ACCOUNTS_REGISTRY]: boolean
+  readonly [SETTING_KEYS.FINANCE_V2_RECEIVABLES]:       boolean
+  readonly [SETTING_KEYS.FINANCE_V2_EXPENSES]:          boolean
+  readonly [SETTING_KEYS.FINANCE_V2_PAYROLL]:           boolean
+  readonly [SETTING_KEYS.FINANCE_V2_LOANS]:             boolean
+  readonly [SETTING_KEYS.FINANCE_V2_FINES]:             boolean
+  readonly [SETTING_KEYS.FINANCE_V2_RECONCILIATION]:    boolean
+  readonly [SETTING_KEYS.FINANCE_V2_REPORTS]:           boolean
+  readonly [SETTING_KEYS.FINANCE_V2_PERMISSIONS]:       boolean
+  readonly [SETTING_KEYS.FINANCE_V2_PROPOSALS]:         FinanceV2Proposals
 
   // ── Library
   readonly [SETTING_KEYS.LIBRARY_LOAN_PERIOD_STUDENT]:  number  // days
@@ -837,6 +906,84 @@ export const SETTING_META: { readonly [K in SettingKey]: SettingMeta<K> } = {
     isPublic: false,
     description: 'Prefix prepended to every generated payment receipt number.',
     defaultValue: 'RCP',
+  },
+
+  [SETTING_KEYS.FINANCE_V2_LEDGER_ENGINE]: {
+    key: SETTING_KEYS.FINANCE_V2_LEDGER_ENGINE,
+    category: SETTING_CATEGORIES.FINANCE,
+    isPublic: false,
+    description: 'Finance v2 rollout flag (finance.v2.ledgerEngine): when ON, the ledger engine (transactional posting, register, immutability) run their v2 code paths. Default OFF; changed only by Finance proposal + High Rank approval.',
+    defaultValue: false,
+  },
+  [SETTING_KEYS.FINANCE_V2_ACCOUNTS_REGISTRY]: {
+    key: SETTING_KEYS.FINANCE_V2_ACCOUNTS_REGISTRY,
+    category: SETTING_CATEGORIES.FINANCE,
+    isPublic: false,
+    description: 'Finance v2 rollout flag (finance.v2.accountsRegistry): when ON, the Payment Accounts registry, chart v2, posting map and periods run their v2 code paths. Default OFF; changed only by Finance proposal + High Rank approval.',
+    defaultValue: false,
+  },
+  [SETTING_KEYS.FINANCE_V2_RECEIVABLES]: {
+    key: SETTING_KEYS.FINANCE_V2_RECEIVABLES,
+    category: SETTING_CATEGORIES.FINANCE,
+    isPublic: false,
+    description: 'Finance v2 rollout flag (finance.v2.receivables): when ON, accrual receivables, payments v2, credits, refunds and sponsors run their v2 code paths. Default OFF; changed only by Finance proposal + High Rank approval.',
+    defaultValue: false,
+  },
+  [SETTING_KEYS.FINANCE_V2_EXPENSES]: {
+    key: SETTING_KEYS.FINANCE_V2_EXPENSES,
+    category: SETTING_CATEGORIES.FINANCE,
+    isPublic: false,
+    description: 'Finance v2 rollout flag (finance.v2.expenses): when ON, expenses, budgets, procurement, supplier invoices and advances v2 run their v2 code paths. Default OFF; changed only by Finance proposal + High Rank approval.',
+    defaultValue: false,
+  },
+  [SETTING_KEYS.FINANCE_V2_PAYROLL]: {
+    key: SETTING_KEYS.FINANCE_V2_PAYROLL,
+    category: SETTING_CATEGORIES.FINANCE,
+    isPublic: false,
+    description: 'Finance v2 rollout flag (finance.v2.payroll): when ON, payroll calculation, posting, disbursement and statutory remittances v2 run their v2 code paths. Default OFF; changed only by Finance proposal + High Rank approval.',
+    defaultValue: false,
+  },
+  [SETTING_KEYS.FINANCE_V2_LOANS]: {
+    key: SETTING_KEYS.FINANCE_V2_LOANS,
+    category: SETTING_CATEGORIES.FINANCE,
+    isPublic: false,
+    description: 'Finance v2 rollout flag (finance.v2.loans): when ON, the staff-loan model v2 run their v2 code paths. Default OFF; changed only by Finance proposal + High Rank approval.',
+    defaultValue: false,
+  },
+  [SETTING_KEYS.FINANCE_V2_FINES]: {
+    key: SETTING_KEYS.FINANCE_V2_FINES,
+    category: SETTING_CATEGORIES.FINANCE,
+    isPublic: false,
+    description: 'Finance v2 rollout flag (finance.v2.fines): when ON, library fines v2 (students and staff) run their v2 code paths. Default OFF; changed only by Finance proposal + High Rank approval.',
+    defaultValue: false,
+  },
+  [SETTING_KEYS.FINANCE_V2_RECONCILIATION]: {
+    key: SETTING_KEYS.FINANCE_V2_RECONCILIATION,
+    category: SETTING_CATEGORIES.FINANCE,
+    isPublic: false,
+    description: 'Finance v2 rollout flag (finance.v2.reconciliation): when ON, cash control: transfers, statement reconciliation and cashbook run their v2 code paths. Default OFF; changed only by Finance proposal + High Rank approval.',
+    defaultValue: false,
+  },
+  [SETTING_KEYS.FINANCE_V2_REPORTS]: {
+    key: SETTING_KEYS.FINANCE_V2_REPORTS,
+    category: SETTING_CATEGORIES.FINANCE,
+    isPublic: false,
+    description: 'Finance v2 rollout flag (finance.v2.reports): when ON, ledger-based reporting, period close and the control centre run their v2 code paths. Default OFF; changed only by Finance proposal + High Rank approval.',
+    defaultValue: false,
+  },
+  [SETTING_KEYS.FINANCE_V2_PERMISSIONS]: {
+    key: SETTING_KEYS.FINANCE_V2_PERMISSIONS,
+    category: SETTING_CATEGORIES.FINANCE,
+    isPublic: false,
+    description: 'Finance v2 rollout flag (finance.v2.permissions): when ON, the financial permission matrix (Admin has no unrestricted finance write) run their v2 code paths. Default OFF; changed only by Finance proposal + High Rank approval.',
+    defaultValue: false,
+  },
+  [SETTING_KEYS.FINANCE_V2_PROPOSALS]: {
+    key: SETTING_KEYS.FINANCE_V2_PROPOSALS,
+    category: SETTING_CATEGORIES.FINANCE,
+    isPublic: false,
+    description: 'Pending Finance v2 flag-change proposals awaiting High Rank approval. Managed by the rollout workflow only.',
+    defaultValue: {},
   },
 
   // ── Library

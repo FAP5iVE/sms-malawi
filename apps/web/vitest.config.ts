@@ -55,6 +55,32 @@ export default defineConfig({
           exclude: ['node_modules/**', 'src/stories/**', 'e2e/**'],
         },
       },
+      {
+        // Finance Hardening Plan P0-01 (D-25): tests that need a REAL Postgres
+        // (atomicity, locking, concurrency, triggers). Named *.itest.ts so the
+        // "unit" project never collects them; files run one at a time because
+        // each builds and drops its own schema. Needs TEST_DATABASE_URL (a
+        // throwaway Neon branch); suites skip when it is unset.
+        // Run: pnpm --filter web test:integration
+        extends: true,
+        resolve: {
+          alias: {
+            'server-only': path.join(dirname, 'test/stubs/empty.ts'),
+            '@': path.join(dirname, 'src'),
+            '@shared': path.join(dirname, '..', '..', 'packages', 'shared'),
+          },
+        },
+        test: {
+          name: 'integration',
+          environment: 'node',
+          globals: true,
+          testTimeout: 60_000,
+          hookTimeout: 180_000,
+          fileParallelism: false,
+          include: ['src/server/__integration__/**/*.itest.ts'],
+          exclude: ['node_modules/**'],
+        },
+      },
     ],
   },
 });

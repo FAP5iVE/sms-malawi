@@ -8,9 +8,9 @@ Every server entry point, extracted from source by `test/security/endpointInvent
 
 | Measure | Count |
 |---|---:|
-| Express endpoints (mounted under `/api`) | 611 |
-| — mutations (non-GET) | 281 |
-| — with a role/permission gate | 522 (251 mutations) |
+| Express endpoints (mounted under `/api`) | 626 |
+| — mutations (non-GET) | 292 |
+| — with a role/permission gate | 537 (262 mutations) |
 | — signed-in only, with a declared policy | 64 |
 | — public (no identity) | 25 |
 | — declared `cron-or-admin` | 1 |
@@ -27,7 +27,7 @@ Every server entry point, extracted from source by `test/security/endpointInvent
 
 | Path | Methods | Declared policy | Source |
 |---|---|---|---|
-| `/api/[[...slug]]` | GET, POST, PATCH, DELETE, OPTIONS | express-gateway | `src/app/api/[[...slug]]/route.ts` |
+| `/api/[[...slug]]` | GET, POST, PUT, PATCH, DELETE, OPTIONS | express-gateway | `src/app/api/[[...slug]]/route.ts` |
 | `/api/cron/contract-alerts` | GET | cron | `src/app/api/cron/contract-alerts/route.ts` |
 | `/api/cron/daily-tasks` | GET | cron | `src/app/api/cron/daily-tasks/route.ts` |
 | `/api/cron/fee-reminders` | GET | cron | `src/app/api/cron/fee-reminders/route.ts` |
@@ -325,6 +325,14 @@ Columns: **Client IDs** = path params plus `body` / `query` when the handler rea
 | ● | POST | `/api/exams/maneb` | `requirePermission(exam.manageManebRecords)` |  | body |
 | ● | POST | `/api/exams/maneb/bulk` | `requirePermission(exam.manageManebRecords)` |  | body |
 | ● | POST | `/api/exams/maneb/recompute` | `requirePermission(exam.manageManebRecords)` |  | body |
+|  | GET | `/api/exams/maneb/registrations` | `requireRole([...MANEB_BOARD_ROLES])` |  | query |
+| ● | POST | `/api/exams/maneb/registrations` | `requirePermission(exam.manageManebRecords)` |  | body |
+| ● | PATCH | `/api/exams/maneb/registrations/:id` | `requirePermission(exam.manageManebRecords)` |  | :id, body |
+| ● | POST | `/api/exams/maneb/registrations/:id/withdraw` | `requirePermission(exam.manageManebRecords)` |  | :id, body |
+| ● | POST | `/api/exams/maneb/registrations/bulk` | `requirePermission(exam.manageManebRecords)` |  | body |
+| ● | POST | `/api/exams/maneb/registrations/lock` | `requirePermission(exam.manageManebRecords)` |  | body |
+| ● | POST | `/api/exams/maneb/registrations/numbers` | `requirePermission(exam.manageManebRecords)` |  | body |
+| ● | POST | `/api/exams/maneb/registrations/unlock` | `requireRole([admin, high_rank])` |  | body |
 | ● | POST | `/api/exams/release-term` | `requirePermission(exam.authorizeRelease)` |  | body |
 | ● | POST | `/api/exams/report-card` | `requireRole([admin, exam_officer])` |  | body |
 |  | GET | `/api/exams/report-card/:studentId` | signed-in user | object-checked | :studentId, query |
@@ -343,7 +351,6 @@ Columns: **Client IDs** = path params plus `body` / `query` when the handler rea
 |  | GET | `/api/finances/accounting/ledger/:code` | `requireRole([...FINANCE_ROLES])` |  | :code, query |
 |  | GET | `/api/finances/accounting/trial-balance` | `requireRole([...FINANCE_ROLES])` |  | — |
 |  | GET | `/api/finances/balance/:studentId` | `requireRole([admin, finance, high_rank, student])` |  | :studentId, query |
-|  | GET | `/api/finances/billing-standing` | `requireRole([...FINANCE_ROLES])` |  | query |
 |  | GET | `/api/finances/budget` | `requireRole([...FINANCE_ROLES, high_rank])` |  | query |
 | ● | POST | `/api/finances/budget` | `requireRole([...FINANCE_ROLES])` |  | body |
 |  | GET | `/api/finances/budget-windows` | `requireAnyPermission([finance.viewBudget, procurement.createRequisition])` |  | query |
@@ -408,6 +415,7 @@ Columns: **Client IDs** = path params plus `body` / `query` when the handler rea
 | M | Method | Path | Access | Declared policy | Client IDs |
 |:-:|---|---|---|---|---|
 |  | GET | `/api/guardians/access-log` | `requirePermission(guardian.viewAccessLog)` |  | query |
+|  | GET | `/api/guardians/access-log/recent` | `requirePermission(guardian.viewAccessLog)` |  | query |
 | ● | DELETE | `/api/guardians/invitations/:id` | `requirePermission(guardian.invite)` |  | :id |
 | ● | POST | `/api/guardians/links/:id/approve` | `requirePermission(guardian.approve)` |  | :id, body |
 | ● | PATCH | `/api/guardians/links/:id/capabilities` | `requirePermission(guardian.restrict)` |  | :id, body |
@@ -420,6 +428,7 @@ Columns: **Client IDs** = path params plus `body` / `query` when the handler rea
 | ● | POST | `/api/guardians/links/:id/reverified` | `requirePermission(guardian.approve)` |  | :id |
 | ● | POST | `/api/guardians/links/:id/revoke` | `requirePermission(guardian.restrict)` |  | :id, body |
 | ● | POST | `/api/guardians/links/:id/suspend` | `requirePermission(guardian.restrict)` |  | :id, body |
+| ● | POST | `/api/guardians/national-ids/backfill` | `requirePermission(guardian.backfill)` |  | body |
 |  | GET | `/api/guardians/onboarding/:id` | `requirePermission(guardian.backfill)` |  | :id, query |
 | ● | POST | `/api/guardians/onboarding/:id/apply` | `requirePermission(guardian.backfill)` |  | :id, body |
 | ● | POST | `/api/guardians/onboarding/:id/rollback` | `requirePermission(guardian.backfill)` |  | :id |
@@ -427,6 +436,7 @@ Columns: **Client IDs** = path params plus `body` / `query` when the handler rea
 | ● | POST | `/api/guardians/profiles/:id/reinstate` | `requirePermission(guardian.approve)` |  | :id |
 | ● | POST | `/api/guardians/profiles/:id/suspend` | `requirePermission(guardian.restrict)` |  | :id, body |
 |  | GET | `/api/guardians/queue` | `requirePermission(guardian.view)` |  | query |
+|  | GET | `/api/guardians/students` | `requirePermission(guardian.view)` |  | query |
 |  | GET | `/api/guardians/students/:studentId` | `requirePermission(guardian.view)` |  | :studentId |
 | ● | POST | `/api/guardians/students/:studentId/sync` | `requirePermission(guardian.propose)` |  | :studentId |
 
@@ -878,11 +888,16 @@ Columns: **Client IDs** = path params plus `body` / `query` when the handler rea
 |  | GET | `/api/settings/exam/ca-config` | signed-in user | reference-data | — |
 |  | GET | `/api/settings/finance` | `requireRole([admin, finance])` |  | — |
 | ● | PATCH | `/api/settings/finance` | `requireRole([admin, finance])` |  | body |
+|  | GET | `/api/settings/finance/rollout` | `requireRole([admin, finance, high_rank])` |  | — |
+| ● | POST | `/api/settings/finance/rollout/:module/decision` | `requireRole([high_rank])` |  | :module, body |
+| ● | POST | `/api/settings/finance/rollout/propose` | `requireRole([finance])` |  | body |
 |  | GET | `/api/settings/grading-scales` | signed-in user | reference-data | — |
 | ● | PATCH | `/api/settings/grading-scales/:id` | `requireRole([admin, high_rank])` |  | :id, body |
 | ● | POST | `/api/settings/grading-scales/reset` | `requireRole([admin])` |  | — |
 |  | GET | `/api/settings/hr` | `requireRole([admin, hr, high_rank])` |  | — |
 | ● | PATCH | `/api/settings/hr` | `requireRole([admin, hr, high_rank])` |  | body |
+|  | GET | `/api/settings/id-numbers` | `requireRole([admin, hr, high_rank])` |  | — |
+| ● | PATCH | `/api/settings/id-numbers` | `requireRole([admin, hr, high_rank])` |  | body |
 | ● | POST | `/api/settings/leadership-photo/upload-ticket` | `requireRole([admin, hr, high_rank])` |  | — |
 |  | GET | `/api/settings/library` | `requireRole([admin, library])` |  | — |
 | ● | PATCH | `/api/settings/library` | `requireRole([admin, library])` |  | body |

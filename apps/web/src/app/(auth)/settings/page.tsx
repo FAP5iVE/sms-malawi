@@ -141,7 +141,9 @@ const SECTIONS: Section[] = [
     id:    'finance',
     label: 'Finance preferences',
     icon:  Banknote,
-    roles: ['admin', 'finance'],
+    // high_rank is here for Feature rollout approvals (Finance Hardening
+    // Plan P0-03); FinanceSettings shows it only that sub-section.
+    roles: ['admin', 'high_rank', 'finance'],
   },
   {
     id:    'library',

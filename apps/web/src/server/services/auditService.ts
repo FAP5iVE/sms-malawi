@@ -184,6 +184,11 @@ export const ACTION_SEVERITY: Readonly<Record<string, Severity>> = {
   'finance.expense_approved':     SEVERITY.HIGH,
   'finance.expense_rejected':     SEVERITY.HIGH,
 
+  // ── Finance — v2 rollout flags (Finance Hardening Plan D-28 / P0-03)
+  'finance.flag_proposed':        SEVERITY.HIGH,
+  'finance.flag_approved':        SEVERITY.CRITICAL,
+  'finance.flag_rejected':        SEVERITY.HIGH,
+
   // ── Finance — budget
   'finance.budget_created':       SEVERITY.HIGH,
   'finance.budget_updated':       SEVERITY.HIGH,
@@ -268,11 +273,6 @@ export const ACTION_SEVERITY: Readonly<Record<string, Severity>> = {
   'exam.promotion_engine_run':    SEVERITY.CRITICAL,
   'exam.maneb_record_created':    SEVERITY.HIGH,
   'exam.maneb_record_updated':    SEVERITY.HIGH,
-
-  // ── Signatures
-  'signature.uploaded':           SEVERITY.HIGH,
-  'signature.removed':            SEVERITY.HIGH,
-  'signature.printed':            SEVERITY.LOW,
 
   // ── Settings
   'settings.updated':             SEVERITY.HIGH,
