@@ -261,11 +261,46 @@ export async function computeInvoiceCharges(
   return { feeStructures, subtotal, scholarship, discount, lineItemsData, totalAmount, creditApplications, creditApplied }
 }
 
+/** Shape of the invoice fields the search index needs — satisfied by generateInvoice()'s result. */
+type InvoiceForSearchIndex = {
+  id: string
+  status: string
+  academicYear: string
+  term: number
+  dueDate: Date
+  balance: unknown
+  createdAt: Date
+  student: { firstName: string; lastName: string; registrationNo: string | null; class: { name: string } | null }
+}
+
+/** Builds the Algolia record for an invoice. Shared by generateInvoice() and the bulk generator. */
+export function toAlgoliaInvoice(invoice: InvoiceForSearchIndex): algolia.AlgoliaInvoice {
+  return {
+    objectID:       invoice.id,
+    studentName:    `${invoice.student.firstName} ${invoice.student.lastName}`,
+    registrationNo: invoice.student.registrationNo,
+    status:         invoice.status,
+    academicYear:   invoice.academicYear,
+    term:           invoice.term,
+    className:      invoice.student.class?.name ?? null,
+    dueDate:        invoice.dueDate.toISOString(),
+    balance:        Number(invoice.balance),
+    createdAt:      invoice.createdAt.toISOString(),
+  }
+}
+
 export async function generateInvoice(
   data: GenerateInvoiceInput,
   actorUid: string,
   actorRole: string,
-  chargeOptions?: Pick<InvoiceChargeOptions, 'applyScholarship' | 'consumeCredit'>
+  chargeOptions?: Pick<InvoiceChargeOptions, 'applyScholarship' | 'consumeCredit'>,
+  /**
+   * Bulk callers set `deferSearchIndex` and index every created invoice in ONE
+   * Algolia batch call afterwards (see bulkInvoiceService), instead of one
+   * network round-trip per invoice. The invoice is still created identically;
+   * only the search-index write moves to the caller.
+   */
+  options?: { deferSearchIndex?: boolean }
 ) {
   const existing = await prisma.invoice.findUnique({
     where: { studentId_academicYear_term: { studentId: data.studentId, academicYear: data.academicYear, term: data.term } },
@@ -320,18 +355,7 @@ export async function generateInvoice(
     totalAmount, feeTypes: feeStructures.map((f) => f.name), creditApplied, actorUid, actorRole,
   })
   // [ALGOLIA ROLLOUT — Tier 2 item 7, upgraded to high priority] New index.
-  void algolia.indexInvoice({
-    objectID:       invoice.id,
-    studentName:    `${invoice.student.firstName} ${invoice.student.lastName}`,
-    registrationNo: invoice.student.registrationNo,
-    status:         invoice.status,
-    academicYear:   invoice.academicYear,
-    term:           invoice.term,
-    className:      invoice.student.class?.name ?? null,
-    dueDate:        invoice.dueDate.toISOString(),
-    balance:        Number(invoice.balance),
-    createdAt:      invoice.createdAt.toISOString(),
-  })
+  if (!options?.deferSearchIndex) void algolia.indexInvoice(toAlgoliaInvoice(invoice))
   return invoice
 }
 

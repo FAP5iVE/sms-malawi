@@ -143,6 +143,27 @@ hrRouter.get('/staff-picker', verifyAuth,
     return res.json(await hrService.listStaffForPicker())
   })
 
+// [PRODUCTION FIX 2026-11-25 — GET /hr/loans was answered by GET /:id]
+// [R11] hrService.listLoans() needs a route; the Loans tab's admin-management
+// view has no other way to see loan requests across all staff. See the header
+// comment for the role-list rationale.
+//
+// This route used to be registered further down, AFTER GET /:id. Express
+// matches in registration order and /:id accepts any single segment, so
+// "loans" was treated as a staff id: the request hit
+// hrService.getStaffProfile("loans"), found nothing, and threw Prisma P2025
+// ("No record was found for a query") — ~600 unhandled Sentry events — while
+// the Loans tab never received a loan list. (It also meant `finance`, which
+// this route allows but GET /:id does not, got a 403 instead.) Every
+// single-segment literal GET path must be registered before GET /:id.
+hrRouter.get('/loans', verifyAuth, requireRole(['admin', 'hr', 'finance', 'high_rank']),
+  async (req, res) => {
+    const { status } = req.query as { status?: string }
+    return res.json(await hrService.listLoans(
+      status as 'PENDING' | 'APPROVED' | 'DISBURSED' | 'REPAYING' | 'SETTLED' | 'REJECTED' | undefined
+    ))
+  })
+
 // ── Terminate: records WHY and WHEN. Needs hr.terminateStaff. The login stays
 //    enabled until it is disabled in User Management (a separate permission).
 hrRouter.post('/:id/terminate', verifyAuth, requirePermission('hr.terminateStaff'),
@@ -209,9 +230,13 @@ const STAFF_IDENTITY_KEYS = [
 
 hrRouter.get('/:id', verifyAuth, requireRole([...REVIEWERS]),
   async (req, res) => {
-    const profile = await hrService.getStaffProfile(String(req.params.id))
-    const canSeeSensitive = hasPermission(req.user!.role, 'hr.viewStaffSensitive', req.user!.superUser === true)
-    return res.json(canSeeSensitive ? profile : hrService.redactStaffSensitive(profile))
+    try {
+      const profile = await hrService.getStaffProfile(String(req.params.id))
+      const canSeeSensitive = hasPermission(req.user!.role, 'hr.viewStaffSensitive', req.user!.superUser === true)
+      return res.json(canSeeSensitive ? profile : hrService.redactStaffSensitive(profile))
+    } catch (err) {
+      return sendError(res, err, { tags: { module: 'hr', route: 'staff-get' } })
+    }
   })
 
 hrRouter.patch('/:id', verifyAuth, requirePermission('hr.editStaff'),
@@ -419,16 +444,8 @@ hrRouter.patch('/leave/requests/:id/review', verifyAuth, requireRole([...REVIEWE
   })
 
 // ── LOANS ──
-// [R11] NEW — hrService.listLoans() needs a route; the Loans tab's
-// admin-management view has no other way to see loan requests across all
-// staff. See header comment for the role-list rationale.
-hrRouter.get('/loans', verifyAuth, requireRole(['admin', 'hr', 'finance', 'high_rank']),
-  async (req, res) => {
-    const { status } = req.query as { status?: string }
-    return res.json(await hrService.listLoans(
-      status as 'PENDING' | 'APPROVED' | 'DISBURSED' | 'REPAYING' | 'SETTLED' | 'REJECTED' | undefined
-    ))
-  })
+// GET /loans (the all-staff loan list) is registered near the top of this
+// file, BEFORE GET /:id — see the note there.
 
 // [POST-R11] NEW — self-service loan status. A staff member who submits
 // a request via POST /loans/request previously had no way to check on
