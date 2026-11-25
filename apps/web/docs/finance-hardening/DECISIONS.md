@@ -8,7 +8,7 @@ this file is corrected.
 Update the **Status** column (never the wording) when the owner or accountant answers, and add a line to
 `IMPLEMENTATION-LOG.md` saying what changed and when.
 
-Last reviewed: 2026-11-25 (P0 gate re-checked; P1-01 and P1-02 done; I-07 to I-09 confirmed; I-10 proposed).
+Last reviewed: 2026-11-25 (P0 gate re-checked; P1-01 to P1-03 done; I-07 to I-09 confirmed; I-10 to I-12 proposed).
 
 ## 1. Decisions (D-xx)
 
@@ -96,3 +96,5 @@ Not specified by the plan. **I-07 to I-09 confirmed by the owner on 2026-11-25**
 | I-08 | `createJournalEntry` keeps its **0.01 balancing tolerance** after P1-01. Exact balancing is task P1-03 (A2-F2, X-10) and a test pins the tolerance so it cannot change by accident. Line amounts are now rounded half-up to the cent first, as the database column would store them. | `accountingService.ts` |
 | I-09 | In `feeService`, the money tolerances (`+ 0.01`, `> 0.01`) are replaced by exact comparison, because the tolerance existed only to absorb float error. Result: one cent over a fee's balance is an overpayment. See the behaviour-change list in the log. | `feeService.ts` |
 | I-10 | The optional `tx` is the **last** parameter of `createJournalEntry`, `postEntry`, `voidEntry` and `recordPaymentEntry`; the plan writes it first (`fn(tx?, …)`). Trailing keeps every existing call site compiling unchanged; the behaviour is what the plan specifies (use the passed client or open its own). | `accountingService.ts` |
+| I-11 | With the balancing tolerance removed (I-08 is **superseded**: the 0.01 tolerance ended in P1-03), `payrollApprovalService.lock` computes deductions exactly (`totalGross - totalNet` with the money utility) and skips the deductions line only when it is zero. Before, it skipped it at `<= 0.01`, which only the tolerance hid. No other caller needed a change. | `payrollApprovalService.ts` |
+| I-12 | `accountingService` signals ledger rule breaks with `LedgerError` (`ALREADY_POSTED` 409, `UNBALANCED` 422, `NOT_FOUND` 404) so routes can answer with the plan's codes; messages are unchanged. The claim uses `isPosted` until P1-05 adds `status`. | `accountingService.ts` |

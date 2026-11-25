@@ -13,14 +13,14 @@ import { Decimal } from '@prisma/client/runtime/library'
 type Fn = ReturnType<typeof vi.fn>
 interface FakeClient {
   chartOfAccount: { findMany: Fn; update: Fn }
-  journalEntry: { create: Fn; update: Fn; findUniqueOrThrow: Fn }
+  journalEntry: { create: Fn; update: Fn; updateMany: Fn; findUnique: Fn; findUniqueOrThrow: Fn }
   $transaction?: Fn
 }
 
 const h = vi.hoisted(() => {
   const client = (_name: string): FakeClient => ({
     chartOfAccount: { findMany: vi.fn(), update: vi.fn() },
-    journalEntry: { create: vi.fn(), update: vi.fn(), findUniqueOrThrow: vi.fn() },
+    journalEntry: { create: vi.fn(), update: vi.fn(), updateMany: vi.fn(), findUnique: vi.fn(), findUniqueOrThrow: vi.fn() },
   })
   const shared = client('shared')
   // The shared client can open a transaction; the one it hands out (and a caller's tx) cannot nest one.
@@ -44,6 +44,7 @@ const asTx = (c: FakeClient) => c as unknown as accounting.LedgerTx
 function wire(db: FakeClient) {
   db.chartOfAccount.findMany.mockResolvedValue([{ id: 'a1000', code: '1000' }, { id: 'a4000', code: '4000' }])
   db.journalEntry.create.mockResolvedValue({ id: 'je1' })
+  db.journalEntry.updateMany.mockResolvedValue({ count: 1 })
   db.journalEntry.findUniqueOrThrow.mockResolvedValue({
     id: 'je1', reference: 'R-1', description: 'orig', isPosted: true,
     lines: [
@@ -54,7 +55,7 @@ function wire(db: FakeClient) {
 }
 
 const touched = (c: FakeClient) =>
-  [c.chartOfAccount.findMany, c.journalEntry.create, c.journalEntry.update, c.journalEntry.findUniqueOrThrow, c.chartOfAccount.update]
+  [c.chartOfAccount.findMany, c.journalEntry.create, c.journalEntry.update, c.journalEntry.updateMany, c.journalEntry.findUnique, c.journalEntry.findUniqueOrThrow, c.chartOfAccount.update]
     .reduce((n, f) => n + f.mock.calls.length, 0)
 
 beforeEach(() => {
@@ -79,9 +80,9 @@ describe('with a caller transaction: everything runs on it, nothing else is touc
   })
 
   it('postEntry reads and writes through tx only and opens no transaction of its own', async () => {
-    callerTx.journalEntry.findUniqueOrThrow.mockResolvedValue(unpostedEntry())
+    callerTx.journalEntry.findUnique.mockResolvedValue(unpostedEntry())
     await accounting.postEntry('je1', 'u1', asTx(callerTx))
-    expect(callerTx.journalEntry.update).toHaveBeenCalledTimes(1)
+    expect(callerTx.journalEntry.updateMany).toHaveBeenCalledTimes(1)
     expect(callerTx.chartOfAccount.update).toHaveBeenCalledTimes(2)
     expect(touched(h.shared)).toBe(0)
     expect(touched(h.own)).toBe(0)
@@ -98,7 +99,7 @@ describe('with a caller transaction: everything runs on it, nothing else is touc
           { accountId: 'a4000', debit: dec('0'),   credit: dec('100'), description: 'Rev',  account: { code: '4000', type: 'REVENUE' } },
         ],
       })
-      .mockResolvedValueOnce(unpostedEntry())
+    callerTx.journalEntry.findUnique.mockResolvedValue(unpostedEntry())
     callerTx.journalEntry.create.mockResolvedValue({ id: 'je2' })
 
     await expect(accounting.voidEntry('je1', 'u1', asTx(callerTx))).resolves.toBe('je2')
@@ -112,47 +113,47 @@ describe('with a caller transaction: everything runs on it, nothing else is touc
   })
 
   it('recordPaymentEntry creates and posts on tx only', async () => {
-    callerTx.journalEntry.findUniqueOrThrow.mockResolvedValue(unpostedEntry())
+    callerTx.journalEntry.findUnique.mockResolvedValue(unpostedEntry())
     await accounting.recordPaymentEntry(
       { invoiceId: 'inv-12345678', studentName: 'A B', amount: 100, paymentRef: 'r', actorUid: 'u1' },
       asTx(callerTx),
     )
     expect(callerTx.journalEntry.create).toHaveBeenCalledTimes(1)
-    expect(callerTx.journalEntry.update).toHaveBeenCalledTimes(1)
+    expect(callerTx.journalEntry.updateMany).toHaveBeenCalledTimes(1)
     expect(touched(h.shared)).toBe(0)
     expect(h.shared.$transaction).not.toHaveBeenCalled()
   })
 
   it('an error inside is thrown to the caller, who decides to roll back', async () => {
-    callerTx.journalEntry.findUniqueOrThrow.mockResolvedValue({ ...unpostedEntry(), isPosted: true })
+    callerTx.journalEntry.findUnique.mockResolvedValue({ ...unpostedEntry(), isPosted: true })
     await expect(accounting.postEntry('je1', 'u1', asTx(callerTx))).rejects.toThrow(/already posted/)
-    expect(callerTx.journalEntry.update).not.toHaveBeenCalled()
+    expect(callerTx.journalEntry.updateMany).not.toHaveBeenCalled()
   })
 })
 
 describe('without a caller transaction: one transaction of its own', () => {
   it('postEntry opens exactly one transaction and does all its work inside it', async () => {
-    h.own.journalEntry.findUniqueOrThrow.mockResolvedValue(unpostedEntry())
+    h.own.journalEntry.findUnique.mockResolvedValue(unpostedEntry())
     await accounting.postEntry('je1', 'u1')
     expect(h.shared.$transaction).toHaveBeenCalledTimes(1)
-    expect(h.own.journalEntry.update).toHaveBeenCalledTimes(1)
+    expect(h.own.journalEntry.updateMany).toHaveBeenCalledTimes(1)
     expect(h.own.chartOfAccount.update).toHaveBeenCalledTimes(2)
     expect(touched(h.shared)).toBe(0) // nothing on the shared client outside the transaction
   })
 
   it('recordPaymentEntry creates AND posts inside one transaction (no orphan draft)', async () => {
-    h.own.journalEntry.findUniqueOrThrow.mockResolvedValue(unpostedEntry())
+    h.own.journalEntry.findUnique.mockResolvedValue(unpostedEntry())
     await accounting.recordPaymentEntry(
       { invoiceId: 'inv-12345678', studentName: 'A B', amount: 100, paymentRef: 'r', actorUid: 'u1' },
     )
     expect(h.shared.$transaction).toHaveBeenCalledTimes(1)
     expect(h.own.journalEntry.create).toHaveBeenCalledTimes(1)
-    expect(h.own.journalEntry.update).toHaveBeenCalledTimes(1)
+    expect(h.own.journalEntry.updateMany).toHaveBeenCalledTimes(1)
     expect(touched(h.shared)).toBe(0)
   })
 
   it('a failure while posting propagates out of the transaction (so the create rolls back with it)', async () => {
-    h.own.journalEntry.findUniqueOrThrow.mockResolvedValue(unpostedEntry())
+    h.own.journalEntry.findUnique.mockResolvedValue(unpostedEntry())
     h.own.chartOfAccount.update.mockRejectedValueOnce(new Error('numeric overflow'))
     await expect(
       accounting.recordPaymentEntry(
@@ -170,7 +171,7 @@ describe('without a caller transaction: one transaction of its own', () => {
           { accountId: 'a4000', debit: dec('0'),   credit: dec('100'), description: 'Rev',  account: { code: '4000', type: 'REVENUE' } },
         ],
       })
-      .mockResolvedValueOnce(unpostedEntry())
+    h.own.journalEntry.findUnique.mockResolvedValue(unpostedEntry())
     h.own.journalEntry.create.mockResolvedValue({ id: 'je2' })
     await expect(accounting.voidEntry('je1', 'u1')).resolves.toBe('je2')
     expect(h.shared.$transaction).toHaveBeenCalledTimes(1)
@@ -184,9 +185,9 @@ describe('without a caller transaction: one transaction of its own', () => {
   })
 })
 
-describe('P1-03 boundary (pinned so it cannot move by accident)', () => {
-  it('still refuses an already-posted entry with the same message', async () => {
-    h.own.journalEntry.findUniqueOrThrow.mockResolvedValue({ ...unpostedEntry(), isPosted: true })
+describe('message compatibility', () => {
+  it('an already-posted entry is still refused with the same message', async () => {
+    h.own.journalEntry.findUnique.mockResolvedValue({ ...unpostedEntry(), isPosted: true })
     await expect(accounting.postEntry('je1', 'u1')).rejects.toThrow('Entry je1 is already posted.')
   })
 })

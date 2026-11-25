@@ -235,7 +235,60 @@ Still open by design:
 - Balance updates still run in line order, not a fixed account order: P1-03 (deadlock avoidance).
 - **Run the itest before relying on this** (`TEST_DATABASE_URL=… pnpm --filter web test:integration`) and record the result here.
 
+### Neon facts observed through the connector (2026-11-25), runbook §1 partly answered
+Read from the Neon API and one read-only query on a preview branch. **These are observations, not owner confirmations.**
+- Project `sms-malawi` (`long-fire-80218178`), organisation on the **free plan**, Postgres 16, region aws-eu-west-2.
+- §1 (1) Branches: **yes**. Vercel already creates a `preview/<git branch>` branch per pushed branch (including both P1 branches), each a copy of production data. Who may create one by hand: not checked.
+- §1 (2) Point-in-time restore window: **history_retention_seconds = 21600, i.e. 6 hours**. A mistake found later than that cannot be restored from Neon itself. This makes a named pre-migration branch (§2 step 2) and a separate export (§1 (3)) more important, not optional.
+- The `production` branch is flagged `protected: false` (it cannot be deleted because Vercel uses it).
+- §1 (3) separate export, (4) restore authoriser, (5) how production migrations are applied: **still unanswered; owner to confirm.**
+- Schema check on the P1-02 preview branch: `chart_of_accounts.balance`, `journal_lines.debit` and `credit` are `numeric(14,2)`, which is the premise of the overflow test in `accountingService.itest.ts`; accounts `1000` (ASSET) and `4000` (REVENUE) exist.
+- The integration harness still has **not** been run: this build environment cannot reach the Prisma engine download or the Neon Postgres host. It needs a machine that can (your computer, or CI). Nothing was written to any Neon branch.
+
+### P1-03 Atomic post claim, exact balancing, ordered balance updates  (2026-11-25)
+Status: **code done; unit-tested; the real-database proof (T-03) is written but NOT yet run.** Branch
+`finance-hardening/p1-03-atomic-posting`, stacked on the P1-02 branch.
+What was done (`accountingService.ts`):
+- **Atomic claim (A1-F1, A2-F2).** `postEntry` claims the entry with one conditional write,
+  `updateMany where id AND isPosted = false`, and requires a row count of exactly 1. A second concurrent post waits on the
+  first one's row lock, re-checks the condition when it commits, finds 0 rows and gets `ALREADY_POSTED` (409). Before, both read
+  "not posted", both passed, and every balance moved twice. The claim uses `isPosted` because the `status` column arrives with P1-05.
+- **Exact balancing (X-10).** The 0.01 tolerance is gone from `createJournalEntry`, and `postEntry` re-checks the stored lines
+  exactly, so an old draft that is a cent out cannot be posted. Both fail as `UNBALANCED` (422). Amounts are still rounded
+  half-up to the cent first (P1-01).
+- **Ordered, atomic balance updates.** One write per account (net signed delta, exact `Decimal`, `increment`), accounts in
+  ascending id, so two postings that touch the same accounts always lock in the same order and cannot deadlock.
+- **Order inside `postEntry`:** read and validate, then claim, then move balances. Nothing after the claim can fail in JavaScript,
+  so a caller that catches an error and keeps its own transaction cannot be left with a claimed entry whose balances never moved.
+- `LedgerError` (`code`, `status`: `ALREADY_POSTED` 409, `UNBALANCED` 422, `NOT_FOUND` 404). The messages are the old texts.
+  An uncaught posting error now carries a 4xx instead of a generic 500 (visible today only on payroll `lock`; the expense,
+  mark-paid and library-fine routes catch posting errors and log them, unchanged).
+Companion change (needed by the rule above): `payrollApprovalService.lock` computed deductions as `gross - net` in floats and
+skipped the line when it was `<= 0.01`. At exactly 0.01 that left a 0.01 imbalance which only the old tolerance hid. Deductions
+are now exact (`sub`) and the line is skipped only when there is nothing to book (decision I-11). Every other caller already
+balanced by construction (same amount on both sides, or the mirror image in `voidEntry`).
+Tests:
+- `accountingService.post.test.ts` (13, Prisma mocked): the claim's condition, claim before any balance write, the loser gets 409 and moves
+  nothing, ascending id order for any line order, one write per account with the exact net delta, one-cent imbalance refused on create and on
+  post (before claiming), unknown entry 404.
+- `payrollApprovalService.lockBalance.test.ts` (4): 0.01 deductions booked, float-unfriendly amounts exact, no deductions, net above gross refused.
+  The 0.01 case fails against the old payroll code.
+- Existing tests changed on purpose: the test that pinned the 0.01 tolerance (I-08) now pins that a cent imbalance is rejected;
+  `postEntry` mocks read via `findUnique` and claim via `updateMany`; the per-line update expectation became per-account.
+- `accountingService.itest.ts` (+4, real Postgres, **not run**): **T-03** six simultaneous posts of one draft, five rounds, exactly one
+  success each, balances moved once; a deterministic version (A holds its transaction open after claiming, B must stay blocked, then loses with
+  `ALREADY_POSTED`); 24 postings listing the same two accounts in opposite orders, none deadlock; a one-cent imbalance refused with nothing written.
+- Full unit suite: 17 failed, 1954 passed. The 17 failures are the same pre-existing ones (same 9 files, none finance); 17 new tests pass.
+  eslint clean; `tsc` adds only the untyped-Prisma noise.
+Data check (read-only, on the P1-02 preview branch, a copy of production taken 2026-11-25 07:45 UTC): 1,012 journal entries,
+**0 unbalanced** (1,011 posted, 1 balanced draft). Removing the tolerance blocks nothing that exists today.
+Not done by design: reversal is not yet once-only (**P1-04**); callers still post outside their own transactions (P1-06, P1-08);
+no migration was needed or written.
+**Run before relying on it:** `TEST_DATABASE_URL=… pnpm --filter web test:integration`, then record the result here.
+T-03 is the whole point of this task and mocks cannot prove it.
+
 ### Next in order
+<<<<<<< HEAD
 P1-03 Atomic post claim, exact balancing, atomic balance updates (A1-F1, A2-F2, X-10; test **T-03**, concurrent post: exactly one success).
 Before P1-03 is called proven the harness must have run once on a real database, because T-03 is a concurrency test and cannot be proved with mocks.
 
@@ -244,3 +297,6 @@ Status: **done**. `pnpm --filter web exec tsc --noEmit` reported TS7006 (implici
 Cause: `h.prisma` is deliberately `any` (a mock), so `mock.calls.map((c) => ...)` had an untyped parameter and returned `any`, which left the next `.map((u) => ...)` untyped too.
 Fix: a local `BalanceUpdate` type, `(c: unknown[])` on the first callback, and the result annotated as `BalanceUpdate[]`. Test logic and assertions are unchanged.
 File: `src/server/services/__tests__/accountingService.money.test.ts`.
+=======
+P1-04 One-time reversal (A1-F2, A2-F3; test **T-04**). It needs migration M02 (reversal columns and a unique constraint), so it must not be applied anywhere until the runbook §1 answers are in and the harness has run.
+>>>>>>> origin/finance-hardening/p1-03-atomic-posting

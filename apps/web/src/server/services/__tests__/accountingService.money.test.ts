@@ -4,8 +4,8 @@
  * with `@/lib/money` (exact Decimal). Prisma is mocked, so this proves the amounts and deltas handed
  * to Prisma, not atomicity (P1-02/P1-03 cover that against a real database).
  *
- * The 0.01 balancing tolerance is deliberately still present (it is removed in P1-03); one test
- * pins that so the change cannot slip in unnoticed from this task.
+ * [P1-03] The 0.01 balancing tolerance is gone: the test that pinned it now pins the opposite
+ * (a one-cent imbalance is rejected). postEntry claims the entry and moves balances once per account.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Decimal } from '@prisma/client/runtime/library'
@@ -16,7 +16,7 @@ const h = vi.hoisted(() => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const prisma: any = {
     chartOfAccount: { findMany: vi.fn(), update: vi.fn((a: unknown) => a) },
-    journalEntry:   { create: vi.fn(), update: vi.fn((a: unknown) => a), findUniqueOrThrow: vi.fn() },
+    journalEntry:   { create: vi.fn(), update: vi.fn((a: unknown) => a), updateMany: vi.fn(() => ({ count: 1 })), findUnique: vi.fn(), findUniqueOrThrow: vi.fn() },
     journalLine:    { findMany: vi.fn() },
   }
   prisma.$transaction = vi.fn(async (fn: (db: unknown) => unknown) => fn(prisma))
@@ -75,19 +75,20 @@ describe('createJournalEntry', () => {
     ).rejects.toThrow(/unbalanced/)
   })
 
-  it('PINS the current 0.01 tolerance (removed in P1-03, not here)', async () => {
+  it('a one-cent imbalance is now REJECTED (the 0.01 tolerance was removed in P1-03)', async () => {
     await expect(
       accounting.createJournalEntry({
         ...base,
         lines: [{ accountCode: '1000', debit: 100.01 }, { accountCode: '4000', credit: 100 }],
       }),
-    ).resolves.toBe('je1')
+    ).rejects.toThrow(/unbalanced/)
+    expect(h.prisma.journalEntry.create).not.toHaveBeenCalled()
   })
 })
 
 describe('postEntry', () => {
-  it('moves each balance by an exact Decimal delta, by the account type', async () => {
-    h.prisma.journalEntry.findUniqueOrThrow.mockResolvedValue({
+  it('moves each balance by an exact Decimal delta, by the account type (one write per account)', async () => {
+    h.prisma.journalEntry.findUnique.mockResolvedValue({
       id: 'je1', isPosted: false,
       lines: [
         { accountId: 'a1000', debit: dec('0.10'), credit: dec('0'),    account: { type: 'ASSET' } },
@@ -101,15 +102,15 @@ describe('postEntry', () => {
     const updates: BalanceUpdate[] = h.prisma.chartOfAccount.update.mock.calls.map(
       (c: unknown[]) => c[0] as BalanceUpdate,
     )
+    // 0.10 + 0.20 on the same account is ONE exact increment of 0.3 (P1-03), not two writes.
     expect(updates.map((u) => [u.where.id, String(u.data.balance.increment)])).toEqual([
-      ['a1000', '0.1'],
-      ['a1000', '0.2'],
+      ['a1000', '0.3'],
       ['a4000', '0.3'],
     ])
   })
 
   it('refuses an entry that is already posted', async () => {
-    h.prisma.journalEntry.findUniqueOrThrow.mockResolvedValue({ id: 'je1', isPosted: true, lines: [] })
+    h.prisma.journalEntry.findUnique.mockResolvedValue({ id: 'je1', isPosted: true, lines: [] })
     await expect(accounting.postEntry('je1', 'u1')).rejects.toThrow(/already posted/)
   })
 })

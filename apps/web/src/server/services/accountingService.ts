@@ -38,7 +38,7 @@ import { prisma }     from '@/lib/prisma'
 import { logger }     from '@/lib/logger'
 // [P1-01] All arithmetic below uses the shared money utility (Decimal, half-up, 2 dp) instead of
 // JavaScript floats (plan X-11). Amounts still leave this module as numbers where they did before.
-import { add, sub, sum, round2, toNumber, ZERO } from '@/lib/money'
+import { add, sub, sum, round2, toNumber, eq, ZERO } from '@/lib/money'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TRANSACTION AWARENESS  [P1-02]  (plan C-11; root cause of A1-F3)
@@ -53,9 +53,38 @@ import { add, sub, sum, round2, toNumber, ZERO } from '@/lib/money'
 //     longer leave a draft or a half-moved balance behind.
 // The plan writes the signature as `fn(tx?, …)`; the position is notation, not a requirement.
 // `tx` is the LAST parameter so no existing call site changes.
-// Still open here, by design: the "already posted" check is not yet an atomic claim (P1-03),
-// and reversal is not yet once-only (P1-04).
+//
+// ATOMIC POSTING  [P1-03]  (plan A1-F1, A2-F2, X-10; spec Part 3 §4)
+//   - postEntry CLAIMS the entry with one conditional write (`updateMany … WHERE id AND isPosted = false`)
+//     and requires a row count of exactly 1. Two concurrent posts cannot both win: the second waits on
+//     the first's row lock, re-evaluates the condition when it commits, finds 0 rows and gets
+//     ALREADY_POSTED (409). The old read-then-update let both through and moved every balance twice.
+//   - Balancing is EXACT (debits === credits to the cent); the 0.01 tolerance (X-10) is gone. Entries
+//     are balance-checked before the claim and nothing after the claim can fail in JavaScript, so a
+//     caller that catches an error and keeps its transaction cannot be left with a claimed entry whose
+//     balances never moved.
+//   - Balances move once per ACCOUNT (net signed delta, exact Decimal) with an atomic `increment`, in
+//     ascending account id, so two postings that touch the same accounts always lock them in the same
+//     order and cannot deadlock each other.
+// Still open here, by design: reversal is not yet once-only (P1-04); the `status` column that the plan
+// names in the claim arrives with P1-05, so the claim uses `isPosted` until then.
 // ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * A ledger rule was broken. `status` and `code` follow the plan's error table (Part 4 §2): they let a
+ * route answer 409 ALREADY_POSTED / 422 UNBALANCED / 404 instead of a generic 500. The message is the
+ * same text the service has always used.
+ */
+export class LedgerError extends Error {
+  constructor(
+    public readonly code: 'ALREADY_POSTED' | 'UNBALANCED' | 'NOT_FOUND',
+    public readonly status: 404 | 409 | 422,
+    message: string,
+  ) {
+    super(message)
+    this.name = 'LedgerError'
+  }
+}
 
 /** The client of a caller's open transaction (`prisma.$transaction(async (tx) => …)`). */
 export type LedgerTx = Prisma.TransactionClient
@@ -162,15 +191,15 @@ export async function createJournalEntry(
   // Validate balanced entry (sum debits == sum credits)
   // [P1-01] Each line is rounded half-up to the cent first, exactly as the database column would
   // store it, so the balance test runs on the amounts that will really be written.
-  // The 0.01 tolerance is KEPT here on purpose: removing it ("exact balancing", plan A2-F2/X-10)
-  // is task P1-03 and must not slip into this one.
+  // [P1-03] EXACT: no tolerance (plan A2-F2 / X-10). Debits and credits must be equal to the cent.
   const lineDebits  = input.lines.map((l) => round2(l.debit  ?? 0))
   const lineCredits = input.lines.map((l) => round2(l.credit ?? 0))
   const totalDebits  = sum(lineDebits)
   const totalCredits = sum(lineCredits)
 
-  if (sub(totalDebits, totalCredits).abs().gt(0.01)) {
-    throw new Error(
+  if (!eq(totalDebits, totalCredits)) {
+    throw new LedgerError(
+      'UNBALANCED', 422,
       `Journal entry is unbalanced: debits ${totalDebits.toFixed(2)} ≠ credits ${totalCredits.toFixed(2)}`,
     )
   }
@@ -221,29 +250,47 @@ export async function postEntry(
   const normalDebitTypes  = new Set(['ASSET', 'EXPENSE'])
 
   await inTransaction(tx, async (db) => {
-    const entry = await db.journalEntry.findUniqueOrThrow({
+    // 1. Read and validate BEFORE claiming (read-only; a draft's lines are never edited).
+    const entry = await db.journalEntry.findUnique({
       where:   { id: entryId },
       include: { lines: { include: { account: true } } },
     })
+    if (!entry) throw new LedgerError('NOT_FOUND', 404, `Journal entry ${entryId} not found.`)
+    if (entry.isPosted) throw new LedgerError('ALREADY_POSTED', 409, `Entry ${entryId} is already posted.`)
 
-    if (entry.isPosted) throw new Error(`Entry ${entryId} is already posted.`)
+    // Exact balance of the stored lines (covers drafts written before the tolerance was removed).
+    const debits  = sum(entry.lines.map((l) => l.debit))
+    const credits = sum(entry.lines.map((l) => l.credit))
+    if (!eq(debits, credits)) {
+      throw new LedgerError(
+        'UNBALANCED', 422,
+        `Journal entry is unbalanced: debits ${debits.toFixed(2)} ≠ credits ${credits.toFixed(2)}`,
+      )
+    }
 
-    // Mark entry as posted
-    await db.journalEntry.update({
-      where: { id: entryId },
-      data:  { isPosted: true, postedAt: new Date(), postedByUid: actorUid },
-    })
-
-    // Update each account balance, in line order (a fixed lock order is P1-03).
+    // 2. Net signed delta per account (exact Decimal), accounts in ascending id.
+    const deltaByAccount = new Map<string, ReturnType<typeof sub>>()
     for (const line of entry.lines) {
-      const isDebitNormal = normalDebitTypes.has(line.account.type)
-      // [P1-01] Exact Decimal delta (was Number(...) - Number(...), plan X-11).
-      const delta = isDebitNormal
+      const delta = normalDebitTypes.has(line.account.type)
         ? sub(line.debit, line.credit)
         : sub(line.credit, line.debit)
+      deltaByAccount.set(line.accountId, add(deltaByAccount.get(line.accountId) ?? ZERO, delta))
+    }
+    const ordered = [...deltaByAccount.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
 
+    // 3. CLAIM: one conditional write; exactly one concurrent caller can change isPosted false → true.
+    const claim = await db.journalEntry.updateMany({
+      where: { id: entryId, isPosted: false },
+      data:  { isPosted: true, postedAt: new Date(), postedByUid: actorUid },
+    })
+    if (claim.count !== 1) {
+      throw new LedgerError('ALREADY_POSTED', 409, `Entry ${entryId} is already posted.`)
+    }
+
+    // 4. Move the balances: atomic increment, one write per account, ascending id (deadlock-free).
+    for (const [accountId, delta] of ordered) {
       await db.chartOfAccount.update({
-        where: { id: line.accountId },
+        where: { id: accountId },
         data:  { balance: { increment: delta } },
       })
     }
