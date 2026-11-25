@@ -9,6 +9,7 @@ import {
   SITE_URL,
 } from '@/lib/site'
 import { Analytics }            from '@vercel/analytics/next'
+import { SpeedInsights }        from '@vercel/speed-insights/next'
 import { AuthProvider }         from '@/components/providers/AuthProvider'
 import { QueryProvider }        from '@/components/providers/QueryProvider'
 import { ThemeProvider }        from '@/components/providers/ThemeProvider'
@@ -126,6 +127,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
         </ThemeProvider>
         <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   )
