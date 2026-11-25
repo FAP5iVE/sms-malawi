@@ -8,7 +8,7 @@ this file is corrected.
 Update the **Status** column (never the wording) when the owner or accountant answers, and add a line to
 `IMPLEMENTATION-LOG.md` saying what changed and when.
 
-Last reviewed: 2026-11-24 (end of the first P0 session).
+Last reviewed: 2026-11-25 (P0 gate re-checked; P1-01 done; I-07 to I-09 confirmed).
 
 ## 1. Decisions (D-xx)
 
@@ -55,7 +55,7 @@ named phase must not start without the owner knowing which default it is running
 |---|---|---|---|---|
 | OQ-01 | Which providers/accounts exist today (banks, wallets, POS, cheque, cash offices)? | P2-04 | Registry starts empty; legacy `1000` remains. | OPEN (default applies) |
 | OQ-02 | Accrual transition: cutover entries (D-01a) or back-dated restatement? Cutover date? Have financial statements already been issued from the system? | P9-04 | Cutover entries at the start of the current term. | OPEN (default applies) |
-| OQ-03 | Rounding rule (half-up vs bankers) and whether tambala (cents) are ever collected. | P1-01 | Half-up, 2 dp. | OPEN (default applies) |
+| OQ-03 | Rounding rule (half-up vs bankers) and whether tambala (cents) are ever collected. | P1-01 | Half-up, 2 dp. | OPEN (default applies). 2026-11-25: owner accepted half-up at 2 dp as the working default; still open for the accountant. It lives in one constant, `ROUNDING` in `src/lib/money.ts`. |
 | OQ-04 | Fiscal year start month; are terms the reporting periods? | P2-05 | Calendar year, monthly periods. | OPEN (default applies) |
 | OQ-05 | Approval thresholds (expense payment, refund, transfer, write-off, backdating days). | P4-03 | All payments above MWK 0 need a single approver; configurable. | OPEN (default applies) |
 | OQ-06 | Employer statutory items and their rules/rates; which remittance bodies. | P5-01 | Employer pension % setting only. | OPEN (default applies) |
@@ -85,3 +85,13 @@ These are choices the plan does not specify. They were put to the owner, who **c
 | I-04 | The audit row for a flag change is written straight after the change commits, not inside the same transaction. It moves inside the transaction when P1-11 makes financial audit transactional. | `settingsService.ts` |
 | I-05 | The baseline checks compare **journal references**, because the code stores no link between a journal entry and the record that caused it (plan X-13). A reversal is matched by `VOID-<reference>`. | `tools/finance-baseline/checks.mts` |
 | I-06 | The integration harness creates a throwaway **database** per run (not a schema), because seven existing migrations check for enum types with `pg_type` lookups that ignore schemas and would fail inside a database that already holds the app. | `src/server/__integration__/harness.ts` |
+
+## 4. Implementer choices made during P1
+
+Not specified by the plan. **I-07 to I-09 confirmed by the owner on 2026-11-25** ("I agree with them"); each states the default taken so it can be reversed.
+
+| ID | Choice | Where it applies |
+|---|---|---|
+| I-07 | `moneyInput` caps an amount at `MONEY_MAX` = 9,999,999,999.99 (the largest value a `Decimal(12,2)` column holds) unless the caller passes a lower `max`. The plan wants the bound to come from settings; a shared schema cannot read settings, so this is the safe default until the threshold settings exist (OQ-05). `moneyInput` was applied to six fields: payment amount, payment allocation amount, expense amount, library-fine amount, fee-structure create and update. | `packages/shared/schemas/finance.ts` |
+| I-08 | `createJournalEntry` keeps its **0.01 balancing tolerance** after P1-01. Exact balancing is task P1-03 (A2-F2, X-10) and a test pins the tolerance so it cannot change by accident. Line amounts are now rounded half-up to the cent first, as the database column would store them. | `accountingService.ts` |
+| I-09 | In `feeService`, the money tolerances (`+ 0.01`, `> 0.01`) are replaced by exact comparison, because the tolerance existed only to absorb float error. Result: one cent over a fee's balance is an overpayment. See the behaviour-change list in the log. | `feeService.ts` |

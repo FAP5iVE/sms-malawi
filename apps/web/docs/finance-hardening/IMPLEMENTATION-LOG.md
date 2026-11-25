@@ -117,11 +117,18 @@ Remains: nothing for P0-05.
 
 ## Phase P0 gate
 
-Not passed. Still needed before P1 starts (Part 6 §2):
-1. The first **real baseline report** from a production copy.
-2. The integration harness run once on the Neon test branch.
-3. The owner's answers in the P0-04 runbook §1.
-4. Owner authorisation to start P1 (plan D-29 governs any deploy).
+**Not passed.** Re-checked 2026-11-25 against the committed code (`ed714f9`). P0 is **complete as code and documents**
+(P0-01, P0-02, P0-03, P0-05 done; P0-04 written) but its "done when" conditions still need things only the owner can supply
+(Part 6 §2):
+1. The first **real baseline report** from a production copy. **Open.** The report supplied on 2026-11-24 is
+   `SYNTHETIC-demo-baseline-report.md`, generated from the planted-defect fixture, not from school data. It proves the 46 checks
+   fire (45 report rows, LF-04 is clean as documented) and shows the report format. It sizes nothing and must not be filed in
+   `baseline/` (see that folder's README).
+2. The integration harness run once on the Neon test branch. **Open.**
+3. The owner's answers in the P0-04 runbook §1. **Open.**
+4. Owner authorisation to start P1 (plan D-29 governs any deploy). **Given 2026-11-24** ("start the next phase"), taken as
+   authorisation to write P1 **code and tests only**. Nothing is applied to production: runbook §1 (1) and (2) must be
+   answered before any P1 migration touches the production database.
 
 ## Pre-existing problems found (not caused by, and not fixed in, this work)
 
@@ -132,3 +139,73 @@ Reported so they are not mistaken for regressions:
   `passwordResetService.test.ts` (1), `routeContract.test.ts` (1, gateway verbs against the CORS list).
 - `pnpm docs:security` points at `scripts/generate-security-docs.mts`, which does not exist in the repository.
 - `tools/hills/handler-inventory.mts --check` already reports other people's files as changed or new; the new `FeatureRollout.tsx` shows as "new" in it. The inventory was left alone so it does not absorb unrelated changes.
+
+---
+
+## Phase P1: Ledger core, immediate safeguards, permissions
+
+Session of 2026-11-25. Worked on a clone of `FAP5iVE/sms-malawi` at `ed714f9` (the P0 commit). Not committed, not pushed.
+Order of work follows Part 6 §3 (one task at a time).
+Pushed 2026-11-25 on branch `finance-hardening/p1-01-money-utility`, applied on `main` at `9499ae6` (PR #2, Sentry fixes). That PR changed
+`feeService.ts` only to build the Algolia search record (`toAlgoliaInvoice`) and let bulk generation defer indexing; it has no money arithmetic, so
+it does not interact with P1-01. The new and related tests were re-run on the merged tree (28 files, 428 tests, all passing).
+
+### Pre-phase check V-12: repository against the audited commit  (2026-11-25)
+Status: done.
+HEAD is `ed714f9`; the audited commit is `5c816c0`. Diffed the finance files (`accountingService`, `feeService`, `payroll*`,
+`expenseApprovalService`, `budgetService`, `hrService`, `library*`, `bulkInvoiceService`, `routes/{finances,payroll,hr,library}`,
+`schema.prisma`, shared finance schemas and permissions). **No posting, claim or permission logic changed.** What did change:
+- `feeService.listStudentBillingStanding()` and `GET /finances/billing-standing`: a new **read-only** list (2026-11-24). It reads
+  invoice balances with `Number(...)`; it moves no money and is left for the P3 receivables rewrite.
+- `StaffProfile.payrollNo` removed from the schema and the HR routes (relevant to V-09 / OQ-17: staff payment-detail fields).
+- Everything else is unrelated (MANEB, signatures, report cards, settings, student service).
+Parts 1 to 6 still describe the code accurately.
+
+### P1-01 Money utility and Zod money validators  (2026-11-25)
+Status: **done in code; unit-tested; not run against a real database** (no schema change in this task).
+What was done:
+- `src/lib/money.ts` (new, justified in the file header): `money` (strict gate for outside values: at most 2 dp),
+  `round2` (**half-up**), `add`, `sub`, `mul`, `percentOf`, `sum`, `min`, `max`, `nonNegative`, `compare`, `eq/gt/gte/lt/lte`,
+  `isZero`, `allocate` (**largest remainder**, done in BigInt so the shares are exact), `toNumber`, `MONEY_MAX`, `MoneyError`.
+  Comparisons have **no tolerance**.
+- `packages/shared/schemas/finance.ts`: `moneyInput({min, max, allowZero, label})` and `hasAtMostTwoDecimals`. Now used by
+  `RecordPaymentSchema.amount`, `PaymentAllocationSchema.amount`, `CreateExpenseSchema.amount`, `CreateLibraryFineSchema.amount`,
+  `CreateFeeStructureSchema.amount`, `UpdateFeeStructureSchema.amount`. Existing wording ("Amount must be positive") is kept.
+- `accountingService.ts`: line amounts rounded half-up to the cent before the balance test and before storing; balance deltas,
+  the income statement, trial balance and ledger running balance are exact Decimals (converted to numbers once, at the end).
+- `feeService.ts`: `computeInvoiceCharges` (subtotal, scholarship share, manual discount, credit), `recordPayment` (duplicate guard,
+  allocation total, overpayment, line and invoice balances), `applyLatePenalties`, `repairMissingLatePenaltyLineItems`,
+  `addInvoiceLineItem` and the billing-standing rounding helper now use the utility. Every `Math.round(n * 100) / 100` in the file is gone.
+Files: `src/lib/money.ts`, `src/lib/__tests__/money.test.ts`, `src/lib/__tests__/moneyInput.test.ts`,
+`src/server/services/accountingService.ts`, `src/server/services/feeService.ts`,
+`src/server/services/__tests__/{feeService.money,accountingService.money}.test.ts`, `packages/shared/schemas/finance.ts`.
+Verification:
+- New tests: 63 (money 26, moneyInput 11, feeService 17, accountingService 9). All pass.
+- Full unit suite (run with a config that omits `test/setup.ts`, see the pre-existing problems below): **1924 pass, 17 fail**; before this task
+  1861 pass, 17 fail. The failing test names are **identical** before and after, so nothing regressed.
+- The `feeService` tests were also run against the original `feeService.ts`: 8 of 17 fail there (one cent over an overpayment, 1.005 rounding,
+  exact allocation limit, duplicate window by cent, rounded penalty, and others), so they do detect the old behaviour. Some of those 8 fail only
+  because the old code hands Prisma a number where the new code hands a Decimal.
+- `tsc`: no error in any file added or changed by this task. The 1,000-odd existing errors come from the Prisma client not being generated
+  here (engine download blocked) and are unchanged in kind; two old implicit-`any` errors in these files disappeared.
+- eslint: no error and no new warning on the changed files.
+Decisions (I-07 to I-09 in DECISIONS.md, **confirmed by the owner 2026-11-25**): upper bound defaults to the column maximum; the 0.01 balancing tolerance is **kept** until P1-03;
+exact comparisons now replace the money tolerances in `feeService`. Owner also accepted half-up at 2 dp as the working default for OQ-03 (still open for the accountant).
+Behaviour changes a reviewer should know about (all follow from "no tolerance, exact cents"):
+1. A payment that is **one cent over** a fee line's balance is now an overpayment (confirmation and a 0.01 credit). Before, up to 0.01 was ignored.
+2. Allocations may not exceed the payment by even one cent. Before, 0.01 over was allowed.
+3. The duplicate-payment guard treats amounts as the same only when equal to the cent (before: within 0.01).
+4. A percentage scholarship is rounded to the cent first, so the line shares and the invoice total always agree. Before, the total used the unrounded figure.
+5. A late penalty is rounded to the cent. Before it was an unrounded float written to three columns.
+6. API clients that send an amount with more than 2 decimal places (or a float artefact such as `0.1 + 0.2`) are now refused with a clear message on the six fields above.
+Remains / open questions:
+- **OQ-03** (half-up versus bankers rounding, whether tambala are collected) is still open; half-up at 2 dp is the stated default and lives in one constant (`ROUNDING` in `money.ts`).
+- The maximum per amount should come from settings (Part 3 §2.1); a shared schema cannot read settings, so callers with a lower business limit pass `max`. Wiring that is for the phase that adds the threshold settings (OQ-05).
+- Other services still use float arithmetic and migrate with their phase, as the plan says: payroll, budgets, loans, library fines, `bulkInvoiceService`, `reportService`.
+  `listStudentBillingStanding` still accumulates `Number(...)` totals before its final rounding.
+- Not yet exercised in a browser: the client forms were not changed, but a form that sends more than 2 decimals will now see the validation message.
+
+### Next in order
+P1-02 Transaction-aware accounting service (`createJournalEntry(tx?, …)`, `postEntry(tx?, …)`, `voidEntry(tx?, …)`), which needs the integration
+harness running on a real Postgres to prove "posting inside a caller transaction rolls back with it". **Before P1-02:** the harness has not run on the Neon branch
+(P0 gate item 2).
