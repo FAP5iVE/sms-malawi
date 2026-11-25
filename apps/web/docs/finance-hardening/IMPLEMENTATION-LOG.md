@@ -235,6 +235,16 @@ Still open by design:
 - Balance updates still run in line order, not a fixed account order: P1-03 (deadlock avoidance).
 - **Run the itest before relying on this** (`TEST_DATABASE_URL=… pnpm --filter web test:integration`) and record the result here.
 
+### Neon facts observed through the connector (2026-11-25), runbook §1 partly answered
+Read from the Neon API and one read-only query on a preview branch. **These are observations, not owner confirmations.**
+- Project `sms-malawi` (`long-fire-80218178`), organisation on the **free plan**, Postgres 16, region aws-eu-west-2.
+- §1 (1) Branches: **yes**. Vercel already creates a `preview/<git branch>` branch per pushed branch (including both P1 branches), each a copy of production data. Who may create one by hand: not checked.
+- §1 (2) Point-in-time restore window: **history_retention_seconds = 21600, i.e. 6 hours**. A mistake found later than that cannot be restored from Neon itself. This makes a named pre-migration branch (§2 step 2) and a separate export (§1 (3)) more important, not optional.
+- The `production` branch is flagged `protected: false` (it cannot be deleted because Vercel uses it).
+- §1 (3) separate export, (4) restore authoriser, (5) how production migrations are applied: **still unanswered; owner to confirm.**
+- Schema check on the P1-02 preview branch: `chart_of_accounts.balance`, `journal_lines.debit` and `credit` are `numeric(14,2)`, which is the premise of the overflow test in `accountingService.itest.ts`; accounts `1000` (ASSET) and `4000` (REVENUE) exist.
+- The integration harness still has **not** been run: this build environment cannot reach the Prisma engine download or the Neon Postgres host. It needs a machine that can (your computer, or CI). Nothing was written to any Neon branch.
+
 ### Next in order
 P1-03 Atomic post claim, exact balancing, atomic balance updates (A1-F1, A2-F2, X-10; test **T-03**, concurrent post: exactly one success).
 Before P1-03 is called proven the harness must have run once on a real database, because T-03 is a concurrency test and cannot be proved with mocks.
