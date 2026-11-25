@@ -238,3 +238,9 @@ Still open by design:
 ### Next in order
 P1-03 Atomic post claim, exact balancing, atomic balance updates (A1-F1, A2-F2, X-10; test **T-03**, concurrent post: exactly one success).
 Before P1-03 is called proven the harness must have run once on a real database, because T-03 is a concurrency test and cannot be proved with mocks.
+
+### Type-check fix: accountingService.money.test.ts  (2026-11-25)
+Status: **done**. `pnpm --filter web exec tsc --noEmit` reported TS7006 (implicit `any`) twice in `postEntry > moves each balance by an exact Decimal delta`.
+Cause: `h.prisma` is deliberately `any` (a mock), so `mock.calls.map((c) => ...)` had an untyped parameter and returned `any`, which left the next `.map((u) => ...)` untyped too.
+Fix: a local `BalanceUpdate` type, `(c: unknown[])` on the first callback, and the result annotated as `BalanceUpdate[]`. Test logic and assertions are unchanged.
+File: `src/server/services/__tests__/accountingService.money.test.ts`.

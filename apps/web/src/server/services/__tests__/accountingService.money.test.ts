@@ -96,8 +96,10 @@ describe('postEntry', () => {
       ],
     })
     await accounting.postEntry('je1', 'u1')
-    const updates = h.prisma.chartOfAccount.update.mock.calls.map(
-      (c) => (c[0] as { where: { id: string }; data: { balance: { increment: Decimal } } }),
+    type BalanceUpdate = { where: { id: string }; data: { balance: { increment: Decimal } } }
+    // `h.prisma` is deliberately `any` (a mock), so the callback parameter and the result are typed here.
+    const updates: BalanceUpdate[] = h.prisma.chartOfAccount.update.mock.calls.map(
+      (c: unknown[]) => c[0] as BalanceUpdate,
     )
     expect(updates.map((u) => [u.where.id, String(u.data.balance.increment)])).toEqual([
       ['a1000', '0.1'],

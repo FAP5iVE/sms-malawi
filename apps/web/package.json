@@ -9,7 +9,7 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "cross-env NODE_OPTIONS=--max-old-space-size=6144 tsc --noEmit",
+    "typecheck": "node --max-old-space-size=4096 ./node_modules/typescript/bin/tsc --noEmit",
     "backfill-attendance": "tsx scripts/backfill-attendance.ts",
     "seed:full": "cross-env NODE_OPTIONS=--require=./scripts/seed/lib/stub-server-only.cjs DEMO_MODE=true tsx scripts/seed/index.ts",
     "seed:demo": "cross-env NODE_OPTIONS=--require=./scripts/seed/lib/stub-server-only.cjs DEMO_MODE=true tsx scripts/seed/index.ts",
