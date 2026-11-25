@@ -279,7 +279,7 @@ describe('applyLatePenalties', () => {
       invoice: { update: vi.fn().mockResolvedValue({ id: 'inv1', status: 'OVERDUE', balance: dec('350.00') }) },
       invoiceLineItem: { create: vi.fn() },
     }
-    h.prisma.$transaction.mockImplementationOnce(async (fn: (t: unknown) => unknown) => fn(tx))
+    h.prisma.$transaction.mockImplementationOnce((async (fn: (t: unknown) => unknown) => fn(tx)) as never)
     await applyLatePenalties(0.05)
     const bump = tx.invoice.update.mock.calls[0]![0].data
     expect(String(bump.latePenalty.increment)).toBe('16.67')

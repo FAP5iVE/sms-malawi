@@ -33,11 +33,41 @@
  */
 
 import 'server-only'
+import type { Prisma } from '@prisma/client'
 import { prisma }     from '@/lib/prisma'
 import { logger }     from '@/lib/logger'
 // [P1-01] All arithmetic below uses the shared money utility (Decimal, half-up, 2 dp) instead of
 // JavaScript floats (plan X-11). Amounts still leave this module as numbers where they did before.
 import { add, sub, sum, round2, toNumber, ZERO } from '@/lib/money'
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TRANSACTION AWARENESS  [P1-02]  (plan C-11; root cause of A1-F3)
+//
+// createJournalEntry, postEntry, voidEntry and recordPaymentEntry take an optional
+// trailing `tx`: the client of a transaction the CALLER already opened.
+//   - With `tx`, every read and write goes through it and no transaction is opened here, so the
+//     ledger entry commits or rolls back together with the caller's own writes (a payment and its
+//     journal entry become one unit; there is no "payment saved, journal lost" state).
+//   - Without `tx`, behaviour for existing callers is unchanged, except that posting, voiding and
+//     recordPaymentEntry now run in ONE transaction of their own, so a failure partway can no
+//     longer leave a draft or a half-moved balance behind.
+// The plan writes the signature as `fn(tx?, …)`; the position is notation, not a requirement.
+// `tx` is the LAST parameter so no existing call site changes.
+// Still open here, by design: the "already posted" check is not yet an atomic claim (P1-03),
+// and reversal is not yet once-only (P1-04).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** The client of a caller's open transaction (`prisma.$transaction(async (tx) => …)`). */
+export type LedgerTx = Prisma.TransactionClient
+
+/** Run `fn` on the caller's transaction when there is one, otherwise inside a new transaction. */
+async function inTransaction<T>(
+  tx: LedgerTx | undefined,
+  fn: (db: LedgerTx) => Promise<T>,
+): Promise<T> {
+  if (tx) return fn(tx)
+  return prisma.$transaction((db) => fn(db))
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
@@ -126,7 +156,9 @@ export async function seedChartOfAccounts(): Promise<void> {
 
 export async function createJournalEntry(
   input: CreateJournalEntryInput,
+  tx?: LedgerTx,
 ): Promise<string> {
+  const db: LedgerTx = tx ?? prisma
   // Validate balanced entry (sum debits == sum credits)
   // [P1-01] Each line is rounded half-up to the cent first, exactly as the database column would
   // store it, so the balance test runs on the amounts that will really be written.
@@ -145,7 +177,7 @@ export async function createJournalEntry(
 
   // Resolve account codes to IDs
   const codes    = input.lines.map((l) => l.accountCode)
-  const accounts = await prisma.chartOfAccount.findMany({ where: { code: { in: codes } } })
+  const accounts = await db.chartOfAccount.findMany({ where: { code: { in: codes } } })
   const accountMap = new Map(accounts.map((a) => [a.code, a.id]))
 
   const missingCodes = codes.filter((c) => !accountMap.has(c))
@@ -153,7 +185,7 @@ export async function createJournalEntry(
     throw new Error(`Unknown account codes: ${missingCodes.join(', ')}`)
   }
 
-  const entry = await prisma.journalEntry.create({
+  const entry = await db.journalEntry.create({
     data: {
       reference:   input.reference,
       description: input.description,
@@ -184,39 +216,40 @@ export async function createJournalEntry(
 export async function postEntry(
   entryId:  string,
   actorUid: string,
+  tx?:      LedgerTx,
 ): Promise<void> {
-  const entry = await prisma.journalEntry.findUniqueOrThrow({
-    where:   { id: entryId },
-    include: { lines: { include: { account: true } } },
-  })
-
-  if (entry.isPosted) throw new Error(`Entry ${entryId} is already posted.`)
-
   const normalDebitTypes  = new Set(['ASSET', 'EXPENSE'])
 
-  await prisma.$transaction([
+  await inTransaction(tx, async (db) => {
+    const entry = await db.journalEntry.findUniqueOrThrow({
+      where:   { id: entryId },
+      include: { lines: { include: { account: true } } },
+    })
+
+    if (entry.isPosted) throw new Error(`Entry ${entryId} is already posted.`)
+
     // Mark entry as posted
-    prisma.journalEntry.update({
+    await db.journalEntry.update({
       where: { id: entryId },
       data:  { isPosted: true, postedAt: new Date(), postedByUid: actorUid },
-    }),
+    })
 
-    // Update each account balance
-    ...entry.lines.map((line) => {
+    // Update each account balance, in line order (a fixed lock order is P1-03).
+    for (const line of entry.lines) {
       const isDebitNormal = normalDebitTypes.has(line.account.type)
       // [P1-01] Exact Decimal delta (was Number(...) - Number(...), plan X-11).
       const delta = isDebitNormal
         ? sub(line.debit, line.credit)
         : sub(line.credit, line.debit)
 
-      return prisma.chartOfAccount.update({
+      await db.chartOfAccount.update({
         where: { id: line.accountId },
         data:  { balance: { increment: delta } },
       })
-    }),
-  ])
+    }
+  })
 
-  logger.info({ event: 'journal.posted', entryId, actorUid })
+  logger.info({ event: 'journal.posted', entryId, actorUid, inCallerTransaction: Boolean(tx) })
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -350,29 +383,35 @@ export async function getAccountLedger(
 export async function voidEntry(
   entryId:  string,
   actorUid: string,
+  tx?:      LedgerTx,
 ): Promise<string> {
-  const original = await prisma.journalEntry.findUniqueOrThrow({
-    where:   { id: entryId },
-    include: { lines: { include: { account: true } } },
+  // The reversal is created and posted in one transaction (the caller's, or its own).
+  const reversalId = await inTransaction(tx, async (db) => {
+    const original = await db.journalEntry.findUniqueOrThrow({
+      where:   { id: entryId },
+      include: { lines: { include: { account: true } } },
+    })
+
+    if (!original.isPosted) throw new Error('Cannot void an unposted entry.')
+
+    const id = await createJournalEntry({
+      reference:   `VOID-${original.reference}`,
+      description: `Reversal of: ${original.description}`,
+      entryDate:   new Date(),
+      actorUid,
+      lines: original.lines.map((l) => ({
+        accountCode: l.account.code,
+        debit:       toNumber(l.credit),
+        credit:      toNumber(l.debit),
+        description: `Reversal — ${l.description ?? ''}`,
+      })),
+    }, db)
+
+    await postEntry(id, actorUid, db)
+    return id
   })
 
-  if (!original.isPosted) throw new Error('Cannot void an unposted entry.')
-
-  const reversalId = await createJournalEntry({
-    reference:   `VOID-${original.reference}`,
-    description: `Reversal of: ${original.description}`,
-    entryDate:   new Date(),
-    actorUid,
-    lines: original.lines.map((l) => ({
-      accountCode: l.account.code,
-      debit:       toNumber(l.credit),
-      credit:      toNumber(l.debit),
-      description: `Reversal — ${l.description ?? ''}`,
-    })),
-  })
-
-  await postEntry(reversalId, actorUid)
-  logger.info({ event: 'journal.voided', originalId: entryId, reversalId, actorUid })
+  logger.info({ event: 'journal.voided', originalId: entryId, reversalId, actorUid, inCallerTransaction: Boolean(tx) })
   return reversalId
 }
 
@@ -387,16 +426,20 @@ export async function recordPaymentEntry(opts: {
   amount:       number
   paymentRef:   string
   actorUid:     string
-}): Promise<void> {
-  const entryId = await createJournalEntry({
-    reference:   `PAY-${opts.invoiceId.slice(-8).toUpperCase()}`,
-    description: `Fee payment — ${opts.studentName} (ref: ${opts.paymentRef})`,
-    entryDate:   new Date(),
-    actorUid:    opts.actorUid,
-    lines: [
-      { accountCode: '1000', debit: opts.amount, description: 'Cash received' },
-      { accountCode: '4000', credit: opts.amount, description: 'Tuition fee revenue' },
-    ],
+}, tx?: LedgerTx): Promise<void> {
+  // Create and post as one unit: with `tx` they join the caller's payment transaction, without it
+  // they still commit or fail together, so no orphan draft entry (check LG-03) is left behind.
+  await inTransaction(tx, async (db) => {
+    const entryId = await createJournalEntry({
+      reference:   `PAY-${opts.invoiceId.slice(-8).toUpperCase()}`,
+      description: `Fee payment — ${opts.studentName} (ref: ${opts.paymentRef})`,
+      entryDate:   new Date(),
+      actorUid:    opts.actorUid,
+      lines: [
+        { accountCode: '1000', debit: opts.amount, description: 'Cash received' },
+        { accountCode: '4000', credit: opts.amount, description: 'Tuition fee revenue' },
+      ],
+    }, db)
+    await postEntry(entryId, opts.actorUid, db)
   })
-  await postEntry(entryId, opts.actorUid)
 }

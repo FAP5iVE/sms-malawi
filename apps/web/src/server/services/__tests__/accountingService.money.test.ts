@@ -10,14 +10,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Decimal } from '@prisma/client/runtime/library'
 
-const h = vi.hoisted(() => ({
-  prisma: {
+const h = vi.hoisted(() => {
+  // [P1-02] postEntry/voidEntry now open an interactive transaction: the callback gets a client.
+  // The mock hands back the same mock client, so the assertions below see every write.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const prisma: any = {
     chartOfAccount: { findMany: vi.fn(), update: vi.fn((a: unknown) => a) },
     journalEntry:   { create: vi.fn(), update: vi.fn((a: unknown) => a), findUniqueOrThrow: vi.fn() },
     journalLine:    { findMany: vi.fn() },
-    $transaction:   vi.fn(async (ops: unknown[]) => ops),
-  },
-}))
+  }
+  prisma.$transaction = vi.fn(async (fn: (db: unknown) => unknown) => fn(prisma))
+  return { prisma }
+})
 vi.mock('@/lib/prisma', () => ({ prisma: h.prisma }))
 vi.mock('@/lib/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }))
 

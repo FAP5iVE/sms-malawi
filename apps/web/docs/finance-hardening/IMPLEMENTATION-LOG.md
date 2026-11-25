@@ -205,7 +205,36 @@ Remains / open questions:
   `listStudentBillingStanding` still accumulates `Number(...)` totals before its final rounding.
 - Not yet exercised in a browser: the client forms were not changed, but a form that sends more than 2 decimals will now see the validation message.
 
+### P1-02 Transaction-aware accounting service  (2026-11-25)
+Status: **code done; wiring unit-tested; the real-database proof is written but NOT yet run.** Branch
+`finance-hardening/p1-02-transaction-aware-accounting`, stacked on the P1-01 branch.
+What was done (`accountingService.ts`, modified in place; no new file):
+- `createJournalEntry`, `postEntry`, `voidEntry` and `recordPaymentEntry` take an optional trailing `tx` (the client of the caller's open
+  transaction, type `LedgerTx = Prisma.TransactionClient`). With `tx`, every read and write goes through it and no transaction is opened
+  here, so the entry commits or rolls back with the caller's own writes. This removes the root cause of A1-F3 ("payment saved, journal lost")
+  for callers that adopt it; the callers themselves are converted in P1-06/P1-08 (unchanged here: `feeService`, `payrollApprovalService`,
+  `expenseApprovalService`, `routes/finances.ts`).
+- Without `tx`, existing callers behave as before, except `postEntry`, `voidEntry` and `recordPaymentEntry` now run in **one transaction of their
+  own** (an interactive transaction replaces the array form), so a failure partway no longer leaves an orphan draft (check LG-03) or a reversal
+  that was created but not posted. `createJournalEntry` alone opens none (one nested create is already atomic).
+- Reports (`getTrialBalance`, ledger, income statement) are untouched.
+Tests:
+- `src/server/services/__tests__/accountingService.tx.test.ts` (11, Prisma mocked): which client each call uses, that a caller's `tx` is the only client
+  touched, that no transaction is opened when one is passed, and that the own-transaction path runs create and post inside one. Against the
+  **old** service 8 of the 11 fail, so they detect the change. They prove wiring, not rollback.
+- `src/server/__integration__/accountingService.itest.ts` (7, real Postgres, **not run**): commit with the caller; rollback undoes the entry, the balances AND a
+  business write together; the entry is invisible to other connections until commit; void inside a caller transaction rolls back and commits with it;
+  without a caller transaction, create+post commit together, and a posting failure (balance overflow on `Decimal(14,2)`) leaves no orphan draft.
+  The test replaces the app's global Prisma client with one bound to the throwaway database and **throws if it is used outside it**.
+- Full unit suite: 1937 pass, 17 fail; the 17 are the same pre-existing failures (identical names).
+- `tsc` and eslint: nothing new beyond the untyped-Prisma noise (the client cannot be generated here). One genuine type error in the P1-01
+  `feeService.money.test.ts` (a mock cast) was found and fixed in this branch.
+Decision I-10 (DECISIONS.md): `tx` is the last parameter, not the first as the plan writes it.
+Still open by design:
+- The "already posted" check is not yet an atomic claim, and the 0.01 tolerance is still there: **P1-03**. Reversal is not yet once-only: **P1-04**.
+- Balance updates still run in line order, not a fixed account order: P1-03 (deadlock avoidance).
+- **Run the itest before relying on this** (`TEST_DATABASE_URL=… pnpm --filter web test:integration`) and record the result here.
+
 ### Next in order
-P1-02 Transaction-aware accounting service (`createJournalEntry(tx?, …)`, `postEntry(tx?, …)`, `voidEntry(tx?, …)`), which needs the integration
-harness running on a real Postgres to prove "posting inside a caller transaction rolls back with it". **Before P1-02:** the harness has not run on the Neon branch
-(P0 gate item 2).
+P1-03 Atomic post claim, exact balancing, atomic balance updates (A1-F1, A2-F2, X-10; test **T-03**, concurrent post: exactly one success).
+Before P1-03 is called proven the harness must have run once on a real database, because T-03 is a concurrency test and cannot be proved with mocks.

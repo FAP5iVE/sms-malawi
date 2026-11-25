@@ -8,7 +8,7 @@ this file is corrected.
 Update the **Status** column (never the wording) when the owner or accountant answers, and add a line to
 `IMPLEMENTATION-LOG.md` saying what changed and when.
 
-Last reviewed: 2026-11-25 (P0 gate re-checked; P1-01 done; I-07 to I-09 confirmed).
+Last reviewed: 2026-11-25 (P0 gate re-checked; P1-01 and P1-02 done; I-07 to I-09 confirmed; I-10 proposed).
 
 ## 1. Decisions (D-xx)
 
@@ -95,3 +95,4 @@ Not specified by the plan. **I-07 to I-09 confirmed by the owner on 2026-11-25**
 | I-07 | `moneyInput` caps an amount at `MONEY_MAX` = 9,999,999,999.99 (the largest value a `Decimal(12,2)` column holds) unless the caller passes a lower `max`. The plan wants the bound to come from settings; a shared schema cannot read settings, so this is the safe default until the threshold settings exist (OQ-05). `moneyInput` was applied to six fields: payment amount, payment allocation amount, expense amount, library-fine amount, fee-structure create and update. | `packages/shared/schemas/finance.ts` |
 | I-08 | `createJournalEntry` keeps its **0.01 balancing tolerance** after P1-01. Exact balancing is task P1-03 (A2-F2, X-10) and a test pins the tolerance so it cannot change by accident. Line amounts are now rounded half-up to the cent first, as the database column would store them. | `accountingService.ts` |
 | I-09 | In `feeService`, the money tolerances (`+ 0.01`, `> 0.01`) are replaced by exact comparison, because the tolerance existed only to absorb float error. Result: one cent over a fee's balance is an overpayment. See the behaviour-change list in the log. | `feeService.ts` |
+| I-10 | The optional `tx` is the **last** parameter of `createJournalEntry`, `postEntry`, `voidEntry` and `recordPaymentEntry`; the plan writes it first (`fn(tx?, …)`). Trailing keeps every existing call site compiling unchanged; the behaviour is what the plan specifies (use the passed client or open its own). | `accountingService.ts` |
