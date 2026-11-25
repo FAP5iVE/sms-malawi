@@ -287,5 +287,21 @@ no migration was needed or written.
 **Run before relying on it:** `TEST_DATABASE_URL=… pnpm --filter web test:integration`, then record the result here.
 T-03 is the whole point of this task and mocks cannot prove it.
 
+### First integration-harness run (2026-11-25, run by the owner on Windows)  -  FAILED, cause found and fixed
+Result: `harness.itest.ts` 2 passed, 2 failed; `baseline.itest.ts` and `accountingService.itest.ts` (all 11 tests, including T-03) **skipped**
+because their `beforeAll` failed. So **P1-02 and P1-03 are still not proven on a real database.**
+Cause: `prisma/schema.prisma` declares `directUrl = env("DIRECT_URL")` and `prisma migrate deploy` prefers it. The harness overrode only
+`DATABASE_URL`, so the migrations went to whatever `DIRECT_URL` points at and the throwaway `it_…` database stayed empty
+("table public.chart_of_accounts does not exist"). Fix (this commit): the harness now sets `DIRECT_URL` as well, refuses to run when
+`TEST_DATABASE_URL` equals `DIRECT_URL`, and checks that the schema really exists in the new database before any test runs.
+What the run touched (checked through the Neon connector): the run used the **production branch's** endpoint. That is allowed by design (the harness
+creates and drops its own database) and teardown left no `it_…` database behind. Production's latest applied migration is still
+`20261123100000_user_signatures` (24 Nov), so **this run applied no migration to production**; whether `DIRECT_URL` pointed at production
+could not be confirmed from here. Two `prisma_migrate_shadow_db_*` databases from earlier local `migrate dev` runs exist on the production branch;
+they are harmless but can be dropped.
+Going forward: use the dedicated Neon branch `itest-harness` (a copy of production taken 2026-11-25 19:46 UTC) for all harness runs.
+Owner note 2026-11-25: all current data is demo seed data and may be reset freely; this removes the "do not touch existing data" worry for the
+migrations and repairs in later tasks (the production-safety gates in the runbook still apply to a real go-live).
+
 ### Next in order
 P1-04 One-time reversal (A1-F2, A2-F3; test **T-04**). It needs migration M02 (reversal columns and a unique constraint), so it must not be applied anywhere until the runbook §1 answers are in and the harness has run.

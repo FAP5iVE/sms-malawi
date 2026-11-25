@@ -52,8 +52,12 @@ function baseUrl(): string {
   if (!url) {
     throw new Error('TEST_DATABASE_URL is not set — integration tests need a throwaway Postgres (e.g. a Neon branch).')
   }
-  if (process.env.DATABASE_URL && sameDatabase(url, process.env.DATABASE_URL)) {
-    throw new Error('TEST_DATABASE_URL points at the same database as DATABASE_URL — refusing to run integration tests against it.')
+  // The schema has `directUrl = env("DIRECT_URL")`, and migrations use it, so it is guarded like DATABASE_URL.
+  for (const name of ['DATABASE_URL', 'DIRECT_URL'] as const) {
+    const other = process.env[name]
+    if (other && sameDatabase(url, other)) {
+      throw new Error(`TEST_DATABASE_URL points at the same database as ${name} — refusing to run integration tests against it.`)
+    }
   }
   return url
 }
@@ -201,8 +205,12 @@ export async function createTestDb(): Promise<TestDb> {
     execFileSync(
       process.execPath,
       [prismaCli, 'migrate', 'deploy', '--schema', path.join(process.cwd(), 'prisma', 'schema.prisma')],
-      { env: { ...process.env, DATABASE_URL: url }, stdio: 'pipe' },
+      // DIRECT_URL must be overridden too: prisma/schema.prisma declares `directUrl = env("DIRECT_URL")`, and
+      // `migrate deploy` prefers it. Overriding only DATABASE_URL sent the migrations to whatever DIRECT_URL
+      // pointed at (the app's own database) and left this throwaway database empty.
+      { env: { ...process.env, DATABASE_URL: url, DIRECT_URL: url }, stdio: 'pipe' },
     )
+    await assertMigrated(url, database)
   } catch (err) {
     await teardown()
     throw err
@@ -243,6 +251,19 @@ export async function createTestDb(): Promise<TestDb> {
       }
     },
     teardown,
+  }
+}
+
+/** Fails loudly if `migrate deploy` did not build the schema in OUR database (see the DIRECT_URL note above). */
+async function assertMigrated(url: string, database: string): Promise<void> {
+  const probe = makeClient(url)
+  try {
+    const rows = await probe.$queryRaw<Array<{ t: string | null }>>`SELECT to_regclass('public.chart_of_accounts')::text AS t`
+    if (!rows[0]?.t) {
+      throw new Error(`Migrations did not create the schema in the test database "${database}". Check that nothing redirects prisma migrate (DIRECT_URL, .env).`)
+    }
+  } finally {
+    await probe.$disconnect()
   }
 }
 
