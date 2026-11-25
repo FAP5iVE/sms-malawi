@@ -67,6 +67,8 @@ import { logger } from '@/lib/logger'
 import * as auditService from '@/server/services/auditService'
 import { assertNotSelfReview } from '@/server/lib/selfReview'
 import { createJournalEntry, postEntry, voidEntry } from '@/server/services/accountingService'
+// [P1-03] Exact deductions: the journal now balances to the cent with no tolerance.
+import { sub, gt, toNumber, ZERO } from '@/lib/money'
 import type { UserRole } from '@shared/types/roles'
 import type { PayrollRun, PayrollStatus } from '@prisma/client'
 
@@ -204,7 +206,11 @@ export async function lock(
 
   const grossPayroll = Number(run.totalGross)
   const netPayroll   = Number(run.totalNet)
-  const deductions   = grossPayroll - netPayroll
+  // [P1-03] Was `grossPayroll - netPayroll` in floats with a `> 0.01` guard. That guard dropped the
+  // deductions line when the difference was exactly 0.01, leaving a 0.01 imbalance that only the old
+  // balancing tolerance let through. Now exact: the line is skipped only when there is nothing to book.
+  const deductionsExact = sub(run.totalGross, run.totalNet)
+  const deductions      = toNumber(deductionsExact)
 
   const entryId = await createJournalEntry({
     reference:   journalReference(run.month, run.year),
@@ -214,7 +220,7 @@ export async function lock(
     lines: [
       { accountCode: '5000', debit: grossPayroll, description: 'Gross staff salaries' },
       { accountCode: '2100', credit: netPayroll, description: 'Net payroll payable' },
-      ...(deductions > 0.01
+      ...(gt(deductionsExact, ZERO)
         ? [{ accountCode: '2000', credit: deductions, description: 'PAYE tax, pension, loans' }]
         : []),
     ],

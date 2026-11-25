@@ -14,6 +14,8 @@
  * with a stand-in that points at the throwaway database, and that THROWS when no test database is
  * attached, so the test can never reach the real application database.
  *
+ * [P1-03] Adds T-03 (concurrent post: exactly one success) and the deadlock and exact-balance tests below.
+ *
  * STATUS: written against the schema and harness API by reading them; NOT yet run on a database
  * (the build environment that wrote it cannot reach the Prisma engine download or Postgres).
  * Run it once and record the result in IMPLEMENTATION-LOG.md before treating P1-02 as proven.
@@ -37,7 +39,7 @@ vi.mock('@/lib/prisma', () => ({
 vi.mock('@/lib/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }))
 
 import {
-  createJournalEntry, postEntry, voidEntry, recordPaymentEntry,
+  createJournalEntry, postEntry, voidEntry, recordPaymentEntry, LedgerError,
 } from '../services/accountingService'
 
 class Rollback extends Error {
@@ -58,7 +60,7 @@ const entry = (reference: string, amount: number) => ({
   ],
 })
 
-describe.skipIf(!integrationEnabled())('accountingService: caller transactions (P1-02)', () => {
+describe.skipIf(!integrationEnabled())('accountingService: caller transactions (P1-02) and atomic posting (P1-03)', () => {
   let db: TestDb
 
   const balances = async (): Promise<Record<string, string>> => {
@@ -195,5 +197,99 @@ describe.skipIf(!integrationEnabled())('accountingService: caller transactions (
     const cash = await db.prisma.chartOfAccount.findUniqueOrThrow({ where: { code: '1000' } })
     expect(cash.balance.toFixed(2)).toBe('999999999999.99')                 // untouched
     expect((await balances())['4000']).toBe('0.00')
+  })
+  // ── P1-03 ────────────────────────────────────────────────────────────────────────────────────
+
+  it('T-03: six simultaneous posts of one draft give exactly ONE success and move the balances once', async () => {
+    const ROUNDS = 5
+    for (let round = 1; round <= ROUNDS; round++) {
+      const id = await createJournalEntry(entry(`ITEST-T03-${round}`, 100))
+      const results = await Promise.allSettled(
+        Array.from({ length: 6 }, (_, i) => postEntry(id, `user-${i}`)),
+      )
+      expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1)
+      for (const r of results) {
+        if (r.status === 'rejected') {
+          expect(r.reason).toBeInstanceOf(LedgerError)
+          expect(r.reason).toMatchObject({ code: 'ALREADY_POSTED', status: 409 })
+        }
+      }
+    }
+    const b = await balances()
+    expect(b['1000']).toBe('500.00') // 5 entries x 100, never 600 or 3000
+    expect(b['4000']).toBe('500.00')
+  })
+
+  it('T-03 (deterministic): a second post WAITS on the first, then loses with ALREADY_POSTED', async () => {
+    const id = await createJournalEntry(entry('ITEST-T03-WAIT', 100))
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    let claimed!: () => void
+    const firstHasClaimed = new Promise<void>((resolve) => { claimed = resolve })
+
+    // A claims the entry inside a transaction it keeps open.
+    const first = db.prisma.$transaction(async (tx) => {
+      await postEntry(id, 'user-A', tx)
+      claimed()
+      await gate
+    })
+    await firstHasClaimed
+
+    // B starts while A is uncommitted: its read still sees a draft, so only the claim can stop it.
+    let secondSettled = false
+    const second = postEntry(id, 'user-B').then(
+      () => 'won' as const,
+      (e: unknown) => e,
+    ).finally(() => { secondSettled = true })
+    await new Promise((resolve) => setTimeout(resolve, 400))
+    expect(secondSettled).toBe(false) // blocked on A's row lock, not racing past it
+
+    release()
+    await first
+    const outcome = await second
+    expect(outcome).toBeInstanceOf(LedgerError)
+    expect(outcome).toMatchObject({ code: 'ALREADY_POSTED', status: 409 })
+
+    const posted = await db.prisma.journalEntry.findFirstOrThrow({ where: { reference: 'ITEST-T03-WAIT' } })
+    expect(posted.postedByUid).toBe('user-A')
+    expect((await balances())['1000']).toBe('100.00')
+  })
+
+  it('postings that list the same two accounts in opposite orders never deadlock', async () => {
+    const reversed = (reference: string, amount: number) => ({
+      ...entry(reference, amount),
+      lines: [
+        { accountCode: '4000', credit: amount, description: 'Revenue' },
+        { accountCode: '1000', debit: amount, description: 'Cash' },
+      ],
+    })
+    const WAVES = 4
+    const PER_WAVE = 6 // stays within the default connection pool so no run waits for a free connection
+    for (let w = 0; w < WAVES; w++) {
+      const ids: string[] = []
+      for (let i = 0; i < PER_WAVE; i++) {
+        ids.push(await createJournalEntry(i % 2 === 0 ? entry(`ITEST-DL-${w}-${i}`, 10) : reversed(`ITEST-DL-${w}-${i}`, 10)))
+      }
+      const results = await Promise.allSettled(ids.map((id) => postEntry(id, 'itest-user')))
+      const failed = results.filter((r) => r.status === 'rejected')
+      expect(failed).toEqual([]) // a deadlock would surface here as a rejected post
+    }
+    const b = await balances()
+    expect(b['1000']).toBe('240.00') // 24 entries x 10
+    expect(b['4000']).toBe('240.00')
+  })
+
+  it('a one-cent imbalance is refused on a real database and nothing is written', async () => {
+    const before = await counts()
+    await expect(
+      createJournalEntry({
+        ...entry('ITEST-UNBAL', 100),
+        lines: [
+          { accountCode: '1000', debit: 100.01, description: 'Cash' },
+          { accountCode: '4000', credit: 100, description: 'Revenue' },
+        ],
+      }),
+    ).rejects.toMatchObject({ code: 'UNBALANCED', status: 422 })
+    expect(await counts()).toEqual(before)
   })
 })
