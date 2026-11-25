@@ -19,6 +19,7 @@
  *   InventoryVariance — R22), inventoryService.ts, sequenceNumbers.ts
  */
 import 'server-only'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import * as auditService from '@/server/services/auditService'
 import * as inventoryService from '@/server/services/inventoryService'
@@ -57,18 +58,31 @@ export async function createStocktake(
   input: { academicYear: string; term?: number; departmentId?: string; roomId?: string; notes?: string },
   actorUid: string, actorRole: UserRole,
 ) {
-  if (!input.departmentId && !input.roomId) {
+  // An unselected <select> posts '' — treat that as "not provided", never as an id.
+  const roomId = input.roomId?.trim() || undefined
+  const departmentId = input.departmentId?.trim() || undefined
+  if (!departmentId && !roomId) {
     throw Object.assign(new Error('A stocktake needs either a department or a room scope.'), { status: 400 })
   }
-  if (input.roomId) {
-    const existing = await prisma.stocktake.findUnique({ where: { academicYear_term_roomId: { academicYear: input.academicYear, term: input.term ?? null as never, roomId: input.roomId } } })
+  if (roomId) {
+    const existing = await prisma.stocktake.findUnique({ where: { academicYear_term_roomId: { academicYear: input.academicYear, term: input.term ?? null as never, roomId } } })
     if (existing) throw Object.assign(new Error('A stocktake already exists for this room this term.'), { status: 409 })
   }
 
+  // [PRODUCTION FIX 2026-11-25] The room/department ids come straight from the
+  // client. A stale or invalid id used to reach prisma.stocktake.create() and
+  // fail there as a foreign-key violation (`stocktakes_roomId_fkey`) — an
+  // unhandled 500 in Sentry and an unhelpful "database constraint" message for
+  // the user. Check both up front and answer with a clear 400 instead.
   let custodianUid: string | undefined
-  if (input.roomId) {
-    const room = await prisma.room.findUnique({ where: { id: input.roomId } })
-    custodianUid = room?.custodianUid ?? undefined
+  if (roomId) {
+    const room = await prisma.room.findUnique({ where: { id: roomId } })
+    if (!room) throw Object.assign(new Error('The selected room no longer exists. Refresh the page and pick the room again.'), { status: 400 })
+    custodianUid = room.custodianUid ?? undefined
+  }
+  if (departmentId) {
+    const department = await prisma.department.findUnique({ where: { id: departmentId }, select: { id: true } })
+    if (!department) throw Object.assign(new Error('The selected department no longer exists. Refresh the page and pick the department again.'), { status: 400 })
   }
 
   for (let attempt = 0; attempt < SEQUENCE_MAX_ATTEMPTS; attempt++) {
@@ -79,16 +93,21 @@ export async function createStocktake(
           stocktakeNumber,
           academicYear: input.academicYear,
           term: input.term,
-          departmentId: input.departmentId,
-          roomId: input.roomId,
+          departmentId,
+          roomId,
           custodianUid,
           notes: input.notes,
           status: 'DRAFT',
         },
       })
-      await auditService.log({ action: 'inventory.stocktake.create', entityType: 'Stocktake', entityId: stocktake.id, actorUid, actorRole, metadata: { context: { stocktakeNumber, roomId: input.roomId, departmentId: input.departmentId } } })
+      await auditService.log({ action: 'inventory.stocktake.create', entityType: 'Stocktake', entityId: stocktake.id, actorUid, actorRole, metadata: { context: { stocktakeNumber, roomId, departmentId } } })
       return stocktake
     } catch (err) {
+      // Safety net for the narrow race where the room/department is deleted
+      // between the checks above and this insert.
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2003') {
+        throw Object.assign(new Error('The selected room or department no longer exists. Refresh the page and try again.'), { status: 400 })
+      }
       if (!isUniqueConstraintError(err) || attempt === SEQUENCE_MAX_ATTEMPTS - 1) throw err
     }
   }

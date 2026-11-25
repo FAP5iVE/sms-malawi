@@ -54,6 +54,7 @@ import 'server-only'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import * as feeService from '@/server/services/feeService'
+import * as algolia from '@/server/services/algoliaService'
 import type { BulkGenerateInvoicesInput } from '@shared/schemas/finance'
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -133,6 +134,13 @@ export async function bulkGenerateInvoices(
   })
 
   const results: StudentInvoiceResult[] = []
+  // Invoices created in this run, indexed in a single Algolia batch after the
+  // loop. [PRODUCTION FIX 2026-11-25] generateInvoice() used to fire one
+  // Algolia write per invoice, so a class-sized run made dozens of sequential
+  // network calls (~1.5 s apart in the Sentry trace) and held the
+  // `bulk-mutation` rate-limit slot long enough to raise "Slow expensive
+  // operation on bulk-mutation".
+  const searchRecords: ReturnType<typeof feeService.toAlgoliaInvoice>[] = []
   let created = 0
   let existing = 0
   let skipped = 0
@@ -213,8 +221,10 @@ export async function bulkGenerateInvoices(
         { studentId: student.id, academicYear, term, feeStructureIds },
         actorUid,
         actorRole,
-        { applyScholarship: applyScholarships, consumeCredit: consumeAdvanceCredit }
+        { applyScholarship: applyScholarships, consumeCredit: consumeAdvanceCredit },
+        { deferSearchIndex: true }
       )
+      searchRecords.push(feeService.toAlgoliaInvoice(invoice))
 
       const scholarshipAbsorbed = Number(invoice.discount)
       // subtotal - discount is "net fees due before credit"; the gap
@@ -243,6 +253,13 @@ export async function bulkGenerateInvoices(
       errors++
       logger.error({ event: 'bulk-invoice.student-error', studentId: student.id, err })
     }
+  }
+
+  // One batched write for the whole run. bulkIndexInvoices() never throws — a
+  // search-index hiccup must not fail invoices that are already committed.
+  if (searchRecords.length > 0) {
+    const indexed = await algolia.bulkIndexInvoices(searchRecords)
+    if (indexed.error) logger.warn({ event: 'bulk-invoice.index-failed', count: searchRecords.length, error: indexed.error })
   }
 
   logger.info(

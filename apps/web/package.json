@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "prisma generate && node tools/migrate-deploy.mjs && next build",
+    "db:migrate:status": "prisma migrate status",
+    "db:migrate:deploy": "prisma migrate deploy",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "cross-env NODE_OPTIONS=--max-old-space-size=6144 tsc --noEmit",

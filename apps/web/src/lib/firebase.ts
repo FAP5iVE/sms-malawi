@@ -31,7 +31,7 @@
 import { initializeApp, getApps, getApp, type FirebaseOptions } from 'firebase/app'
 import { getAuth, connectAuthEmulator }            from 'firebase/auth'
 import { getFirestore, connectFirestoreEmulator }  from 'firebase/firestore'
-import { getMessaging, getToken, deleteToken, isSupported } from 'firebase/messaging'
+import { getMessaging, getToken, deleteToken, isSupported, type Messaging } from 'firebase/messaging'
 
 // ─────────────────────────────────────────────────────────
 //  FIREBASE APP CONFIGURATION
@@ -90,19 +90,40 @@ export const auth = (app && typeof window !== 'undefined')
   : null
 
 /**
- * Firebase Cloud Messaging instance.
+ * Firebase Cloud Messaging instance — created lazily, and only where FCM can work.
  *
- * Used for push notification token registration.
- * Call getFcmToken() to get the user's device token — do not use messaging directly.
+ * [PRODUCTION FIX 2026-11-25] This used to be an eagerly-evaluated
+ * `export const messaging = getMessaging(app)`. Because AuthProvider imports
+ * this module, that line ran during module evaluation on every page load, and
+ * in a browser without service workers (headless crawlers, preview-screenshot
+ * bots, some in-app webviews, insecure contexts) it blew up twice:
+ *   • synchronously — `navigator.serviceWorker` is undefined, so the SDK threw
+ *     "Cannot read properties of undefined (reading 'addEventListener')"
+ *     while the module was being evaluated, taking AuthProvider's import
+ *     chain down with it; and
+ *   • asynchronously — the SDK fires `isWindowSupported()` internally and
+ *     throws "messaging/unsupported-browser" from an un-awaited promise, which
+ *     is an unhandled rejection no try/catch around getMessaging() can catch.
+ * The fix is to ask `isSupported()` ourselves FIRST and only call
+ * getMessaging() when it resolves true. Nothing runs at import time now.
  *
- * null on:
+ * Resolves null on:
  *   • Server-side render (no window object)
- *   • Browsers without Notification API or Service Worker support
+ *   • Browsers without Notification API, Service Worker or IndexedDB support
  *   • When firebase config is missing
+ * Never rejects.
  */
-export const messaging = (app && typeof window !== 'undefined')
-  ? getMessaging(app)
-  : null
+let messagingPromise: Promise<Messaging | null> | null = null
+
+function getMessagingSafe(): Promise<Messaging | null> {
+  if (!app || typeof window === 'undefined' || !('serviceWorker' in navigator)) {
+    return Promise.resolve(null)
+  }
+  messagingPromise ??= isSupported()
+    .then((supported) => (supported ? getMessaging(app) : null))
+    .catch(() => null)
+  return messagingPromise
+}
 
 // ─────────────────────────────────────────────────────────
 //  FCM TOKEN MANAGEMENT
@@ -122,7 +143,7 @@ export const messaging = (app && typeof window !== 'undefined')
  *
  * Returns null (without throwing) when:
  *   • Server-side render
- *   • messaging is null (unsupported browser)
+ *   • messaging is unavailable (unsupported browser — see getMessagingSafe())
  *   • NEXT_PUBLIC_FIREBASE_VAPID_KEY is not configured
  *   • Browser doesn't support FCM (checked via isSupported())
  *   • User denies the notification permission prompt
@@ -133,7 +154,7 @@ export const messaging = (app && typeof window !== 'undefined')
  * already granted returns the existing token without re-prompting the user.
  */
 export async function getFcmToken(): Promise<string | null> {
-  if (typeof window === 'undefined' || !messaging || !app) return null
+  if (typeof window === 'undefined' || !app) return null
 
   const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY
   if (!vapidKey) {
@@ -146,8 +167,9 @@ export async function getFcmToken(): Promise<string | null> {
   try {
     // isSupported() returns false for: Firefox in private mode, Safari < 16.4 without
     // PWA install, all iOS WebView, and any browser without Service Worker support.
-    const supported = await isSupported()
-    if (!supported) return null
+    // getMessagingSafe() has already consulted isSupported(); null means unsupported.
+    const messaging = await getMessagingSafe()
+    if (!messaging) return null
 
     // Request permission — resolves immediately if already decided.
     // If the user has previously denied, this returns 'denied' without a prompt.
@@ -246,9 +268,11 @@ export async function getFcmToken(): Promise<string | null> {
  * Safe to call even if the token was never registered — returns silently.
  */
 export async function removeFcmToken(): Promise<void> {
-  if (typeof window === 'undefined' || !messaging) return
+  if (typeof window === 'undefined') return
 
   try {
+    const messaging = await getMessagingSafe()
+    if (!messaging) return
     await deleteToken(messaging)
   } catch {
     // Non-fatal — the token will expire and be cleaned up server-side

@@ -197,7 +197,22 @@ export function redactStaffSensitive<T extends Record<string, unknown>>(profile:
   return copy as Omit<T, (typeof STAFF_SENSITIVE_FIELDS)[number]>
 }
 
+/**
+ * A missing StaffProfile is a plain 404 for the caller, not a server fault.
+ * `findUniqueOrThrow` raised Prisma's P2025 instead, which the Express chain
+ * reported to Sentry as an unhandled 500 (SMS-MALAWI "No record was found for
+ * a query"). Carrying `.status` lets sendError / Sentry treat it as the
+ * expected client error it is.
+ */
+function staffNotFound() {
+  return Object.assign(new Error('Staff member not found.'), { status: 404 })
+}
+
 export async function getStaffProfile(id: string) {
+  // Check first: refreshLeaveBalances would otherwise run (and write) for an id that doesn't exist.
+  const exists = await prisma.staffProfile.findUnique({ where: { id }, select: { id: true } })
+  if (!exists) throw staffNotFound()
+
   // Balances for this year exist and match today's settings before they are shown.
   await refreshLeaveBalances({ staffId: id }).catch((err) => logger.error({ event: 'leave.balance_refresh_failed', err }))
   const profile = await prisma.staffProfile.findUniqueOrThrow({
@@ -228,12 +243,14 @@ export async function getStaffProfile(id: string) {
 // payrollService.ts already reads it), so this resolves id -> uid first,
 // same pattern as the loan functions below.
 export async function getSalaryStructure(id: string) {
-  const staff = await prisma.staffProfile.findUniqueOrThrow({ where: { id }, select: { uid: true } })
+  const staff = await prisma.staffProfile.findUnique({ where: { id }, select: { uid: true } })
+  if (!staff) throw staffNotFound()
   return prisma.salaryStructure.findUnique({ where: { staffUid: staff.uid } })
 }
 
 export async function upsertSalaryStructure(id: string, data: UpdateSalaryInput, actorUid: string, actorRole: string) {
-  const staff = await prisma.staffProfile.findUniqueOrThrow({ where: { id }, select: { uid: true } })
+  const staff = await prisma.staffProfile.findUnique({ where: { id }, select: { uid: true } })
+  if (!staff) throw staffNotFound()
   const result = await prisma.salaryStructure.upsert({
     where:  { staffUid: staff.uid },
     update: { baseSalary: data.baseSalary },
@@ -257,7 +274,8 @@ export async function upsertSalaryStructure(id: string, data: UpdateSalaryInput,
 // query — recurring OR matching the specific run's month/year) to compute
 // each month's gross.
 export async function listAllowances(id: string) {
-  const staff = await prisma.staffProfile.findUniqueOrThrow({ where: { id }, select: { uid: true } })
+  const staff = await prisma.staffProfile.findUnique({ where: { id }, select: { uid: true } })
+  if (!staff) throw staffNotFound()
   return prisma.staffAllowance.findMany({
     where: { staffUid: staff.uid },
     orderBy: [{ recurring: 'desc' }, { createdAt: 'desc' }],
@@ -265,7 +283,8 @@ export async function listAllowances(id: string) {
 }
 
 export async function addAllowance(id: string, data: CreateAllowanceInput, actorUid: string, actorRole: string) {
-  const staff = await prisma.staffProfile.findUniqueOrThrow({ where: { id }, select: { uid: true } })
+  const staff = await prisma.staffProfile.findUnique({ where: { id }, select: { uid: true } })
+  if (!staff) throw staffNotFound()
   const result = await prisma.staffAllowance.create({
     data: {
       staffUid:     staff.uid,
@@ -836,10 +855,11 @@ export async function applyForLeave(staffId: string, data: LeaveRequestInput) {
   const days = countLeaveDays(start, end)
   if (days <= 0) throw leaveError('Those dates contain no working days. Weekends and public holidays are not counted as leave.')
 
-  const staff = await prisma.staffProfile.findUniqueOrThrow({
+  const staff = await prisma.staffProfile.findUnique({
     where:  { id: staffId },
     select: { sex: true, status: true },
   })
+  if (!staff) throw staffNotFound()
   if (staff.status === 'TERMINATED') throw leaveError('A terminated staff account cannot apply for leave.', 403)
 
   const onlyFor = LEAVE_TYPE_SEX[leaveType as LeaveTypeKey]
