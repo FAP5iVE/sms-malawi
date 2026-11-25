@@ -13,8 +13,9 @@
  *      migrations and row locks need a real session) or a local Postgres.
  *      It must differ from DATABASE_URL; the harness refuses to run otherwise.
  *   2. createTestDb() creates a uniquely named DATABASE (it_<random>) on that
- *      server, applies every migration in prisma/migrations to it with
- *      `prisma migrate deploy`, and hands back Prisma clients bound to it.
+ *      server as a copy of a migrated template database (it_tpl_<hash of the
+ *      migrations>, built once with `prisma migrate deploy` and kept between
+ *      runs), and hands back Prisma clients bound to it.
  *      A separate database (not just a schema) is deliberate: seven of the
  *      repo's migrations guard enum creation with `pg_type` lookups that are
  *      NOT schema-aware, so a schema inside a database that already holds the
@@ -34,7 +35,8 @@
  * vitest.config.ts, which runs files one at a time.
  */
 import { execFileSync } from 'node:child_process'
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
+import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { PrismaClient } from '@prisma/client'
 
@@ -166,8 +168,91 @@ const SEED_CHART = [
   { code: '5900', name: 'Miscellaneous Expense', type: 'EXPENSE',   category: 'Operating Expense' },
 ] as const
 
+/**
+ * Neon computes suspend when idle, and a cold start takes longer than Prisma's 5 s default connect timeout
+ * ("Can't reach database server"), so give every connection 30 s unless the URL already says otherwise.
+ */
+function withConnectTimeout(url: string): string {
+  const u = new URL(url)
+  if (!u.searchParams.has('connect_timeout')) u.searchParams.set('connect_timeout', '30')
+  return u.toString()
+}
+
 function makeClient(url: string): PrismaClient {
-  return new PrismaClient({ datasources: { db: { url } }, log: [] })
+  return new PrismaClient({ datasources: { db: { url: withConnectTimeout(url) } }, log: [] })
+}
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
+
+/** Wake a suspended compute: retry a trivial query until the server answers (or give up after `ms`). */
+async function waitForServer(client: PrismaClient, ms = 90_000): Promise<void> {
+  const deadline = Date.now() + ms
+  for (;;) {
+    try {
+      await client.$queryRaw`SELECT 1`
+      return
+    } catch (err) {
+      if (Date.now() > deadline) throw err
+      await sleep(2_000)
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+//  MIGRATED TEMPLATE
+//  `prisma migrate deploy` replays every migration statement over the network and takes minutes from a
+//  laptop, so it is done ONCE per set of migrations. The result is kept as a template database named
+//  after a hash of the migration files; every test database is then a fast server-side copy of it.
+//  Changing or adding a migration changes the hash, so a stale template is never reused.
+//  The template (`it_tpl_<hash>`) is left in place on purpose between runs; it is safe to drop at any time.
+// ─────────────────────────────────────────────────────────
+
+const TEMPLATE_NAME = /^it_tpl_[a-f0-9]{12}$/
+
+function migrationsHash(): string {
+  const dir = path.join(process.cwd(), 'prisma', 'migrations')
+  const hash = createHash('sha256')
+  for (const name of readdirSync(dir).filter((n) => !n.includes('.')).sort()) {
+    hash.update(name)
+    hash.update(readFileSync(path.join(dir, name, 'migration.sql')))
+  }
+  return hash.digest('hex').slice(0, 12)
+}
+
+function migrate(url: string): void {
+  const prismaCli = path.join(process.cwd(), 'node_modules', 'prisma', 'build', 'index.js')
+  execFileSync(
+    process.execPath,
+    [prismaCli, 'migrate', 'deploy', '--schema', path.join(process.cwd(), 'prisma', 'schema.prisma')],
+    // DIRECT_URL must be overridden too: prisma/schema.prisma declares `directUrl = env("DIRECT_URL")`, and
+    // `migrate deploy` prefers it. Overriding only DATABASE_URL sent the migrations to whatever DIRECT_URL
+    // pointed at (the app's own database) and left this throwaway database empty.
+    { env: { ...process.env, DATABASE_URL: url, DIRECT_URL: url }, stdio: 'pipe' },
+  )
+}
+
+async function ensureTemplate(base: string, admin: PrismaClient): Promise<string> {
+  const name = `it_tpl_${migrationsHash()}`
+  if (!TEMPLATE_NAME.test(name)) throw new Error(`Unexpected template name "${name}".`)
+
+  const found = await admin.$queryRaw<Array<{ ready: string | null }>>`
+    SELECT shobj_description(oid, 'pg_database') AS ready FROM pg_database WHERE datname = ${name}
+  `
+  if (found[0]?.ready === 'ready') return name
+  // Present but not marked ready: an earlier build was interrupted. Rebuild it from scratch.
+  if (found.length > 0) await admin.$executeRawUnsafe(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`)
+
+  const url = withDatabase(base, name)
+  try {
+    await admin.$executeRawUnsafe(`CREATE DATABASE "${name}"`)
+    migrate(url)
+    await assertMigrated(url, name)
+    await admin.$executeRawUnsafe(`COMMENT ON DATABASE "${name}" IS 'ready'`)
+  } catch (err) {
+    await admin.$executeRawUnsafe(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`).catch(() => undefined)
+    throw err
+  }
+  return name
 }
 
 /**
@@ -198,18 +283,10 @@ export async function createTestDb(): Promise<TestDb> {
   }
 
   try {
-    await admin.$executeRawUnsafe(`CREATE DATABASE "${database}"`)
-
-    // Apply the repo's own migrations, exactly as production would.
-    const prismaCli = path.join(process.cwd(), 'node_modules', 'prisma', 'build', 'index.js')
-    execFileSync(
-      process.execPath,
-      [prismaCli, 'migrate', 'deploy', '--schema', path.join(process.cwd(), 'prisma', 'schema.prisma')],
-      // DIRECT_URL must be overridden too: prisma/schema.prisma declares `directUrl = env("DIRECT_URL")`, and
-      // `migrate deploy` prefers it. Overriding only DATABASE_URL sent the migrations to whatever DIRECT_URL
-      // pointed at (the app's own database) and left this throwaway database empty.
-      { env: { ...process.env, DATABASE_URL: url, DIRECT_URL: url }, stdio: 'pipe' },
-    )
+    await waitForServer(admin)
+    const template = await ensureTemplate(base, admin)
+    // A server-side copy of the migrated template: seconds, not minutes.
+    await admin.$executeRawUnsafe(`CREATE DATABASE "${database}" TEMPLATE "${template}"`)
     await assertMigrated(url, database)
   } catch (err) {
     await teardown()

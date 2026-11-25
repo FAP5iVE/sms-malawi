@@ -75,7 +75,8 @@ export default defineConfig({
           environment: 'node',
           globals: true,
           testTimeout: 60_000,
-          hookTimeout: 180_000,
+          // The first run of a new set of migrations builds the template database over the network (minutes).
+          hookTimeout: 600_000,
           fileParallelism: false,
           include: ['src/server/__integration__/**/*.itest.ts'],
           exclude: ['node_modules/**'],

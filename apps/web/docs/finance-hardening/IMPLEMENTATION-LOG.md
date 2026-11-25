@@ -303,6 +303,19 @@ Going forward: use the dedicated Neon branch `itest-harness` (a copy of producti
 Owner note 2026-11-25: all current data is demo seed data and may be reset freely; this removes the "do not touch existing data" worry for the
 migrations and repairs in later tasks (the production-safety gates in the runbook still apply to a real go-live).
 
+### Second integration-harness run (2026-11-25, owner, Neon branch `itest-harness`)  -  harness proven, accounting suites still unrun
+Result: `harness.itest.ts` **4 of 4 passed**, so the DIRECT_URL fix works: migrations apply into the throwaway database, seeding works, two parallel
+transactions serialise, teardown drops the database. `accountingService.itest.ts` failed in `beforeAll` ("Can't reach database server") and
+`baseline.itest.ts` hit the 180 s hook limit, so **neither ran a test; P1-02 and P1-03 are still not proven on a real database.**
+Causes (checked: the branch was healthy, 11 connections, no leftover `it_` database): (1) the branch compute had suspended and a Neon cold start
+outlasts Prisma's 5 s default connect timeout; (2) `prisma migrate deploy` of 32 migrations over the network from a laptop takes well over 100 s
+for every test file.
+Fix (harness only): connections get `connect_timeout=30`; `createTestDb` first waits for the server to answer; the migrations now run ONCE per set of
+migrations into a template database `it_tpl_<hash of the migration files>` (kept between runs, marked ready with a database comment, rebuilt if a build was
+interrupted), and every test database is a server-side `CREATE DATABASE … TEMPLATE` copy of it; integration `hookTimeout` is 600 s for the one-off template build.
+Template cloning was checked on Neon with a probe. The new code itself could not be run in the build environment; the next owner run is its first.
+Housekeeping on `itest-harness`: two empty probe databases (`it_tpl_probe`, `it_clone_probe`) and two old `prisma_migrate_shadow_db_*` databases can be dropped.
+
 ### Next in order
 <<<<<<< HEAD
 P1-03 Atomic post claim, exact balancing, atomic balance updates (A1-F1, A2-F2, X-10; test **T-03**, concurrent post: exactly one success).
