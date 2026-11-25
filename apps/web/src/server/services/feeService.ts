@@ -78,6 +78,11 @@ import { getSchoolBranding } from '@/server/services/notificationService'
 import * as settingsService from '@/server/services/settingsService'
 import { SETTING_KEYS } from '@shared/types/settings'
 import { withInvoiceNumber } from '@/server/services/invoiceNumberService'
+// [P1-01] Exact Decimal money arithmetic (half-up, 2 dp) replaces the float `Math.round(n * 100) / 100`
+// that was repeated through this file (plan X-11, X-15).
+import {
+  add, sub, sum, mul, min, nonNegative, percentOf, round2, toNumber, gt, lte, eq, ZERO,
+} from '@/lib/money'
 import { summariseInvoices } from '@/server/services/analytics/financeLogic'
 import { daysBetween } from '@/server/services/reporting/kpi'
 import type { ApiStudentBillingStandingResponse } from '@shared/types/api'
@@ -196,34 +201,36 @@ export async function computeInvoiceCharges(
     throw new Error('One or more selected fee types could not be found or are no longer active.')
   }
 
-  const subtotal = feeStructures.reduce((sum, f) => sum + Number(f.amount), 0)
+  const subtotalD = sum(feeStructures.map((f) => f.amount))
+  const subtotal = toNumber(subtotalD)
 
   const scholarship = applyScholarship
     ? await prisma.scholarship.findFirst({ where: { studentId, academicYear, isActive: true } })
     : null
-  let discount = 0
+  let discountD = ZERO
   if (scholarship) {
-    discount = scholarship.discountType === 'PERCENTAGE'
-      ? subtotal * (Number(scholarship.value) / 100)
-      : Number(scholarship.value)
+    discountD = scholarship.discountType === 'PERCENTAGE'
+      ? percentOf(subtotalD, scholarship.value)
+      : round2(scholarship.value)
   }
   // Manual discount stacks on top of any scholarship discount rather than
   // replacing it -- a scholarship and a one-off manual adjustment are
   // independent reasons a family might owe less.
-  if (options?.manualDiscount) discount += options.manualDiscount
-  discount = Math.min(discount, subtotal) // never a negative total from discount alone
+  if (options?.manualDiscount) discountD = add(discountD, round2(options.manualDiscount))
+  discountD = min(discountD, subtotalD) // never a negative total from discount alone
+  const discount = toNumber(discountD)
 
   // Distribute the discount proportionally across line items so each
   // fee type's own "amount owed" reflects its fair share -- the last
   // item absorbs whatever rounding remainder is left so the sum is exact.
-  let allocatedDiscount = 0
+  let allocatedDiscountD = ZERO
   const lineItemsData = feeStructures.map((f, idx) => {
-    const full = Number(f.amount)
+    const full = round2(f.amount)
     const isLast = idx === feeStructures.length - 1
-    let share = subtotal > 0 ? Math.round((full / subtotal) * discount * 100) / 100 : 0
-    if (isLast) share = Math.round((discount - allocatedDiscount) * 100) / 100
-    allocatedDiscount += share
-    const amount = Math.max(0, Math.round((full - share) * 100) / 100)
+    let share = gt(subtotalD, 0) ? round2(mul(full, discountD).div(subtotalD)) : ZERO
+    if (isLast) share = round2(sub(discountD, allocatedDiscountD))
+    allocatedDiscountD = add(allocatedDiscountD, share)
+    const amount = toNumber(nonNegative(round2(sub(full, share))))
     return {
       feeStructureId: f.id,
       feeName: f.name,
@@ -233,7 +240,7 @@ export async function computeInvoiceCharges(
     }
   })
 
-  let totalAmount = Math.max(0, subtotal - discount)
+  const totalD = nonNegative(sub(subtotalD, discountD))
 
   // [PRODUCTION FIX] Auto-apply any unapplied credit from a prior
   // overpayment (see recordPayment()) -- oldest first, applied against
@@ -247,16 +254,17 @@ export async function computeInvoiceCharges(
       })
     : []
   const creditApplications: { id: string; amountUsed: number; remaining: number }[] = []
-  let remainingToCover = totalAmount
+  let remainingToCoverD = totalD
   for (const credit of availableCredits) {
-    if (remainingToCover <= 0) break
-    const available = Number(credit.amount)
-    const used = Math.min(available, remainingToCover)
-    remainingToCover -= used
-    creditApplications.push({ id: credit.id, amountUsed: used, remaining: available - used })
+    if (lte(remainingToCoverD, 0)) break
+    const available = round2(credit.amount)
+    const used = min(available, remainingToCoverD)
+    remainingToCoverD = sub(remainingToCoverD, used)
+    creditApplications.push({ id: credit.id, amountUsed: toNumber(used), remaining: toNumber(sub(available, used)) })
   }
-  const creditApplied = creditApplications.reduce((sum, c) => sum + c.amountUsed, 0)
-  totalAmount = Math.max(0, Math.round((totalAmount - creditApplied) * 100) / 100)
+  const creditAppliedD = sum(creditApplications.map((c) => c.amountUsed))
+  const creditApplied = toNumber(creditAppliedD)
+  const totalAmount = toNumber(nonNegative(round2(sub(totalD, creditAppliedD))))
 
   return { feeStructures, subtotal, scholarship, discount, lineItemsData, totalAmount, creditApplications, creditApplied }
 }
@@ -436,14 +444,16 @@ export async function recordPayment(data: RecordPaymentInput, actorUid: string, 
     const isTransactionRef = incomingRef.length >= 6 && /\d/.test(incomingRef)
     const isDuplicate = invoice.payments.some((p) => {
       if (p.method !== data.method) return false
-      if (Math.abs(Number(p.amount) - data.amount) > 0.01) return false
+      if (!eq(round2(p.amount), round2(data.amount))) return false
       if (isTransactionRef && (p.reference ?? '').trim().toLowerCase() === incomingRef) return true
       return Date.now() - p.paidAt.getTime() < DUPLICATE_PAYMENT_WINDOW_MS
     })
     if (isDuplicate) throw new DuplicatePaymentError()
 
-    const allocationTotal = Math.round(data.allocations.reduce((sum, a) => sum + a.amount, 0) * 100) / 100
-    if (allocationTotal > data.amount + 0.01) {
+    const allocationTotalD = round2(sum(data.allocations.map((a) => a.amount)))
+    const allocationTotal = toNumber(allocationTotalD)
+    // [P1-01] Exact comparison. The old `> amount + 0.01` tolerance existed only to absorb float error.
+    if (gt(allocationTotalD, round2(data.amount))) {
       throw new Error(
         `Allocated amount MWK ${allocationTotal.toLocaleString()} cannot exceed the total payment MWK ${data.amount.toLocaleString()}.`
       )
@@ -460,16 +470,16 @@ export async function recordPayment(data: RecordPaymentInput, actorUid: string, 
     const overpayments = data.allocations
       .map((a) => {
         const li = lineItemsById.get(a.lineItemId)!
-        const excess = Math.round((a.amount - Number(li.balance)) * 100) / 100
-        return excess > 0.01 ? { lineItemId: a.lineItemId, feeName: li.feeName, excess } : null
+        const excess = round2(sub(a.amount, li.balance))
+        return gt(excess, 0) ? { lineItemId: a.lineItemId, feeName: li.feeName, excess: toNumber(excess) } : null
       })
       .filter((x): x is { lineItemId: string; feeName: string; excess: number } => x !== null)
 
     // The unallocated remainder (paid but not assigned to any fee) is also
     // effectively an overpayment against nothing in particular.
-    const unallocatedRemainder = Math.round((data.amount - allocationTotal) * 100) / 100
-    if (unallocatedRemainder > 0.01) {
-      overpayments.push({ lineItemId: '', feeName: 'Unallocated', excess: unallocatedRemainder })
+    const unallocatedRemainder = round2(sub(data.amount, allocationTotalD))
+    if (gt(unallocatedRemainder, 0)) {
+      overpayments.push({ lineItemId: '', feeName: 'Unallocated', excess: toNumber(unallocatedRemainder) })
     }
 
     // Nothing has been written yet, so throwing here rolls back nothing.
@@ -477,8 +487,9 @@ export async function recordPayment(data: RecordPaymentInput, actorUid: string, 
       throw new OverpaymentConfirmationRequiredError(overpayments)
     }
 
-    const totalCreditToCreate = overpayments.reduce((sum, o) => sum + o.excess, 0)
-    const appliedToInvoice = Math.round((data.amount - totalCreditToCreate) * 100) / 100
+    const totalCreditToCreateD = sum(overpayments.map((o) => o.excess))
+    const totalCreditToCreate = toNumber(totalCreditToCreateD)
+    const appliedToInvoiceD = round2(sub(data.amount, totalCreditToCreateD))
 
     const p = await tx.payment.create({
       data: {
@@ -496,15 +507,15 @@ export async function recordPayment(data: RecordPaymentInput, actorUid: string, 
     // invoice's total balance; anything beyond the cap became credit above.
     for (const a of data.allocations) {
       const li = lineItemsById.get(a.lineItemId)!
-      const appliedToLine = Math.min(a.amount, Number(li.balance))
+      const appliedToLine = min(a.amount, li.balance)
       await tx.paymentAllocation.create({
         data: { paymentId: p.id, lineItemId: a.lineItemId, amount: a.amount },
       })
       await tx.invoiceLineItem.update({
         where: { id: a.lineItemId },
         data: {
-          paidAmount: Number(li.paidAmount) + appliedToLine,
-          balance: Math.max(0, Number(li.balance) - appliedToLine),
+          paidAmount: add(li.paidAmount, appliedToLine),
+          balance: nonNegative(sub(li.balance, appliedToLine)),
         },
       })
     }
@@ -521,9 +532,9 @@ export async function recordPayment(data: RecordPaymentInput, actorUid: string, 
       })
     }
 
-    const newPaid = Number(invoice.paidAmount) + appliedToInvoice
-    const newBalance = Math.max(0, Number(invoice.totalAmount) - newPaid)
-    const newStatus = newBalance <= 0 ? 'PAID' : newPaid > 0 ? 'PARTIAL' : 'UNPAID'
+    const newPaid = add(invoice.paidAmount, appliedToInvoiceD)
+    const newBalance = nonNegative(sub(invoice.totalAmount, newPaid))
+    const newStatus = lte(newBalance, 0) ? 'PAID' : gt(newPaid, 0) ? 'PARTIAL' : 'UNPAID'
     const inv = await tx.invoice.update({
       where: { id: data.invoiceId },
       data: { paidAmount: newPaid, balance: newBalance, status: newStatus },
@@ -656,8 +667,9 @@ export async function applyLatePenalties(penaltyRate?: number): Promise<number> 
     where: { status: { in: ['UNPAID', 'PARTIAL'] }, dueDate: { lt: new Date() }, latePenalty: { equals: 0 } },
   })
   for (const inv of overdue) {
-    const penalty = Number(inv.balance) * rate
-    if (penalty <= 0) continue
+    // [P1-01] Rounded to the cent. It was an unrounded float, stored through three separate columns.
+    const penalty = round2(mul(inv.balance, rate))
+    if (lte(penalty, 0)) continue
     // [FIX] Previously this only bumped the invoice's own totalAmount/
     // balance fields — nothing ever represented the penalty as a line a
     // parent/student can see an itemised breakdown of, and (more
@@ -704,10 +716,10 @@ export async function repairMissingLatePenaltyLineItems(): Promise<{ checked: nu
   })
   let repaired = 0
   for (const inv of candidates) {
-    const lineTotal = inv.lineItems.reduce((s, li) => s + Number(li.amount), 0)
-    const gap = Number(inv.totalAmount) - lineTotal
+    const lineTotal = sum(inv.lineItems.map((li) => li.amount))
+    const gap = sub(inv.totalAmount, lineTotal)
     const alreadyRepaired = inv.lineItems.some((li) => li.feeName === 'Late Payment Penalty')
-    if (gap > 1 && !alreadyRepaired) {
+    if (gt(gap, 1) && !alreadyRepaired) {
       await prisma.invoiceLineItem.create({
         data: {
           invoiceId: inv.id,
@@ -815,7 +827,7 @@ export async function addInvoiceLineItem(
     throw new Error('This fee type could not be found or is no longer active.')
   }
 
-  const amount = Number(feeStructure.amount)
+  const amount = round2(feeStructure.amount)
 
   const updated = await prisma.$transaction(async (tx) => {
     await tx.invoiceLineItem.create({
@@ -828,10 +840,10 @@ export async function addInvoiceLineItem(
         balance: amount,
       },
     })
-    const newSubtotal = Math.round((Number(invoice.subtotal) + amount) * 100) / 100
-    const newTotal = Math.round((Number(invoice.totalAmount) + amount) * 100) / 100
-    const newBalance = Math.round((Number(invoice.balance) + amount) * 100) / 100
-    const newStatus = newBalance <= 0 ? 'PAID' : Number(invoice.paidAmount) > 0 ? 'PARTIAL' : 'UNPAID'
+    const newSubtotal = round2(add(invoice.subtotal, amount))
+    const newTotal = round2(add(invoice.totalAmount, amount))
+    const newBalance = round2(add(invoice.balance, amount))
+    const newStatus = lte(newBalance, 0) ? 'PAID' : gt(invoice.paidAmount, 0) ? 'PARTIAL' : 'UNPAID'
     return tx.invoice.update({
       where: { id: invoice.id },
       data: { subtotal: newSubtotal, totalAmount: newTotal, balance: newBalance, status: newStatus },
@@ -1062,7 +1074,7 @@ export async function listStudentBillingStanding(
   }
 
   const billedIds = new Set(billed.map((b) => b.studentId))
-  const money = (n: number) => Math.round(n * 100) / 100
+  const money = (n: number) => toNumber(round2(n))
 
   return {
     asOf: asOf.toISOString(),

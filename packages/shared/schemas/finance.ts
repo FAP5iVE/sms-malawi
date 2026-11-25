@@ -39,6 +39,39 @@
 import { z } from 'zod'
 import { SPONSOR_TYPES } from '../constants/malawi/demographics'
 
+// ─── MONEY INPUT ──────────────────────────────────────────
+// [CHANGE TYPE]: ADDITION. Finance Hardening Plan P1-01 (X-15, D-11).
+// One validator for every amount a person or client can submit: a finite number
+// with at most 2 decimal places and an upper bound. Before this, each schema used
+// `z.number().positive()`, so 100.456 or 0.1 + 0.2 passed and was rounded later by
+// whichever service touched it first. The check uses the number's own text, so it
+// agrees with `money()` in apps/web/src/lib/money.ts (this package cannot import it).
+// The upper bound defaults to the largest value a Decimal(12,2) column holds; the
+// plan (Part 3 §2.1) wants it to come from settings, which a shared schema cannot
+// read, so a caller with a lower business limit passes `max`.
+export const MONEY_MAX = 9_999_999_999.99
+
+const TWO_DECIMAL_PLACES = /^-?\d+(\.\d{1,2})?$/
+
+export function hasAtMostTwoDecimals(n: number): boolean {
+  return Number.isFinite(n) && TWO_DECIMAL_PLACES.test(String(n))
+}
+
+export function moneyInput(
+  opts: { min?: number; max?: number; allowZero?: boolean; label?: string } = {},
+) {
+  const { min, max = MONEY_MAX, allowZero = false, label = 'Amount' } = opts
+  let schema: z.ZodType<number, z.ZodTypeDef, number> = z
+    .number({ invalid_type_error: `${label} must be a number` })
+    .refine(Number.isFinite, `${label} must be a finite number`)
+    .refine(hasAtMostTwoDecimals, `${label} cannot have more than 2 decimal places`)
+  schema = allowZero
+    ? schema.refine((n) => n >= 0, `${label} cannot be negative`)
+    : schema.refine((n) => n > 0, `${label} must be positive`)
+  if (min !== undefined) schema = schema.refine((n) => n >= min, `${label} must be at least ${min}`)
+  return schema.refine((n) => n <= max, `${label} cannot be more than ${max.toLocaleString('en-US')}`)
+}
+
 export const PaymentMethodSchema = z.enum([
   'CASH',
   'BANK_TRANSFER',
@@ -90,7 +123,7 @@ export const CreateFeeStructureSchema = z.object({
     .regex(/^[A-Za-z0-9-]+$/, 'Use letters, numbers, and hyphens only')
     .transform((v) => v.toUpperCase()),
   category: FeeCategorySchema,
-  amount: z.number().positive('Amount must be positive'),
+  amount: moneyInput(),
   mandatory: z.boolean(),
   schedule: FeeScheduleSchema,
   description: z.string().max(500).optional(),
@@ -115,7 +148,7 @@ export const UpdateFeeStructureSchema = z.object({
     .transform((v) => v.toUpperCase())
     .optional(),
   category: FeeCategorySchema.optional(),
-  amount: z.number().positive('Amount must be positive').optional(),
+  amount: moneyInput().optional(),
   mandatory: z.boolean().optional(),
   schedule: FeeScheduleSchema.optional(),
   description: z.string().max(500).optional(),
@@ -151,12 +184,12 @@ export const UpdateStudentFeeCommitmentSchema = z.object({
 // fee type becoming a credit rather than an invalid negative balance).
 export const PaymentAllocationSchema = z.object({
   lineItemId: z.string().min(1),
-  amount: z.number().positive('Allocation amount must be positive'),
+  amount: moneyInput({ label: 'Allocation amount' }),
 })
 
 export const RecordPaymentSchema = z.object({
   invoiceId: z.string().min(1),
-  amount: z.number().positive('Amount must be positive'),
+  amount: moneyInput(),
   method: PaymentMethodSchema,
   reference: z.string().optional(),
   notes: z.string().optional(),
@@ -229,7 +262,7 @@ export const BulkGenerateInvoicesSchema = z.object({
 export const CreateExpenseSchema = z.object({
   category: ExpenseCategorySchema,
   description: z.string().min(1),
-  amount: z.number().positive(),
+  amount: moneyInput(),
   academicYear: z.string().regex(/^\d{4}\/\d{4}$/),
   term: z.number().int().min(1).max(3),
   incurredAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -286,7 +319,7 @@ export const CreateLibraryFineSchema = z.object({
   studentId: z.string().min(1).nullish(),
   staffId:   z.string().min(1).nullish(),
   bookTitle: z.string().min(1),
-  amount:    z.number().positive(),
+  amount:    moneyInput(),
   reason:    z.string().min(1),
   kind:      z.enum(['LATE', 'DAMAGED', 'LOST', 'OTHER']).optional(),   // omitted → the column default, OTHER
 }).refine((data) => !!data.studentId || !!data.staffId, {

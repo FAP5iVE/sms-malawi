@@ -33,9 +33,11 @@
  */
 
 import 'server-only'
-import { Decimal }    from '@prisma/client/runtime/library'
 import { prisma }     from '@/lib/prisma'
 import { logger }     from '@/lib/logger'
+// [P1-01] All arithmetic below uses the shared money utility (Decimal, half-up, 2 dp) instead of
+// JavaScript floats (plan X-11). Amounts still leave this module as numbers where they did before.
+import { add, sub, sum, round2, toNumber, ZERO } from '@/lib/money'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
@@ -126,10 +128,16 @@ export async function createJournalEntry(
   input: CreateJournalEntryInput,
 ): Promise<string> {
   // Validate balanced entry (sum debits == sum credits)
-  const totalDebits  = input.lines.reduce((s, l) => s + (l.debit  ?? 0), 0)
-  const totalCredits = input.lines.reduce((s, l) => s + (l.credit ?? 0), 0)
+  // [P1-01] Each line is rounded half-up to the cent first, exactly as the database column would
+  // store it, so the balance test runs on the amounts that will really be written.
+  // The 0.01 tolerance is KEPT here on purpose: removing it ("exact balancing", plan A2-F2/X-10)
+  // is task P1-03 and must not slip into this one.
+  const lineDebits  = input.lines.map((l) => round2(l.debit  ?? 0))
+  const lineCredits = input.lines.map((l) => round2(l.credit ?? 0))
+  const totalDebits  = sum(lineDebits)
+  const totalCredits = sum(lineCredits)
 
-  if (Math.abs(totalDebits - totalCredits) > 0.01) {
+  if (sub(totalDebits, totalCredits).abs().gt(0.01)) {
     throw new Error(
       `Journal entry is unbalanced: debits ${totalDebits.toFixed(2)} ≠ credits ${totalCredits.toFixed(2)}`,
     )
@@ -152,10 +160,10 @@ export async function createJournalEntry(
       entryDate:   input.entryDate,
       isPosted:    false,
       lines: {
-        create: input.lines.map((l) => ({
+        create: input.lines.map((l, i) => ({
           accountId:   accountMap.get(l.accountCode)!,
-          debit:       new Decimal(l.debit  ?? 0),
-          credit:      new Decimal(l.credit ?? 0),
+          debit:       lineDebits[i],
+          credit:      lineCredits[i],
           description: l.description,
         })),
       },
@@ -196,9 +204,10 @@ export async function postEntry(
     // Update each account balance
     ...entry.lines.map((line) => {
       const isDebitNormal = normalDebitTypes.has(line.account.type)
+      // [P1-01] Exact Decimal delta (was Number(...) - Number(...), plan X-11).
       const delta = isDebitNormal
-        ? Number(line.debit) - Number(line.credit)
-        : Number(line.credit) - Number(line.debit)
+        ? sub(line.debit, line.credit)
+        : sub(line.credit, line.debit)
 
       return prisma.chartOfAccount.update({
         where: { id: line.accountId },
@@ -232,33 +241,38 @@ export async function getIncomeStatement(
     },
   })
 
-  const revenueMap = new Map<string, { account: string; code: string; amount: number }>()
-  const expenseMap = new Map<string, { account: string; code: string; amount: number }>()
+  // [P1-01] Totals are kept as exact Decimals and converted to numbers once, at the end.
+  type Acc = { account: string; code: string; amount: ReturnType<typeof sum> }
+  const revenueMap = new Map<string, Acc>()
+  const expenseMap = new Map<string, Acc>()
 
   for (const line of lines) {
     const key = line.account.code
     if (line.account.type === 'REVENUE') {
-      const existing = revenueMap.get(key) ?? { account: line.account.name, code: key, amount: 0 }
-      existing.amount += Number(line.credit) - Number(line.debit)
+      const existing = revenueMap.get(key) ?? { account: line.account.name, code: key, amount: ZERO }
+      existing.amount = add(existing.amount, sub(line.credit, line.debit))
       revenueMap.set(key, existing)
     } else {
-      const existing = expenseMap.get(key) ?? { account: line.account.name, code: key, amount: 0 }
-      existing.amount += Number(line.debit) - Number(line.credit)
+      const existing = expenseMap.get(key) ?? { account: line.account.name, code: key, amount: ZERO }
+      existing.amount = add(existing.amount, sub(line.debit, line.credit))
       expenseMap.set(key, existing)
     }
   }
 
-  const revenueLines = [...revenueMap.values()].sort((a, b) => a.code.localeCompare(b.code))
-  const expenseLines = [...expenseMap.values()].sort((a, b) => a.code.localeCompare(b.code))
-  const totalRevenue  = revenueLines.reduce((s, l) => s + l.amount, 0)
-  const totalExpenses = expenseLines.reduce((s, l) => s + l.amount, 0)
+  const byCode = (a: Acc, b: Acc) => a.code.localeCompare(b.code)
+  const revenueAcc = [...revenueMap.values()].sort(byCode)
+  const expenseAcc = [...expenseMap.values()].sort(byCode)
+  const revenueLines = revenueAcc.map((l) => ({ ...l, amount: toNumber(l.amount) }))
+  const expenseLines = expenseAcc.map((l) => ({ ...l, amount: toNumber(l.amount) }))
+  const totalRevenueD  = sum(revenueAcc.map((l) => l.amount))
+  const totalExpensesD = sum(expenseAcc.map((l) => l.amount))
 
   return {
     periodStart,
     periodEnd,
-    totalRevenue,
-    totalExpenses,
-    netSurplus: totalRevenue - totalExpenses,
+    totalRevenue:  toNumber(totalRevenueD),
+    totalExpenses: toNumber(totalExpensesD),
+    netSurplus:    toNumber(sub(totalRevenueD, totalExpensesD)),
     revenueLines,
     expenseLines,
   }
@@ -281,8 +295,8 @@ export async function getTrialBalance(): Promise<TrialBalanceLine[]> {
   })
 
   return accounts.map((a) => {
-    const totalDebit  = a.lines.reduce((s, l) => s + Number(l.debit),  0)
-    const totalCredit = a.lines.reduce((s, l) => s + Number(l.credit), 0)
+    const totalDebit  = toNumber(sum(a.lines.map((l) => l.debit)))
+    const totalCredit = toNumber(sum(a.lines.map((l) => l.credit)))
     return { code: a.code, name: a.name, type: a.type, debit: totalDebit, credit: totalCredit }
   })
 }
@@ -311,20 +325,20 @@ export async function getAccountLedger(
   })
 
   const normalDebit = new Set(['ASSET', 'EXPENSE']).has(account.type)
-  let runningBalance = 0
+  let runningBalance = ZERO
 
   return lines.map((l) => {
     const delta = normalDebit
-      ? Number(l.debit) - Number(l.credit)
-      : Number(l.credit) - Number(l.debit)
-    runningBalance += delta
+      ? sub(l.debit, l.credit)
+      : sub(l.credit, l.debit)
+    runningBalance = add(runningBalance, delta)
     return {
       date:        l.journalEntry.entryDate,
       reference:   l.journalEntry.reference,
       description: l.description ?? l.journalEntry.description,
-      debit:       Number(l.debit),
-      credit:      Number(l.credit),
-      balance:     runningBalance,
+      debit:       toNumber(l.debit),
+      credit:      toNumber(l.credit),
+      balance:     toNumber(runningBalance),
     }
   })
 }
@@ -351,8 +365,8 @@ export async function voidEntry(
     actorUid,
     lines: original.lines.map((l) => ({
       accountCode: l.account.code,
-      debit:       Number(l.credit),
-      credit:      Number(l.debit),
+      debit:       toNumber(l.credit),
+      credit:      toNumber(l.debit),
       description: `Reversal — ${l.description ?? ''}`,
     })),
   })
