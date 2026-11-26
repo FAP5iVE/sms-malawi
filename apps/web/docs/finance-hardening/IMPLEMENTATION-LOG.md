@@ -316,5 +316,40 @@ interrupted), and every test database is a server-side `CREATE DATABASE … TEMP
 Template cloning was checked on Neon with a probe. The new code itself could not be run in the build environment; the next owner run is its first.
 Housekeeping on `itest-harness`: two empty probe databases (`it_tpl_probe`, `it_clone_probe`) and two old `prisma_migrate_shadow_db_*` databases can be dropped.
 
+### Third integration-harness run (2026-11-25, owner)  -  P0-02 proven; accounting tests failed on latency
+`baseline.itest.ts` **47 of 47 passed** on a real Postgres: every baseline check reports exactly its planted defects (P0-02 verified).
+`harness.itest.ts` 3 of 4 (the lock-serialisation test hit Prisma's default 5 s transaction limit). `accountingService.itest.ts` 4 of 11 passed
+(void rollback, create+post without a caller transaction, **no orphan draft on a posting failure (LG-03)**, one-cent imbalance refused); 7 failed with
+Prisma P2028 "transaction expired / unable to start" because each statement from the owner's laptop to Neon takes about a second. No assertion about
+ledger behaviour failed. Fix (test code only): test clients get `transactionOptions` (30 s / 120 s), the file a 240 s timeout, drafts are created in parallel,
+and the deterministic T-03 test now waits until `pg_stat_activity` shows a session blocked on a lock instead of sleeping.
+**P1-02 and P1-03 remain unproven until the next run shows those 11 tests green.**
+
+### P1-04 One-time reversal  (2026-11-26)
+Status: **code done; unit-tested; the real-database proof (T-04) is written but NOT yet run.** Branch `finance-hardening/p1-04-one-time-reversal`,
+stacked on the P1-03 branch. **Needs `prisma generate`** after pulling (the schema gained fields).
+What was done:
+- **Migration `20261126090000_journal_reversal_columns`** (first M02 piece): four NULLABLE columns on `journal_entries` (`reversalOfId`, `reversedAt`,
+  `reversedByUid`, `reversalReason`), a UNIQUE index on `reversalOfId` (UQ-02) and a self foreign key (`ON DELETE RESTRICT`). Additive and idempotent,
+  nothing read or rewritten. Written and checked against Prisma's own schema parser (and a broken copy is rejected), **never applied anywhere except by
+  the test harness into throwaway databases.** `schema.prisma` has the matching fields.
+- **`voidEntry(entryId, actorUid, reason, tx?)`**: reason is mandatory (trimmed, 1 to 500 characters, else `REASON_REQUIRED` 422). Inside one transaction it
+  validates, then CLAIMS the original with `updateMany where id AND isPosted AND reversedAt IS NULL` (row count must be 1, else `ALREADY_REVERSED` 409),
+  then creates the mirror with `reversalOfId` set and posts it. A duplicate `reversalOfId` (unique violation) is mapped to the same 409. `reversedAt`,
+  `reversedByUid`, `reversalReason` are stored on the original. Everything that can be refused is refused before the claim.
+- `payrollApprovalService.rollback` passes its existing `reason`. `LedgerError` gains `NOT_POSTED`, `ALREADY_REVERSED`, `REASON_REQUIRED`.
+Tests: `accountingService.reversal.test.ts` (13, mocked: reason rules, claim condition and who/when/why, claim before create, mirror link, loser gets 409
+and creates nothing, unique-index fallback, unposted, one-cent-out original refused before the claim, a reversal reversed once); existing voidEntry tests
+updated for the new argument. `accountingService.itest.ts` +5, **not run**: **T-04** second reversal rejected and balances not reversed twice; six
+simultaneous reversals give exactly one success and one mirror (3 rounds); the unique index alone refuses a second mirror with the claim bypassed;
+who/when/why stored and mirror linked; no reason leaves everything unchanged; the rollback test also checks the original is not marked reversed.
+Full unit suite: 17 failed, 1967 passed; the 17 are the same pre-existing failures (same 9 files, none finance). eslint clean; `tsc` adds nothing.
+Not done by design: existing reversals (`VOID-` references, 1 in the demo data) are not linked to their originals, because `reference` is not unique
+(885 distinct values in 1,013 entries) and matching on it would be a guess; that is the historical repair (P9). `status` (POSTED/REVERSED) arrives with P1-05, so the
+claims use `isPosted` and `reversedAt`. The mirror is still dated now (caller-chosen dates arrive with the period rules).
+**IMPORTANT (found while writing this task):** production migrations are applied by the production build (`tools/migrate-deploy.mjs`, added 2026-11-25).
+**Merging a P1 branch to `main` applies its migrations to production.** The runbook is corrected. Take the pre-migration Neon branch before merging this one.
+Preview builds skip migrations, so a preview of this branch lacks the new columns until a migration is run against it.
+
 ### Next in order
-P1-04 One-time reversal (A1-F2, A2-F3; test **T-04**). It needs migration M02 (reversal columns and a unique constraint), so it must not be applied anywhere until the runbook §1 answers are in and the harness has run.
+P1-05 Journal model columns and immutability triggers (A1-DEL, D-12): the rest of M02 (`entryNumber`, `status`, `entryKind`, `createdByUid`, source and period links, line dimensions, CHK-01, TRG-01/02/03), tested on a Neon branch first. Real triggers, so it needs the harness green first.
