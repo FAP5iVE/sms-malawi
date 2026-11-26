@@ -1102,6 +1102,16 @@ model JournalEntry {
   lines        JournalLine[]
   createdAt    DateTime      @default(now())
 
+  // [P1-04] One-time reversal (plan A1-F2, A2-F3; UQ-02). `reversedAt/ByUid/Reason` are set on the ORIGINAL when
+  // it is claimed for reversal; `reversalOfId` is set on the mirror entry and is unique, so an original can have
+  // at most one reversal even if the claim were bypassed. Nullable: nothing existing is touched.
+  reversalOfId   String?        @unique
+  reversalOf     JournalEntry?  @relation("JournalReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
+  reversedBy     JournalEntry?  @relation("JournalReversal")
+  reversedAt     DateTime?
+  reversedByUid  String?
+  reversalReason String?
+
   @@index([entryDate])
   @@index([isPosted])
   @@map("journal_entries")

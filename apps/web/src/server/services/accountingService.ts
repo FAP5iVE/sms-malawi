@@ -66,8 +66,11 @@ import { add, sub, sum, round2, toNumber, eq, ZERO } from '@/lib/money'
 //   - Balances move once per ACCOUNT (net signed delta, exact Decimal) with an atomic `increment`, in
 //     ascending account id, so two postings that touch the same accounts always lock them in the same
 //     order and cannot deadlock each other.
-// Still open here, by design: reversal is not yet once-only (P1-04); the `status` column that the plan
-// names in the claim arrives with P1-05, so the claim uses `isPosted` until then.
+//
+// ONE-TIME REVERSAL  [P1-04]  (plan A1-F2, A2-F3; UQ-02): voidEntry claims the original (`reversedAt IS NULL`, row count 1),
+// creates the mirror with a unique `reversalOfId`, and posts it, all in one transaction; a reason is mandatory.
+// Still open here, by design: the `status` column that the plan names in the claims (POSTED, REVERSED) arrives with
+// P1-05, so the claims use `isPosted` and `reversedAt` until then.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -77,7 +80,9 @@ import { add, sub, sum, round2, toNumber, eq, ZERO } from '@/lib/money'
  */
 export class LedgerError extends Error {
   constructor(
-    public readonly code: 'ALREADY_POSTED' | 'UNBALANCED' | 'NOT_FOUND',
+    public readonly code:
+      | 'ALREADY_POSTED' | 'UNBALANCED' | 'NOT_FOUND'
+      | 'NOT_POSTED' | 'ALREADY_REVERSED' | 'REASON_REQUIRED',
     public readonly status: 404 | 409 | 422,
     message: string,
   ) {
@@ -115,6 +120,8 @@ export interface CreateJournalEntryInput {
   entryDate:   Date
   lines:       JournalLineInput[]
   actorUid:    string
+  /** [P1-04] Set only by voidEntry: the original this entry reverses (unique in the database, UQ-02). */
+  reversalOfId?: string
 }
 
 export interface IncomeStatement {
@@ -220,6 +227,7 @@ export async function createJournalEntry(
       description: input.description,
       entryDate:   input.entryDate,
       isPosted:    false,
+      reversalOfId: input.reversalOfId,
       lines: {
         create: input.lines.map((l, i) => ({
           accountId:   accountMap.get(l.accountCode)!,
@@ -427,32 +435,80 @@ export async function getAccountLedger(
 // VOID ENTRY (reverse via counter-entry)
 // ─────────────────────────────────────────────────────────────────────────────
 
+const REVERSAL_REASON_MAX = 500
+
+/**
+ * Reverses a posted entry with an exact mirror entry, AT MOST ONCE  [P1-04] (plan A1-F2, A2-F3, UQ-02).
+ *
+ * 1. Claim the original with one conditional write (`reversedAt IS NULL`, row count must be 1). The loser of a race,
+ *    or a second attempt, gets ALREADY_REVERSED (409) and nothing is created.
+ * 2. Create the mirror with `reversalOfId = original` (unique in the database: even a path that skipped the claim
+ *    cannot make a second reversal) and post it. All in one transaction (the caller's `tx`, or its own).
+ * A reason is mandatory and is stored on the original (`reversalReason`, with `reversedAt` and `reversedByUid`).
+ * The mirror is dated now, as before; caller-chosen dates arrive with the period rules.
+ */
 export async function voidEntry(
   entryId:  string,
   actorUid: string,
+  reason:   string,
   tx?:      LedgerTx,
 ): Promise<string> {
-  // The reversal is created and posted in one transaction (the caller's, or its own).
+  const why = (reason ?? '').trim()
+  if (!why) throw new LedgerError('REASON_REQUIRED', 422, 'A reason is required to reverse a journal entry.')
+  if (why.length > REVERSAL_REASON_MAX) {
+    throw new LedgerError('REASON_REQUIRED', 422, `The reversal reason must be at most ${REVERSAL_REASON_MAX} characters.`)
+  }
+
   const reversalId = await inTransaction(tx, async (db) => {
     const original = await db.journalEntry.findUniqueOrThrow({
       where:   { id: entryId },
       include: { lines: { include: { account: true } } },
     })
 
-    if (!original.isPosted) throw new Error('Cannot void an unposted entry.')
+    if (!original.isPosted) throw new LedgerError('NOT_POSTED', 409, 'Cannot void an unposted entry.')
+    if (original.reversedAt) throw new LedgerError('ALREADY_REVERSED', 409, `Entry ${entryId} is already reversed.`)
 
-    const id = await createJournalEntry({
-      reference:   `VOID-${original.reference}`,
-      description: `Reversal of: ${original.description}`,
-      entryDate:   new Date(),
-      actorUid,
-      lines: original.lines.map((l) => ({
-        accountCode: l.account.code,
-        debit:       toNumber(l.credit),
-        credit:      toNumber(l.debit),
-        description: `Reversal — ${l.description ?? ''}`,
-      })),
-    }, db)
+    // Validate BEFORE claiming, so nothing after the claim can fail in JavaScript (same rule as postEntry).
+    const debits  = sum(original.lines.map((l) => l.debit))
+    const credits = sum(original.lines.map((l) => l.credit))
+    if (!eq(debits, credits)) {
+      throw new LedgerError(
+        'UNBALANCED', 422,
+        `Journal entry is unbalanced: debits ${debits.toFixed(2)} ≠ credits ${credits.toFixed(2)}`,
+      )
+    }
+
+    // CLAIM: exactly one concurrent caller can set reversedAt on a posted, not-yet-reversed entry.
+    const claim = await db.journalEntry.updateMany({
+      where: { id: entryId, isPosted: true, reversedAt: null },
+      data:  { reversedAt: new Date(), reversedByUid: actorUid, reversalReason: why },
+    })
+    if (claim.count !== 1) {
+      throw new LedgerError('ALREADY_REVERSED', 409, `Entry ${entryId} is already reversed.`)
+    }
+
+    let id: string
+    try {
+      id = await createJournalEntry({
+        reference:    `VOID-${original.reference}`,
+        description:  `Reversal of: ${original.description}`,
+        entryDate:    new Date(),
+        actorUid,
+        reversalOfId: entryId,
+        lines: original.lines.map((l) => ({
+          accountCode: l.account.code,
+          debit:       toNumber(l.credit),
+          credit:      toNumber(l.debit),
+          description: `Reversal — ${l.description ?? ''}`,
+        })),
+      }, db)
+    } catch (err) {
+      // The unique index on reversalOfId (UQ-02) is the second guard: a duplicate is the same conflict.
+      if ((err as { code?: string }).code === 'P2002') {
+        throw new LedgerError('ALREADY_REVERSED', 409, `Entry ${entryId} is already reversed.`)
+      }
+      throw err
+    }
 
     await postEntry(id, actorUid, db)
     return id

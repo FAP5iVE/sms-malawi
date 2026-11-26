@@ -102,7 +102,7 @@ describe('with a caller transaction: everything runs on it, nothing else is touc
     callerTx.journalEntry.findUnique.mockResolvedValue(unpostedEntry())
     callerTx.journalEntry.create.mockResolvedValue({ id: 'je2' })
 
-    await expect(accounting.voidEntry('je1', 'u1', asTx(callerTx))).resolves.toBe('je2')
+    await expect(accounting.voidEntry('je1', 'u1', 'entered in error', asTx(callerTx))).resolves.toBe('je2')
     const reversal = callerTx.journalEntry.create.mock.calls[0]![0].data
     expect(reversal.reference).toBe('VOID-R-1')
     // debits and credits swapped
@@ -173,7 +173,7 @@ describe('without a caller transaction: one transaction of its own', () => {
       })
     h.own.journalEntry.findUnique.mockResolvedValue(unpostedEntry())
     h.own.journalEntry.create.mockResolvedValue({ id: 'je2' })
-    await expect(accounting.voidEntry('je1', 'u1')).resolves.toBe('je2')
+    await expect(accounting.voidEntry('je1', 'u1', 'entered in error')).resolves.toBe('je2')
     expect(h.shared.$transaction).toHaveBeenCalledTimes(1)
     expect(touched(h.shared)).toBe(0)
   })

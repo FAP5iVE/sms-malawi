@@ -126,7 +126,7 @@ describe('exact balancing (X-10)', () => {
     })
     h.db.journalEntry.findUnique.mockResolvedValue(balanced())
     h.db.journalEntry.create.mockResolvedValue({ id: 'je2' })
-    await expect(accounting.voidEntry('je1', 'u1')).resolves.toBe('je2')
+    await expect(accounting.voidEntry('je1', 'u1', 'entered in error')).resolves.toBe('je2')
   })
 })
 

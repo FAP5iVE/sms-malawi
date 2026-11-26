@@ -15,6 +15,7 @@
  * attached, so the test can never reach the real application database.
  *
  * [P1-03] Adds T-03 (concurrent post: exactly one success) and the deadlock and exact-balance tests below.
+ * [P1-04] Adds T-04 (a second and a concurrent reversal are rejected, by the claim and by the unique index).
  *
  * STATUS: written against the schema and harness API by reading them; NOT yet run on a database
  * (the build environment that wrote it cannot reach the Prisma engine download or Postgres).
@@ -150,7 +151,7 @@ describe.skipIf(!integrationEnabled())('accountingService: caller transactions (
 
     await expect(
       db.prisma.$transaction(async (tx) => {
-        await voidEntry(originalId, 'itest-user', tx)
+        await voidEntry(originalId, 'itest-user', 'itest reversal', tx)
         throw new Rollback()
       }),
     ).rejects.toThrow(Rollback)
@@ -158,6 +159,9 @@ describe.skipIf(!integrationEnabled())('accountingService: caller transactions (
     expect(await counts()).toEqual(before)
     expect(await db.prisma.journalEntry.count({ where: { reference: 'VOID-ITEST-ORIG' } })).toBe(0)
     expect(await balances()).toEqual(posted)
+    // the claim on the original rolled back too: it is not marked reversed
+    const orig = await db.prisma.journalEntry.findUniqueOrThrow({ where: { id: originalId } })
+    expect(orig.reversedAt).toBeNull()
   })
 
   it('voidEntry inside a committed caller transaction posts the reversal and zeroes the balances', async () => {
@@ -165,7 +169,7 @@ describe.skipIf(!integrationEnabled())('accountingService: caller transactions (
     await postEntry(originalId, 'itest-user')
 
     await db.prisma.$transaction(async (tx) => {
-      await voidEntry(originalId, 'itest-user', tx)
+      await voidEntry(originalId, 'itest-user', 'itest reversal', tx)
     })
 
     const reversal = await db.prisma.journalEntry.findFirstOrThrow({ where: { reference: 'VOID-ITEST-ORIG2' } })
@@ -307,5 +311,83 @@ describe.skipIf(!integrationEnabled())('accountingService: caller transactions (
       }),
     ).rejects.toMatchObject({ code: 'UNBALANCED', status: 422 })
     expect(await counts()).toEqual(before)
+  })
+  // ── P1-04 ────────────────────────────────────────────────────────────────────────────────────
+
+  const postedOriginal = async (reference: string, amount = 100): Promise<string> => {
+    const id = await createJournalEntry(entry(reference, amount))
+    await postEntry(id, 'itest-user')
+    return id
+  }
+  const reversalsOf = (id: string) => db.prisma.journalEntry.count({ where: { reversalOfId: id } })
+
+  it('T-04: reversing the same entry twice - the second is rejected and balances are not reversed twice', async () => {
+    const id = await postedOriginal('ITEST-T04-TWICE')
+    await voidEntry(id, 'user-A', 'posted to the wrong account')
+
+    const err = await voidEntry(id, 'user-B', 'again').catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(LedgerError)
+    expect(err).toMatchObject({ code: 'ALREADY_REVERSED', status: 409 })
+
+    expect(await reversalsOf(id)).toBe(1)
+    const b = await balances()
+    expect(b['1000']).toBe('0.00') // reversed once; a second reversal would leave -100.00
+    expect(b['4000']).toBe('0.00')
+  })
+
+  it('T-04: six simultaneous reversals give exactly ONE success and one mirror entry', async () => {
+    const ROUNDS = 3
+    for (let round = 1; round <= ROUNDS; round++) {
+      const id = await postedOriginal(`ITEST-T04-RACE-${round}`)
+      const results = await Promise.allSettled(
+        Array.from({ length: 6 }, (_, i) => voidEntry(id, `user-${i}`, `race ${i}`)),
+      )
+      expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1)
+      for (const r of results) {
+        if (r.status === 'rejected') {
+          expect(r.reason).toBeInstanceOf(LedgerError)
+          expect(r.reason).toMatchObject({ code: 'ALREADY_REVERSED', status: 409 })
+        }
+      }
+      expect(await reversalsOf(id)).toBe(1)
+    }
+    const b = await balances()
+    expect(b['1000']).toBe('0.00') // every original was reversed exactly once
+    expect(b['4000']).toBe('0.00')
+  })
+
+  it('T-04: the unique index alone refuses a second reversal even when the claim is bypassed (UQ-02)', async () => {
+    const id = await postedOriginal('ITEST-T04-UQ')
+    await voidEntry(id, 'user-A', 'first')
+
+    // Write a second mirror directly, skipping voidEntry and its claim entirely.
+    await expect(
+      db.prisma.journalEntry.create({
+        data: { reference: 'VOID-ITEST-T04-UQ-2', description: 'second mirror', entryDate: new Date(), reversalOfId: id },
+      }),
+    ).rejects.toMatchObject({ code: 'P2002' })
+    expect(await reversalsOf(id)).toBe(1)
+  })
+
+  it('a reversal records who, when and why on the original and links the mirror to it', async () => {
+    const id = await postedOriginal('ITEST-T04-FIELDS')
+    const reversalId = await voidEntry(id, 'user-A', '  duplicate receipt  ')
+
+    const original = await db.prisma.journalEntry.findUniqueOrThrow({ where: { id } })
+    expect(original.reversedByUid).toBe('user-A')
+    expect(original.reversalReason).toBe('duplicate receipt')
+    expect(original.reversedAt).toBeInstanceOf(Date)
+
+    const mirror = await db.prisma.journalEntry.findUniqueOrThrow({ where: { id: reversalId } })
+    expect(mirror.reversalOfId).toBe(id)
+    expect(mirror.isPosted).toBe(true)
+  })
+
+  it('a reversal without a reason is refused and nothing is changed', async () => {
+    const id = await postedOriginal('ITEST-T04-NOREASON')
+    const before = await counts()
+    await expect(voidEntry(id, 'user-A', '   ')).rejects.toMatchObject({ code: 'REASON_REQUIRED', status: 422 })
+    expect(await counts()).toEqual(before)
+    expect((await db.prisma.journalEntry.findUniqueOrThrow({ where: { id } })).reversedAt).toBeNull()
   })
 })

@@ -16,7 +16,7 @@ has not been confirmed for the school's account. Please confirm, and write the a
 2. How far back can the database be **restored to a point in time** (the retention window)? This depends on the plan.
 3. Is a **separate, periodic export** (for example a nightly `pg_dump` kept outside Neon) in place? If not, who will own that?
 4. Who is the named person allowed to authorise a restore?
-5. How are migrations applied to production today (see §2, step 4)?
+5. How are migrations applied to production today? (Answered 2026-11-25 from the repository: by the production build on merge to `main`, see §2 step 4; the owner should confirm that is intended.)
 
 Until 1 and 2 are answered, no migration from P1 onward and no historical repair (P9) should be applied to production.
 
@@ -28,10 +28,12 @@ the previous version of the code keeps working. Even so, before each one:
 1. Confirm the work was done on a branch copy first and the phase's tests (unit, integration, invariants) are green.
 2. Create a **named branch or snapshot** of production. Name it `pre-<task id>-<yyyy-mm-dd>` (for example `pre-P1-06-2026-12-01`).
 3. Record in `IMPLEMENTATION-LOG.md`: the branch name, the time, who took it, and the migration folder about to be applied.
-4. Apply the migration the way the school's production migrations are normally applied. **The repository does not say how that is done**:
-   `package.json` has no migrate script and the build (`prisma generate && next build`) does not run migrations. The integration harness
-   uses `prisma migrate deploy` for throwaway databases. The owner or implementer must record the production method here before the first
-   P1 migration. Do not hand-edit a migration that has already been applied (`fix-migration-checksum.cjs` exists for the case where that already happened).
+4. Apply the migration. **Production migrations are applied by the production build:** `package.json` runs
+   `node tools/migrate-deploy.mjs` between `prisma generate` and `next build`, and that script runs `prisma migrate deploy` against
+   `DIRECT_URL` when `VERCEL_ENV=production` (added 2026-11-25; if `DIRECT_URL` is missing it only warns and skips; `SKIP_DB_MIGRATE=1`
+   turns it off; a failed migration fails the build so the previous deployment keeps serving). Preview and local builds skip it.
+   **So merging a branch to `main` is the moment its migrations reach production.** Take the §2 step 2 branch BEFORE that merge.
+   Do not hand-edit a migration that has already been applied (`fix-migration-checksum.cjs` exists for the case where that already happened).
 5. Run the baseline report (`pnpm finance:baseline`) against the **branch copy of the result** and compare it with the previous baseline: counts must not increase.
 6. Keep the branch until the phase gate (§4 below) has passed and at least one full week has run cleanly, then ask the owner before deleting it.
 

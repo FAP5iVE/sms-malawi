@@ -265,7 +265,7 @@ export async function rollback(
     orderBy: { createdAt: 'desc' },
   })
   if (entry) {
-    await voidEntry(entry.id, actorUid)
+    await voidEntry(entry.id, actorUid, reason)
   } else {
     logger.warn({ event: 'payroll.rollback_no_journal_entry', runId, reference })
   }
