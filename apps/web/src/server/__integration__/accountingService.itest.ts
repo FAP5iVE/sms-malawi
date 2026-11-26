@@ -23,6 +23,9 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest'
 import { createTestDb, integrationEnabled, type TestDb } from './harness'
 
+// Every statement is a network round trip when the database is remote, and several tests make dozens.
+vi.setConfig({ testTimeout: 240_000 })
+
 const holder = vi.hoisted(() => ({ current: null as null | Record<string, unknown> }))
 
 vi.mock('@/lib/prisma', () => ({
@@ -241,8 +244,21 @@ describe.skipIf(!integrationEnabled())('accountingService: caller transactions (
       () => 'won' as const,
       (e: unknown) => e,
     ).finally(() => { secondSettled = true })
-    await new Promise((resolve) => setTimeout(resolve, 400))
-    expect(secondSettled).toBe(false) // blocked on A's row lock, not racing past it
+
+    // Wait until the database itself reports a session blocked on a row lock. A fixed sleep proves nothing on a
+    // slow link (B might not even have reached its claim yet); this proves B is waiting on A's claim.
+    const observer = db.newClient()
+    let blocked = 0
+    for (let waited = 0; waited < 60_000 && blocked === 0; waited += 250) {
+      const rows = await observer.$queryRaw<Array<{ n: number }>>`
+        SELECT count(*)::int AS n FROM pg_stat_activity
+        WHERE datname = ${db.database} AND wait_event_type = 'Lock'
+      `
+      blocked = rows[0]?.n ?? 0
+      if (blocked === 0) await new Promise((resolve) => setTimeout(resolve, 250))
+    }
+    expect(blocked).toBeGreaterThanOrEqual(1) // B is blocked on A's row lock, not racing past it
+    expect(secondSettled).toBe(false)
 
     release()
     await first
@@ -266,10 +282,10 @@ describe.skipIf(!integrationEnabled())('accountingService: caller transactions (
     const WAVES = 4
     const PER_WAVE = 6 // stays within the default connection pool so no run waits for a free connection
     for (let w = 0; w < WAVES; w++) {
-      const ids: string[] = []
-      for (let i = 0; i < PER_WAVE; i++) {
-        ids.push(await createJournalEntry(i % 2 === 0 ? entry(`ITEST-DL-${w}-${i}`, 10) : reversed(`ITEST-DL-${w}-${i}`, 10)))
-      }
+      const ids = await Promise.all(
+        Array.from({ length: PER_WAVE }, (_, i) =>
+          createJournalEntry(i % 2 === 0 ? entry(`ITEST-DL-${w}-${i}`, 10) : reversed(`ITEST-DL-${w}-${i}`, 10))),
+      )
       const results = await Promise.allSettled(ids.map((id) => postEntry(id, 'itest-user')))
       const failed = results.filter((r) => r.status === 'rejected')
       expect(failed).toEqual([]) // a deadlock would surface here as a rejected post

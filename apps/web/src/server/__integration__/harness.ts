@@ -179,7 +179,14 @@ function withConnectTimeout(url: string): string {
 }
 
 function makeClient(url: string): PrismaClient {
-  return new PrismaClient({ datasources: { db: { url: withConnectTimeout(url) } }, log: [] })
+  return new PrismaClient({
+    datasources: { db: { url: withConnectTimeout(url) } },
+    log: [],
+    // Prisma's defaults (2 s to start a transaction, 5 s to finish one) assume the app sits next to its database.
+    // From a laptop every statement costs a network round trip of about a second, so a five-statement transaction
+    // expires and the test fails for a reason that has nothing to do with the code under test. Test clients only.
+    transactionOptions: { maxWait: 30_000, timeout: 120_000 },
+  })
 }
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
