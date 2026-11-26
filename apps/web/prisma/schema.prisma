@@ -53,7 +53,7 @@ model Student {
   status           StudentStatus @default(ACTIVE)
   classId          String?
   class            Class?        @relation(fields: [classId], references: [id])
-  transcriptKey    String?    // Appwrite file ID for latest transcript
+  transcriptKey    String?    // R2 object key (transcripts bucket) for latest transcript
   borrowings       Borrowing[]
   invoices         Invoice[]
   credits          StudentCredit[]
@@ -313,7 +313,7 @@ model AssignmentSubmission {
   assignmentId String
   assignment   Assignment @relation(fields: [assignmentId], references: [id])
   studentId    String
-  fileKey      String?   @unique   // Appwrite object key for uploaded file (single-bucket, FILE_PREFIX.ASSIGNMENT_SUBMISSION-namespaced — see lib/storage.ts). Unique: one stored file backs at most one hand-in (NULLs are distinct, so note-only/MISSING rows are unaffected).
+  fileKey      String?   @unique   // R2 object key for uploaded file (assignment-submissions bucket, FILE_PREFIX.ASSIGNMENT_SUBMISSION — see lib/storage.ts). Unique: one stored file backs at most one hand-in (NULLs are distinct, so note-only/MISSING rows are unaffected).
   fileName     String?   // from the stored object's metadata, for display
   note         String?   // optional message from the student
   // For SUBMITTED / LATE: when the work came in (a student's own submission =
@@ -791,7 +791,7 @@ model Expense {
   category     ExpenseCategory
   description  String
   amount       Decimal         @db.Decimal(12, 2)
-  receiptKey   String?         // Appwrite file ID for scanned receipt
+  receiptKey   String?         // R2 object key (expense-receipts bucket) for scanned receipt
   academicYear String
   term         Int
   approvedByUid String?
@@ -1101,16 +1101,6 @@ model JournalEntry {
   postedByUid  String?
   lines        JournalLine[]
   createdAt    DateTime      @default(now())
-
-  // [P1-04] One-time reversal (plan A1-F2, A2-F3; UQ-02). `reversedAt/ByUid/Reason` are set on the ORIGINAL when
-  // it is claimed for reversal; `reversalOfId` is set on the mirror entry and is unique, so an original can have
-  // at most one reversal even if the claim were bypassed. Nullable: nothing existing is touched.
-  reversalOfId   String?        @unique
-  reversalOf     JournalEntry?  @relation("JournalReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
-  reversedBy     JournalEntry?  @relation("JournalReversal")
-  reversedAt     DateTime?
-  reversedByUid  String?
-  reversalReason String?
 
   @@index([entryDate])
   @@index([isPosted])
@@ -1425,7 +1415,7 @@ model UserSignature {
 // ─── HR MODULE ────────────────────────────────────────────
 model GalleryPhoto {
   id           String   @id @default(cuid())
-  fileKey      String   @unique // Appwrite file ID, FILE_PREFIX.SCHOOL_GALLERY
+  fileKey      String   @unique // R2 object key, FILE_PREFIX.SCHOOL_GALLERY (gallery bucket)
   caption      String?
   category     String?  // free-text, e.g. "Assembly", "Sports Day" — mirrors the design's labelled tiles
   displayOrder Int      @default(0)
@@ -1477,7 +1467,7 @@ model StaffProfile {
   exitDate              DateTime?
   qualifiedSubjects     StaffQualifiedSubject[]
   responsibilities      StaffResponsibility[]
-  photoKey            String?        // Appwrite file ID
+  photoKey            String?        // R2 object key
   salaryStructureId   String?
   leaveBalances       LeaveBalance[]
   leaveRequests       LeaveRequest[]
@@ -1696,7 +1686,7 @@ model Book {
   availableCopies Int        @default(1)
   barcode       String?      @unique
   shelf         String?      // R21: physical shelf/location label (e.g. "M-02") shown under the barcode in the catalog UI
-  coverKey      String?      // Appwrite file ID
+  coverKey      String?      // R2 object key
   borrowings    Borrowing[]
   // [R21.2] "no where to change [a book's] status" outside of the
   // return flow — Borrowing.condition only ever applied to a copy that
@@ -1803,7 +1793,7 @@ model DigitalResource {
   subject      String?
   form         Int?             // 1–4, null = all forms
   academicYear String?          // for past papers
-  fileKey      String           // Appwrite file ID
+  fileKey      String           // R2 object key
   fileSize     Int              // bytes
   mimeType     String           // application/pdf or application/epub+zip
   uploadedByUid String
@@ -2299,7 +2289,7 @@ model Asset {
   acquisitionCost  Decimal?        @db.Decimal(12, 2)   // MWK
   supplier         String?
   warrantyExpiry   DateTime?
-  photoKey         String?         // Appwrite file ID — mirrors Book.coverKey
+  photoKey         String?         // R2 object key — mirrors Book.coverKey
   notes            String?
   createdByUid     String
   createdAt        DateTime        @default(now())
@@ -2847,7 +2837,7 @@ model Quotation {
   tax             Decimal         @db.Decimal(12, 2) @default(0)
   total           Decimal         @db.Decimal(12, 2)
   status          QuotationStatus @default(RECEIVED)
-  documentKey     String?         // Appwrite file ID for the scanned/uploaded quotation
+  documentKey     String?         // R2 object key for the scanned/uploaded quotation
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
 

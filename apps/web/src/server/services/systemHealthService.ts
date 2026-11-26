@@ -1,27 +1,25 @@
 /**
  * apps/web/src/server/services/systemHealthService.ts
  *
- * [CHANGE TYPE]: MAJOR REWRITE (R19 — Email/push health + Appwrite client dedup).
+ * [CHANGE TYPE]: MAJOR REWRITE (R19 — Email/push health).
  *
  * getSystemHealth() now surfaces email (Resend) and push (FCM) configuration
- * status alongside Neon/Appwrite/Firestore, using lib/email.ts's
+ * status alongside Neon/Cloudflare R2/Firestore, using lib/email.ts's
  * getEmailHealthStatus() and lib/push.ts's getPushHealthStatus() — both
  * implemented specifically to be called from here but previously zero-caller,
  * leaving the admin System Health view blind to whether the actual delivery
  * mechanism for every notification pipeline is configured.
  *
- * checkAppwrite() now reuses lib/storage.ts's exported getAppwriteClient()
- * builder rather than a second, independently-maintained client construction
- * with unchecked non-null assertions.
+ * checkR2() reuses lib/storage.ts's checkStorageBuckets(), so the probe uses
+ * the same validated client and bucket map as every real upload and download.
  */
 
 import { prisma }              from '@/lib/prisma'
-import { SCHOOL_BUCKET, getAppwriteClient } from '@/lib/storage'
+import { checkStorageBuckets } from '@/lib/storage'
 import { getEmailHealthStatus } from '@/lib/email'
 import { getPushHealthStatus }  from '@/lib/push'
 import * as admin               from 'firebase-admin'
 import { logger }               from '@/lib/logger'
-import * as sdk                 from 'node-appwrite'
 
 interface ServiceStatus {
   name: string
@@ -47,20 +45,26 @@ async function checkNeon(): Promise<ServiceStatus> {
   }
 }
 
-async function checkAppwrite(): Promise<ServiceStatus> {
+async function checkR2(): Promise<ServiceStatus> {
   const start = Date.now()
   try {
-    const storage = new sdk.Storage(getAppwriteClient())
-    const bucket = await storage.getBucket(SCHOOL_BUCKET)
-    const usedMB = Math.round((bucket.totalSize ?? 0) / (1024 * 1024))
+    const { total, reachable, failed } = await checkStorageBuckets()
+    if (failed.length === 0) {
+      return {
+        name: 'Cloudflare R2 Storage',
+        status: 'ok',
+        latencyMs: Date.now() - start,
+        details: `${reachable}/${total} buckets reachable`,
+      }
+    }
     return {
-      name: 'Appwrite Storage',
-      status: 'ok',
+      name: 'Cloudflare R2 Storage',
+      status: reachable === 0 ? 'down' : 'degraded',
       latencyMs: Date.now() - start,
-      details: `${usedMB} MB used`,
+      details: `${reachable}/${total} buckets reachable — unreachable: ${failed.join(', ')}`,
     }
   } catch (e: unknown) {
-    return { name: 'Appwrite Storage', status: 'degraded', details: String(e) }
+    return { name: 'Cloudflare R2 Storage', status: 'degraded', details: String(e) }
   }
 }
 
@@ -106,13 +110,13 @@ function checkPush(): ServiceStatus {
 }
 
 export async function getSystemHealth() {
-  const [neon, appwrite, firestore] = await Promise.allSettled([
-    checkNeon(), checkAppwrite(), checkFirestore()
+  const [neon, r2, firestore] = await Promise.allSettled([
+    checkNeon(), checkR2(), checkFirestore()
   ])
 
   const services: ServiceStatus[] = [
     neon.status      === 'fulfilled' ? neon.value      : { name: 'Neon PostgreSQL', status: 'down' as const },
-    appwrite.status  === 'fulfilled' ? appwrite.value  : { name: 'Appwrite Storage', status: 'down' as const },
+    r2.status        === 'fulfilled' ? r2.value        : { name: 'Cloudflare R2 Storage', status: 'down' as const },
     firestore.status === 'fulfilled' ? firestore.value : { name: 'Firestore',        status: 'down' as const },
     checkEmail(),
     checkPush(),

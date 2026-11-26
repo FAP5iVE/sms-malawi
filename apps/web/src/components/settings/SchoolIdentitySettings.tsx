@@ -48,7 +48,7 @@ interface LeadershipMember {
   name:  string
   title: string
   bio?:  string
-  // [NEW] Appwrite file ID — FILE_PREFIX.LEADERSHIP_PHOTO. Set via the
+  // [NEW] R2 object key — FILE_PREFIX.LEADERSHIP_PHOTO. Set via the
   // upload picker below (POST /settings/leadership-photo), then carried in
   // the LeadershipMember record saved with the rest of /school's PATCH.
   photoKey?: string
@@ -538,7 +538,7 @@ export function SchoolIdentitySettings() {
                   <div className="flex items-center gap-3">
                     {editDraft.photoPreview ? (
                       <div className="relative">
-                        {/* eslint-disable-next-line @next/next/no-img-element -- local blob: preview or Appwrite-hosted photo, not a local Next asset */}
+                        {/* eslint-disable-next-line @next/next/no-img-element -- local blob: preview or R2-hosted photo, not a local Next asset */}
                         <img src={editDraft.photoPreview} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0 border border-base" />
                         <button
                           type="button"
@@ -583,7 +583,7 @@ export function SchoolIdentitySettings() {
                 <div key={`${m.name}-${i}`} className="flex items-center justify-between border-b border-base py-3 last:border-b-0">
                   <div className="flex items-center gap-3">
                     {m.photoUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element -- Appwrite-hosted photo, not a local Next asset
+                      // eslint-disable-next-line @next/next/no-img-element -- R2-hosted photo, not a local Next asset
                       <img src={m.photoUrl} alt="" className="w-9 h-9 rounded-lg object-cover shrink-0" />
                     ) : (
                       <div className="w-9 h-9 rounded-lg bg-brand-navy/10 flex items-center justify-center shrink-0">
@@ -660,7 +660,7 @@ export function SchoolIdentitySettings() {
             return (
               <div key={cardKey} className="border-b border-base pb-3 flex flex-col items-center gap-2 text-center">
                 {entry?.photoUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element -- local blob: preview or Appwrite-hosted photo, not a local Next asset
+                  // eslint-disable-next-line @next/next/no-img-element -- local blob: preview or R2-hosted photo, not a local Next asset
                   <img src={entry.photoUrl} alt="" className="w-full aspect-video rounded-lg object-cover border border-base" />
                 ) : (
                   <div className="w-full aspect-video rounded-lg bg-page border border-dashed border-base flex items-center justify-center">

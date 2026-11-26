@@ -96,7 +96,7 @@ export function PublicArchiveList({
             {items.map((a) => (
               <article key={a.id} className="border border-base rounded-2xl overflow-hidden bg-surface sm:flex">
                 {a.imageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element -- external Appwrite view URL
+                  // eslint-disable-next-line @next/next/no-img-element -- external R2 public URL
                   <img src={a.imageUrl} alt="" className="sm:w-56 h-40 sm:h-auto object-cover shrink-0" />
                 ) : null}
                 <div className="p-6 min-w-0">
@@ -189,7 +189,7 @@ export function PublicArchiveDetail({ post, isLoading, notFoundText, backHref, b
       ) : (
         <article>
           {post.imageUrl && (
-            // eslint-disable-next-line @next/next/no-img-element -- external Appwrite view URL
+            // eslint-disable-next-line @next/next/no-img-element -- external R2 public URL
             <img src={post.imageUrl} alt={post.title} className="w-full h-auto rounded-2xl border border-base mb-6" />
           )}
           {/* [FIX] post.body is HTML now (written via RichTextEditor.tsx),

@@ -688,7 +688,7 @@ export async function createStaff(data: CreateStaffInput, actorUid: string) {
 
 // [PRODUCTION FIX] Was uploadStaffPhoto(staffId, buffer, filename) — took
 // the raw file bytes and called uploadFile() itself. The route now uploads
-// directly to Appwrite from the browser (see hr.ts's /:id/photo/upload-ticket
+// directly to R2 from the browser (see hr.ts's /:id/photo/upload-ticket
 // and storage.ts's createDirectUploadTicket()), so this only needs to
 // record the resulting fileId against the staff profile.
 export async function attachStaffPhoto(staffId: string, fileId: string): Promise<string> {

@@ -10,9 +10,9 @@
  *   no change.
  *
  *   DELIBERATELY NOT re-exported (relocated to @shared/constants/storage —
- *   these are Firestore/Appwrite infrastructure naming, not Malawi-regional
+ *   these are Firestore infrastructure naming, not Malawi-regional
  *   data; their six COLLECTIONS consumers are swept to the new path):
- *     COLLECTIONS, SCHOOL_BUCKET_ID, STORAGE_BUCKET_IDS
+ *     COLLECTIONS
  *   REMOVED (replaced by malawi/holidays.ts's getPublicHolidaysForYear();
  *   confirmed zero importers of the old flat array):
  *     MALAWI_PUBLIC_HOLIDAYS_2026

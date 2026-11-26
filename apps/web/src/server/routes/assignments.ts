@@ -27,8 +27,7 @@
  *      over-grant rather than special-casing around it. The ownership
  *      check itself (teacher-matches-Class.teacherId) is now unconditional
  *      since only 'academic' can reach the handler.
- *   2. Added POST /:id/submit — a student uploads a file (multer, Appwrite
- *      storage) against a specific assignment. Gated to students actually
+ *   2. Added POST /:id/submit — a student uploads a file (direct R2 upload) against a specific assignment. Gated to students actually
  *      enrolled in :classId (the same enrollment check GET / uses).
  *   3. Prisma logic is extracted to assignmentService.ts (createAssignment/
  *      submitAssignment/listForClass), matching the established
@@ -209,7 +208,7 @@ for (const [kind, prefix] of [['image', FILE_PREFIX.ASSIGNMENT_IMAGE], ['file', 
     async (req: Request, res: Response) => {
       try {
         await assignmentService.assertCanPostInClass(String(req.params.classId), viewerOf(req))
-        res.json(await createDirectUploadTicket(prefix))
+        res.json(await createDirectUploadTicket(prefix, req.body))
       } catch (err: unknown) {
         return sendError(res, err, { tags: { module: 'assignments', route: `attachment-${kind}-ticket` } })
       }
@@ -313,7 +312,7 @@ assignmentsRouter.post(
       if (req.user!.role !== 'student') {
         return res.status(403).json({ error: 'Only enrolled students may submit assignments.' })
       }
-      res.json(await createDirectUploadTicket(FILE_PREFIX.ASSIGNMENT_SUBMISSION))
+      res.json(await createDirectUploadTicket(FILE_PREFIX.ASSIGNMENT_SUBMISSION, req.body))
     } catch (err: unknown) {
       return sendError(res, err, { tags: { module: 'assignments', route: 'submit-upload-ticket' } })
     }

@@ -18,7 +18,7 @@
  * ── earlier notes ────────────────────────────────────────────────────────────
  *
  * [CHANGE TYPE]: MAJOR REWRITE of the PDF-generation and data-gathering
- *   functions (Appwrite upload/URL helpers are the real, canonical
+ *   functions (the upload/URL helpers are the real, canonical
  *   storage.ts exports — see below — not edited separately since the old
  *   code never actually called real ones).
  * [R-PHASE]: R8 — Academics IV: Report Cards, Transcripts, Promotion & Risk
@@ -90,7 +90,7 @@
  *   2. generateReportCardPDF(data)
  *      → Produces a PDF Buffer via jsPDF v4 (Node.js-compatible).
  *   3. uploadReportCard(buffer, ...)
- *      → Stores the PDF in the shared Appwrite bucket, namespaced under
+ *      → Stores the PDF in the report-cards R2 bucket, namespaced under
  *        FILE_PREFIX.REPORT_CARD.
  *   4. getReportCardUrl(fileId)
  *      → Returns a 1-hour-expiring, access-controlled proxy URL.
@@ -978,7 +978,7 @@ export function generateReportCardPDF(data: PdfReportCardData): Buffer {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// APPWRITE UPLOAD — canonical storage.ts API (uploadFile/getSignedViewUrl),
+// R2 UPLOAD — canonical storage.ts API (uploadFile/getSignedViewUrl),
 // which already implements the authenticated-owner-and-staff-only access
 // model this phase requires (FILE_PREFIX.REPORT_CARD's READ_ROLES entry)
 // and a 1-hour-expiring proxy URL — replacing the previous

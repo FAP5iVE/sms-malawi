@@ -1,67 +1,60 @@
 /**
- * [CHANGE TYPE]: TARGETED EDIT
  * [FILE]: apps/web/src/lib/storage.ts
- * [R-PHASE]: R6 — Academics II: Classes, Assignments & the Attendance Rebuild;
- *   further edited in R10 — Finance II
- * [PURPOSE]: Adds FILE_PREFIX.ASSIGNMENT_SUBMISSION and its READ_ROLES entry
- *   — the new POST /:classId/assignments/:id/submit route needs a real
- *   prefix to namespace uploaded submission files under the single shared
- *   Appwrite bucket; none of the existing prefixes fit (APPLICATION_DOC is
- *   for admissions intake, not coursework). Readable by the student who
- *   submitted it (__self) and by staff who can already view class
- *   assignments (admin, high_rank, academic).
- *   R10 adds FILE_PREFIX.FINANCIAL_REPORT — reportExportService.ts's four
- *   report types were uploading under STORAGE_BUCKETS.PAYSLIPS, which is
- *   not merely mislabeled but a genuine type mismatch (uploadFile()'s
- *   first parameter is a FilePrefix, not a StorageBucket — every
- *   StorageBucket value is the single literal 'school_files', not a
- *   member of the FilePrefix union) that also broke canReadFile()'s
- *   prefix-based access control for these files, since a
- *   school_files_-prefixed fileId matches no READ_ROLES category.
- * [R-PHASE, cont.]: R12 — Library Domain & the Storage API Contract Fix;
- *   adds FILE_PREFIX.DIGITAL_RESOURCE — libraryService.ts's
- *   uploadDigitalResource()/getDigitalResourceViewUrl() were passing
- *   STORAGE_BUCKETS.DIGITAL_LIBRARY (a StorageBucket, not a FilePrefix) to
- *   uploadFile()/calling a nonexistent getViewUrl(); this phase's fix
- *   repoints both onto a real FilePrefix category rather than either of
- *   the existing book-scoped ebook/past_paper prefixes, since
- *   DigitalResource's own type union (EBOOK/PAST_PAPER/REFERENCE/
- *   STUDY_GUIDE) is broader than either.
- * [DEPENDS ON]: none
+ * [PURPOSE]: The ONE storage layer: Cloudflare R2 through its S3-compatible API.
+ *
+ *   FILES ARE GROUPED BY SECURITY DOMAIN, THEN BY CATEGORY:
+ *     bucket  = who may touch the data and how it lives (public vs private,
+ *               staff-confidential vs student records, ...). Separate buckets
+ *               can have separate API tokens, CORS rules, retention rules and
+ *               public/private settings, and limit the blast radius of a leak.
+ *     folder  = the file category inside its bucket (payslips/, report-cards/,
+ *               ...), which keeps a bucket browsable and lets lifecycle rules
+ *               target one category.
+ *   A file id is `<prefix>_<unique>` (for example `payslip_k3j9x0a2b1cd`). The
+ *   prefix decides the bucket + folder (LOCATION), the access rule (READ_ROLES)
+ *   and the upload policy, and the object key is `<folder>/<file id>`. The id
+ *   stored in the database never changes with where a file lives, and because
+ *   the folder comes from the prefix and ids cannot contain "/", an id can only
+ *   ever address its own category's folder.
+ *
+ *   Two ways to read a file:
+ *     - PRIVATE buckets are never reachable from the internet. Bytes only leave
+ *       through /api/files/<id>, which verifies the caller (canReadFile + the
+ *       route's own ownership checks) before streamFile() reads the object.
+ *     - The one PUBLIC bucket (public-media) holds landing-page / <img> assets
+ *       (PUBLIC_FILE_PREFIXES) and nothing else; its public URL is
+ *       R2_PUBLIC_URL_MEDIA, resolved by getPublicViewUrl().
+ *
+ *   Two ways to write a file:
+ *     - Server-generated documents (PDFs, spreadsheets) use uploadFile().
+ *     - Browser uploads never pass through a Vercel function (4.5MB request cap,
+ *       no retry): createDirectUploadTicket() validates the request and returns a
+ *       short-lived presigned PUT URL the browser uploads to directly.
+ *
+ *   Required environment (see docs/storage/r2-setup.md):
+ *     R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_PUBLIC_URL_MEDIA
+ *   Optional: R2_BUCKET_PREFIX (default "sms-malawi"), R2_ENDPOINT (local testing).
+ * [DEPENDS ON]: @aws-sdk/client-s3, @aws-sdk/s3-request-presigner,
+ *   @shared/utils/assignment (assignment file rules)
  */
 import 'server-only'
-import * as sdk from 'node-appwrite'
 import crypto from 'node:crypto'
+import { z } from 'zod'
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  HeadObjectCommand,
+  DeleteObjectCommand,
+  ListObjectsV2Command,
+} from '@aws-sdk/client-s3'
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+import { checkFileAgainstRules, type AssignmentFileKind } from '@shared/utils/assignment'
 
-// ─── BUCKET CONFIG ────────────────────────────────────────────────────────────
-// Single Appwrite bucket enforced by free-tier constraint.
-// All files are path-partitioned using fileId prefixes that encode the category.
-//
-// [PRODUCTION FIX] This must be the bucket's actual Appwrite $id, not a
-// human-readable label. The bucket was created in the Appwrite Console as
-// "School Files" without a custom ID, so Appwrite auto-generated one
-// ("6a0c5723001522915a0f") rather than using the literal string
-// "school_files" this constant previously held — every uploadFile/getFile/
-// deleteFile call was pointing at a bucket ID that didn't exist, causing
-// "Storage bucket with the requested ID could not be found."
-export const SCHOOL_BUCKET = '6a0c5723001522915a0f' as const
-
-export const STORAGE_BUCKETS = {
-  STUDENT_FILES:   SCHOOL_BUCKET,
-  DIGITAL_LIBRARY: SCHOOL_BUCKET,
-  PAYSLIPS:        SCHOOL_BUCKET,
-  REPORT_CARDS:    SCHOOL_BUCKET,
-  RECEIPTS:        SCHOOL_BUCKET,
-  STAFF_DOCS:      SCHOOL_BUCKET,
-  TRANSCRIPTS:     SCHOOL_BUCKET,
-} as const
-
-export type StorageBucket = typeof SCHOOL_BUCKET
-
-// ─── PATH PREFIX MAP ─────────────────────────────────────────────────────────
-// fileId convention: <prefix>_<uid>  e.g. "payslip_cuid123abc"
-// This partitions the single bucket into logical namespaces and enables
-// server-side access control without multiple Appwrite buckets.
+// ─── FILE PREFIXES ───────────────────────────────────────────────────────────
+// fileId convention: <prefix>_<uid>  e.g. "payslip_cuid123abc".
+// canReadFile() only ever inspects the prefix, so a new prefix needs a bucket +
+// folder (LOCATION), a READ_ROLES entry and, if browsers upload it, an UPLOAD_POLICY.
 
 export const FILE_PREFIX = {
   STUDENT_PHOTO:    'student_photo',
@@ -77,7 +70,7 @@ export const FILE_PREFIX = {
   LOAN_DOCUMENT:    'loan_doc',
   APPLICATION_DOC:  'application_doc',
   ASSIGNMENT_SUBMISSION: 'assignment_submission',
-  // [2026-10-27 Assignment workflow] Teacher-side assignment material.
+  // Teacher-side assignment material.
   //   ASSIGNMENT_FILE  - attached documents (private; class members only, via
   //                      the /api/files proxy + assignmentService.canAccessAssignmentFile).
   //   ASSIGNMENT_IMAGE - pictures attached to / embedded in an assignment. These
@@ -90,34 +83,87 @@ export const FILE_PREFIX = {
   ASSIGNMENT_IMAGE: 'assignment_image',
   FINANCIAL_REPORT: 'financial_report',
   DIGITAL_RESOURCE: 'digital_resource',
-  // [PRODUCTION FIX 2026-07-28] Public landing-page assets — served via
-  // getPublicViewUrl() (direct Appwrite view URL, no signed-proxy/role
-  // check), same pattern already documented there for the school logo.
-  // Never put anything sensitive under these two prefixes.
+  // Public landing-page assets, served from their public bucket URL (no proxy,
+  // no role check). Never put anything sensitive under these prefixes.
   ANNOUNCEMENT_IMAGE: 'announcement_image',
   SCHOOL_GALLERY:     'school_gallery',
-  // [NEW] Leadership team member photo — SETTING_KEYS.SCHOOL_LEADERSHIP_TEAM
-  // entries reference this via LeadershipMember.photoKey, resolved to a
-  // view URL by /public/leadership the same way ANNOUNCEMENT_IMAGE/
-  // SCHOOL_GALLERY already are. Same public, no-signed-proxy pattern.
+  // Leadership team member photo — LeadershipMember.photoKey.
   LEADERSHIP_PHOTO:   'leadership_photo',
-  // [NEW] Discover-section card preview photo — SETTING_KEYS.SCHOOL_DISCOVER_CARDS
-  // entries reference this via DiscoverCardImage.photoKey, resolved to a
-  // view URL by /public/school-info the same way LEADERSHIP_PHOTO is by
-  // /public/leadership. Deliberately two underscore-segments ('discover',
-  // 'photo'), matching every other FILE_PREFIX value — canReadFile()'s
-  // `fileId.split('_').slice(0, 2)` only ever inspects the first two
-  // segments of a fileId, so a three-segment prefix here would silently
-  // fail to match its own READ_ROLES entry.
+  // Discover-section card preview photo — DiscoverCardImage.photoKey. Two
+  // underscore-segments ('discover', 'photo') like every other prefix value.
   DISCOVER_PHOTO:     'discover_photo',
 } as const
 
 export type FilePrefix = typeof FILE_PREFIX[keyof typeof FILE_PREFIX]
 
+// ─── BUCKETS AND FOLDERS ─────────────────────────────────────────────────────
+// Bucket name = `${R2_BUCKET_PREFIX}-${suffix}` (R2 bucket names: 3-63 chars,
+// lowercase letters, digits and hyphens). Buckets are split by SECURITY DOMAIN:
+//
+//   public-media    world-readable assets that already appear on the public site
+//                   or inside <img> tags (the ONLY public bucket).
+//   student-records learner identity + academic records and admission papers:
+//                   personal data about children. Served only through the
+//                   role-checked proxy (staff, the student, linked guardians).
+//   finance         fee receipts, expense receipts and financial reports: money
+//                   records that finance/admin audit and that may need long,
+//                   uniform retention.
+//   hr              staff-confidential files: photos, payslips, contracts and
+//                   loan papers. A far smaller audience than student records.
+//   coursework      teacher material and student submissions: high-churn, scoped
+//                   to a class, and a natural candidate for term-based clean-up.
+//   library         shared learning resources: long-lived, read by many.
+//
+// Keeping them apart means a credential, CORS rule, public-access switch or
+// retention rule that is right for one domain is never inherited by another,
+// and a mistake in one cannot expose the rest.
+
+const BUCKETS = {
+  media:      { suffix: 'public-media',    isPublic: true  },
+  students:   { suffix: 'student-records', isPublic: false },
+  finance:    { suffix: 'finance',         isPublic: false },
+  hr:         { suffix: 'hr',              isPublic: false },
+  coursework: { suffix: 'coursework',      isPublic: false },
+  library:    { suffix: 'library',         isPublic: false },
+} as const
+
+type BucketKey = keyof typeof BUCKETS
+
+/** Where each file category lives: its bucket and the folder inside it. */
+const LOCATION: Record<FilePrefix, { bucket: BucketKey; folder: string }> = {
+  // public-media — intentionally public
+  announcement_image:    { bucket: 'media',      folder: 'announcements' },
+  school_gallery:        { bucket: 'media',      folder: 'gallery' },
+  leadership_photo:      { bucket: 'media',      folder: 'leadership' },
+  discover_photo:        { bucket: 'media',      folder: 'discover' },
+  assignment_image:      { bucket: 'media',      folder: 'assignment-images' },
+  // student-records
+  student_photo:         { bucket: 'students',   folder: 'student-photos' },
+  report_card:           { bucket: 'students',   folder: 'report-cards' },
+  transcript:            { bucket: 'students',   folder: 'transcripts' },
+  application_doc:       { bucket: 'students',   folder: 'applications' },
+  // finance
+  receipt:               { bucket: 'finance',    folder: 'receipts' },
+  expense_receipt:       { bucket: 'finance',    folder: 'expense-receipts' },
+  financial_report:      { bucket: 'finance',    folder: 'financial-reports' },
+  // hr
+  staff_photo:           { bucket: 'hr',         folder: 'staff-photos' },
+  payslip:               { bucket: 'hr',         folder: 'payslips' },
+  staff_contract:        { bucket: 'hr',         folder: 'contracts' },
+  loan_doc:              { bucket: 'hr',         folder: 'loan-documents' },
+  // coursework
+  assignment_file:       { bucket: 'coursework', folder: 'assignment-files' },
+  assignment_submission: { bucket: 'coursework', folder: 'submissions' },
+  // library
+  digital_resource:      { bucket: 'library',    folder: 'digital-resources' },
+  ebook:                 { bucket: 'library',    folder: 'ebooks' },
+  past_paper:            { bucket: 'library',    folder: 'past-papers' },
+}
+
 // ─── ACCESS CONTROL MAP ───────────────────────────────────────────────────────
-// Defines which roles may read each file category.
-// Enforced at the API route level — Appwrite itself uses a single API key
-// with full bucket access; role-gating happens here in the server layer.
+// Which roles may read each file category. Enforced at the API route level
+// (/api/files/[fileId]) — the R2 credentials have full access to every bucket;
+// role-gating happens in the server layer.
 
 const READ_ROLES: Record<FilePrefix, string[]> = {
   student_photo:    ['admin', 'high_rank', 'finance', 'library', 'lower_rank', 'academic', 'hr', 'exam_officer'],
@@ -139,41 +185,49 @@ const READ_ROLES: Record<FilePrefix, string[]> = {
   assignment_image: ['admin', 'high_rank', 'finance', 'library', 'lower_rank', 'academic', 'hr', 'exam_officer', 'student'],
   financial_report: ['admin', 'finance', 'high_rank'],
   digital_resource: ['admin', 'high_rank', 'finance', 'library', 'academic', 'hr', 'exam_officer', 'student'],
-  // Public assets — every internal role may view them too (used by any
-  // future admin gallery/announcement management screen); the actual
-  // public landing page never goes through this map at all, it calls
-  // getPublicViewUrl() directly.
+  // Public assets — every internal role may view them too; the public landing
+  // page never goes through this map, it calls getPublicViewUrl() directly.
   announcement_image: ['admin', 'high_rank', 'finance', 'library', 'lower_rank', 'academic', 'hr', 'exam_officer', 'student'],
   school_gallery:     ['admin', 'high_rank', 'finance', 'library', 'lower_rank', 'academic', 'hr', 'exam_officer', 'student'],
   leadership_photo:   ['admin', 'high_rank', 'finance', 'library', 'lower_rank', 'academic', 'hr', 'exam_officer', 'student'],
-  // [NEW] Same public-asset tier as school_gallery/leadership_photo above.
   discover_photo:     ['admin', 'high_rank', 'finance', 'library', 'lower_rank', 'academic', 'hr', 'exam_officer', 'student'],
 }
 
-// [PRODUCTION FIX] The previous `fileId.split('_').slice(0, 2).join('_')`
-// extraction assumed every FilePrefix has exactly two underscore-separated
-// segments (student_photo, school_gallery, ...). Every single-segment
-// prefix — payslip, receipt, ebook, transcript — instead reconstructed the
-// WHOLE fileId (prefix + unique suffix) as the "prefix", which never
-// matches a READ_ROLES key, so all four categories silently fell through to
-// `userRole === 'admin'` regardless of role or __self ownership. This is
-// the direct cause of "even self payslips don't work for any user" — a
-// staff member downloading their own payslip went through the file proxy's
-// __self ownership resolution correctly (that part was already fixed —
-// see api/files/[fileId]/route.ts's own header comment), then got denied
-// here anyway because "payslip" was never recognized as a valid prefix.
-// Matches against every real FILE_PREFIX value by startsWith(), preferring
-// the longest match — no two current prefixes collide, but this keeps a
-// future prefix like "receipt_reversal" from being misread as "receipt".
+// Prefixes whose files are meant to be viewed directly (getPublicViewUrl(), no
+// proxy). Their buckets are the only ones that get a public URL. Everything
+// else must stay private and is served by the role-checked proxy.
+export const PUBLIC_FILE_PREFIXES = [
+  FILE_PREFIX.ANNOUNCEMENT_IMAGE,
+  FILE_PREFIX.SCHOOL_GALLERY,
+  FILE_PREFIX.LEADERSHIP_PHOTO,
+  FILE_PREFIX.DISCOVER_PHOTO,
+  // Assignment pictures render inside rich-text <img> tags - see FILE_PREFIX.ASSIGNMENT_IMAGE.
+  FILE_PREFIX.ASSIGNMENT_IMAGE,
+] as const
+
+export type PublicFilePrefix = typeof PUBLIC_FILE_PREFIXES[number]
+
+/** The environment variable holding the public base URL of the public-media bucket. */
+export const PUBLIC_URL_ENV = 'R2_PUBLIC_URL_MEDIA'
+
+export function isPublicPrefix(prefix: FilePrefix): prefix is PublicFilePrefix {
+  return (PUBLIC_FILE_PREFIXES as readonly string[]).includes(prefix)
+}
+
+/** Longest-prefix match: no two prefixes collide today, but a future "receipt_reversal" must not read as "receipt". */
+export function resolvePrefix(fileId: string): FilePrefix | undefined {
+  return (Object.values(FILE_PREFIX) as string[])
+    .filter((p) => fileId === p || fileId.startsWith(`${p}_`))
+    .sort((a, b) => b.length - a.length)[0] as FilePrefix | undefined
+}
+
 export function canReadFile(fileId: string, userRole: string, userUid: string, ownerUid?: string): boolean {
   // [Guardian portal] A parent is never authorised by role or by the __self rule.
   // Their access is decided per request from a verified guardian link (see the
   // guardian branch in app/api/files/[fileId]/route.ts), so this role-based table
   // must stay closed to them even if a uid were ever (wrongly) shared with an owner.
   if (userRole === 'parent') return false
-  const prefix = (Object.values(FILE_PREFIX) as string[])
-    .filter((p) => fileId === p || fileId.startsWith(`${p}_`))
-    .sort((a, b) => b.length - a.length)[0] as FilePrefix | undefined
+  const prefix = resolvePrefix(fileId)
   const allowed = prefix ? READ_ROLES[prefix] : undefined
   if (!allowed) return userRole === 'admin'
   if (allowed.includes(userRole)) return true
@@ -181,135 +235,202 @@ export function canReadFile(fileId: string, userRole: string, userUid: string, o
   return false
 }
 
-// ─── CLIENT ──────────────────────────────────────────────────────────────────
+// ─── CONFIGURATION ───────────────────────────────────────────────────────────
 
-function getClient(): sdk.Client {
-  const endpoint  = process.env.APPWRITE_ENDPOINT
-  const projectId = process.env.APPWRITE_PROJECT_ID
-  const apiKey    = process.env.APPWRITE_API_KEY
-
-  if (!endpoint || !projectId || !apiKey) {
-    throw new Error('[storage] Missing Appwrite environment variables: APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID, APPWRITE_API_KEY')
+/** A misconfigured or unusable storage setup — an operator problem, never the caller's. */
+export class StorageConfigError extends Error {
+  readonly status = 500
+  constructor(message: string) {
+    super(`[storage] ${message}`)
+    this.name = 'StorageConfigError'
   }
-
-  return new sdk.Client()
-    .setEndpoint(endpoint)
-    .setProject(projectId)
-    .setKey(apiKey)
 }
+
+/** A client-side upload request that is refused. The message is written for the user, hence status 400. */
+export class UploadRejectedError extends Error {
+  readonly status = 400
+  constructor(message: string) {
+    super(message)
+    this.name = 'UploadRejectedError'
+  }
+}
+
+const r2Schema = z.object({
+  R2_ACCOUNT_ID:        z.string().min(1),
+  R2_ACCESS_KEY_ID:     z.string().min(1),
+  R2_SECRET_ACCESS_KEY: z.string().min(1),
+  R2_BUCKET_PREFIX:     z.string().regex(/^[a-z0-9][a-z0-9-]{0,30}$/).default('sms-malawi'),
+  R2_ENDPOINT:          z.string().url().optional(),
+})
+type R2Config = z.infer<typeof r2Schema>
+
+let cachedConfig: R2Config | null = null
+let cachedClient: S3Client | null = null
+
+function getConfig(): R2Config {
+  if (cachedConfig) return cachedConfig
+  const parsed = r2Schema.safeParse({
+    R2_ACCOUNT_ID:        process.env.R2_ACCOUNT_ID,
+    R2_ACCESS_KEY_ID:     process.env.R2_ACCESS_KEY_ID,
+    R2_SECRET_ACCESS_KEY: process.env.R2_SECRET_ACCESS_KEY,
+    R2_BUCKET_PREFIX:     process.env.R2_BUCKET_PREFIX || undefined,
+    R2_ENDPOINT:          process.env.R2_ENDPOINT || undefined,
+  })
+  if (!parsed.success) {
+    const names = parsed.error.issues.map((i) => i.path.join('.')).join(', ')
+    throw new StorageConfigError(`Missing or invalid R2 environment variables: ${names}`)
+  }
+  cachedConfig = parsed.data
+  return cachedConfig
+}
+
+function getClient(): S3Client {
+  if (cachedClient) return cachedClient
+  const cfg = getConfig()
+  cachedClient = new S3Client({
+    region: 'auto',
+    endpoint: cfg.R2_ENDPOINT ?? `https://${cfg.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+    forcePathStyle: true,
+    credentials: { accessKeyId: cfg.R2_ACCESS_KEY_ID, secretAccessKey: cfg.R2_SECRET_ACCESS_KEY },
+    // R2 does not implement the SDK's optional default checksums; without these
+    // the SDK signs a checksum of an empty body into presigned upload URLs and R2
+    // rejects the real upload.
+    requestChecksumCalculation: 'WHEN_REQUIRED',
+    responseChecksumValidation: 'WHEN_REQUIRED',
+  })
+  return cachedClient
+}
+
+function bucketName(key: BucketKey): string {
+  return `${getConfig().R2_BUCKET_PREFIX}-${BUCKETS[key].suffix}`
+}
+
+/** The R2 bucket that holds files of this category. */
+export function bucketNameFor(prefix: FilePrefix): string {
+  return bucketName(LOCATION[prefix].bucket)
+}
+
+/** The folder inside its bucket where files of this category are kept. */
+export function folderFor(prefix: FilePrefix): string {
+  return LOCATION[prefix].folder
+}
+
+export interface BucketInfo {
+  bucket:       string
+  isPublic:     boolean
+  /** The file categories stored in this bucket, with the folder each one uses. */
+  categories:   Array<{ prefix: FilePrefix; folder: string; browserUploadable: boolean }>
+}
+
+/** Every bucket this app uses — what tools/r2/provision.ts creates. */
+export function listBuckets(): BucketInfo[] {
+  return (Object.keys(BUCKETS) as BucketKey[]).map((key) => ({
+    bucket: bucketName(key),
+    isPublic: BUCKETS[key].isPublic,
+    categories: (Object.values(FILE_PREFIX) as FilePrefix[])
+      .filter((prefix) => LOCATION[prefix].bucket === key)
+      .map((prefix) => ({ prefix, folder: LOCATION[prefix].folder, browserUploadable: isBrowserUploadable(prefix) })),
+  }))
+}
+
+const FILE_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/
 
 /**
- * Public accessor for the validated node-appwrite server client.
- * Exported (R19) so systemHealthService.checkAppwrite() reuses this single,
- * env-validated builder instead of constructing its own client with unchecked
- * non-null assertions.
+ * Resolves a file id to its bucket + object key, refusing ids that are malformed
+ * or belong to no category. The folder comes from the id's prefix and an id can
+ * never contain "/", so an id can only ever address its own category's folder.
  */
-export function getAppwriteClient(): sdk.Client {
-  return getClient()
+function locate(fileId: string): { bucket: string; key: string; prefix: FilePrefix } {
+  if (!FILE_ID_PATTERN.test(fileId)) throw new UploadRejectedError('Invalid file id.')
+  const prefix = resolvePrefix(fileId)
+  if (!prefix) throw new UploadRejectedError('Unknown file category.')
+  const { bucket, folder } = LOCATION[prefix]
+  // A file may only ever live in a public bucket if it is meant to be public.
+  if (BUCKETS[bucket].isPublic !== isPublicPrefix(prefix)) {
+    throw new StorageConfigError(`Category "${prefix}" is mapped to a bucket with the wrong visibility.`)
+  }
+  return { bucket: bucketName(bucket), key: `${folder}/${fileId}`, prefix }
 }
 
-// ─── UPLOAD ───────────────────────────────────────────────────────────────────
-
-export interface UploadResult {
-  fileId:   string
-  fileSize: number
-  mimeType: string
+function publicBaseUrl(): string {
+  const raw = (process.env[PUBLIC_URL_ENV] ?? '').trim()
+  if (!raw) throw new StorageConfigError(`Missing ${PUBLIC_URL_ENV} — the public URL of the ${bucketName('media')} bucket.`)
+  let url: URL
+  try {
+    url = new URL(raw)
+  } catch {
+    throw new StorageConfigError(`${PUBLIC_URL_ENV} is not a valid URL.`)
+  }
+  if (url.protocol !== 'https:' && url.hostname !== 'localhost') throw new StorageConfigError(`${PUBLIC_URL_ENV} must be an https:// URL.`)
+  return raw.replace(/\/+$/, '')
 }
 
-/**
- * Upload a file to the Appwrite bucket.
- * @param prefix  - FilePrefix constant to namespace the file
- * @param buffer  - File content
- * @param filename - Original filename (used for Content-Disposition)
- * @param mimeType - MIME type of the file
- * @param customId - Optional: provide a full custom fileId (must start with prefix)
- */
-export async function uploadFile(
-  prefix:    FilePrefix,
-  buffer:    Buffer,
-  filename:  string,
-  mimeType:  string,
-  customId?: string,
-): Promise<UploadResult> {
-  const storage = new sdk.Storage(getClient())
-  const fileId  = customId ?? `${prefix}_${sdk.ID.unique()}`
-  const blob    = new Blob([new Uint8Array(buffer)], { type: mimeType })
-  const file    = await storage.createFile(
-    SCHOOL_BUCKET,
-    fileId,
-    new File([blob], filename, { type: mimeType }),
-  )
-  return { fileId: file.$id, fileSize: file.sizeOriginal, mimeType: file.mimeType }
+// ─── UPLOAD POLICY ───────────────────────────────────────────────────────────
+// What a browser may upload under each prefix. Server-generated documents
+// (payslips, receipts, report cards, transcripts, financial reports) are written
+// by uploadFile() and are NOT listed: a prefix without a policy cannot be
+// uploaded to from the browser at all.
+
+const MB = 1024 * 1024
+const WEB_IMAGE_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'] as const
+const DOCUMENT_OR_IMAGE_MIMES = ['application/pdf', ...WEB_IMAGE_MIMES] as const
+
+interface UploadMeta { name: string; mimeType: string; sizeBytes: number }
+interface UploadPolicy {
+  check(meta: UploadMeta): string | null
+  /** false = validated by assertUploadAllowed() but received by our own API (multer), never via a presigned URL. */
+  direct?: boolean
 }
 
-// ─── DIRECT-FROM-BROWSER UPLOAD TICKET ───────────────────────────────────────
-// [NEW] Lets the browser upload file bytes straight to Appwrite instead of
-// through this app's own API/Vercel function. Investigating the gallery/
-// leadership-photo/announcement-image "upload just fails" reports surfaced
-// two hard limits neither multer config nor Express config can move:
-//   - Vercel Functions cap a request body at 4.5MB, full stop, before this
-//     app's own code even runs (413: FUNCTION_PAYLOAD_TOO_LARGE).
-//   - Below that cap, a single giant request has no retry if the
-//     connection drops mid-upload — the exact "Request aborted" seen in
-//     production logs for these routes.
-// Appwrite's own client SDKs upload large files in chunks with built-in
-// retry per chunk, and talk to Appwrite's servers directly — neither limit
-// applies once the bytes never pass through our Vercel function at all.
-//
-// This does NOT hand the browser the project's real APPWRITE_API_KEY —
-// that key has full read/write/delete on every file in the bucket and must
-// never leave the server. Instead, a dedicated Appwrite Auth user exists
-// ONLY for this purpose (its id in APPWRITE_UPLOADER_USER_ID), and the
-// bucket grants that one user id Create-only permission — no read, no
-// update, no delete (set this up once in the Appwrite Console: Storage →
-// this bucket → Settings → Permissions → add that user id with only
-// "Create" checked). This function mints a short-lived, single-use custom
-// token for that identity; the browser exchanges it for a session via the
-// Appwrite Web SDK's account.createSession(), uploads the one file it was
-// issued a fileId for, and that session has nothing further it's allowed
-// to do.
-//
-// Callers MUST already have run their own requireRole/verifyAuth checks —
-// this function does no authorization itself, it assumes the caller has
-// already decided this specific request may upload into this prefix.
-// Prefixes whose files are meant to be viewed directly (getPublicViewUrl(),
-// no signed-proxy — see the FILE_PREFIX comments above). Everything else
-// must NOT get public read here — those rely on getSignedViewUrl()'s
-// server-side role check instead, and must stay creator-only in Appwrite.
-const PUBLIC_FILE_PREFIXES: readonly FilePrefix[] = [
-  FILE_PREFIX.ANNOUNCEMENT_IMAGE,
-  FILE_PREFIX.SCHOOL_GALLERY,
-  FILE_PREFIX.LEADERSHIP_PHOTO,
-  // [NEW] Without this, discover-photo uploads would get non-public
-  // Appwrite file permissions and getPublicViewUrl() would 403 for
-  // unauthenticated landing-page visitors — same reasoning as
-  // LEADERSHIP_PHOTO/SCHOOL_GALLERY above.
-  FILE_PREFIX.DISCOVER_PHOTO,
-  // Assignment pictures render inside rich-text <img> tags - see FILE_PREFIX.ASSIGNMENT_IMAGE.
-  FILE_PREFIX.ASSIGNMENT_IMAGE,
-]
+const normMime = (m: string) => (m.split(';')[0] ?? '').trim().toLowerCase()
 
-export interface DirectUploadTicket {
-  secret:          string
-  userId:          string
-  endpoint:        string
-  projectId:       string
-  bucketId:        string
-  fileId:          string
-  filePermissions: string[]
+function mimePolicy(allowed: readonly string[], maxBytes: number, direct = true): UploadPolicy {
+  return {
+    direct,
+    check(meta) {
+      if (meta.sizeBytes <= 0) return `"${meta.name}" is empty.`
+      if (meta.sizeBytes > maxBytes) return `"${meta.name}" is larger than ${Math.round(maxBytes / MB)} MB.`
+      if (!allowed.includes(normMime(meta.mimeType))) return `"${meta.name}" is not an allowed file type.`
+      return null
+    },
+  }
 }
 
-// [PRODUCTION FIX] Appwrite enforces a hard 36-character limit on fileIds.
-// This used to build fileIds as `${prefix}_${sdk.ID.unique()}` — fine for
-// short prefixes like school_gallery_ (15 chars), but announcement_image_
-// (20 chars) plus Appwrite's own generated id routinely pushed the total
-// past 36, which Appwrite rejects outright ("Invalid `fileId` param").
-// That's the literal cause of every upload failing except gallery/
-// leadership/staff-photo, whose shorter prefixes happened to survive the
-// same underlying flaw by luck rather than by design. A short, fixed-
-// length random suffix keeps every current and future prefix safely under
-// the limit — even the longest one, assignment_submission_ (22 chars incl.
-// the underscore), leaves comfortable room at 22 + 12 = 34.
+const assignmentPolicy = (kind: AssignmentFileKind): UploadPolicy => ({ check: (meta) => checkFileAgainstRules(meta, kind) })
+
+const UPLOAD_POLICY: Partial<Record<FilePrefix, UploadPolicy>> = {
+  student_photo:         mimePolicy(WEB_IMAGE_MIMES, 25 * MB),
+  staff_photo:           mimePolicy(WEB_IMAGE_MIMES, 25 * MB),
+  announcement_image:    mimePolicy(WEB_IMAGE_MIMES, 25 * MB),
+  school_gallery:        mimePolicy(WEB_IMAGE_MIMES, 25 * MB),
+  leadership_photo:      mimePolicy(WEB_IMAGE_MIMES, 25 * MB),
+  discover_photo:        mimePolicy(WEB_IMAGE_MIMES, 25 * MB),
+  digital_resource:      mimePolicy(DOCUMENT_OR_IMAGE_MIMES, 100 * MB),
+  // Received by the finance route through multer (see finances.ts), not by presigned upload.
+  expense_receipt:       mimePolicy(DOCUMENT_OR_IMAGE_MIMES, 10 * MB, false),
+  assignment_image:      assignmentPolicy('IMAGE'),
+  assignment_file:       assignmentPolicy('ATTACHMENT'),
+  assignment_submission: assignmentPolicy('SUBMISSION'),
+}
+
+/** True when browsers may upload to this category (it has an upload policy) — those buckets need CORS for presigned PUTs. */
+export function isBrowserUploadable(prefix: FilePrefix): boolean {
+  const policy = UPLOAD_POLICY[prefix]
+  return policy !== undefined && policy.direct !== false
+}
+
+/** Throws UploadRejectedError (HTTP 400, user-facing message) unless this upload is allowed under the prefix. */
+export function assertUploadAllowed(prefix: FilePrefix, meta: UploadMeta): void {
+  const policy = UPLOAD_POLICY[prefix]
+  if (!policy) throw new UploadRejectedError('Files of this type cannot be uploaded from the browser.')
+  const problem = policy.check(meta)
+  if (problem) throw new UploadRejectedError(problem)
+}
+
+// ─── IDS ─────────────────────────────────────────────────────────────────────
+
+// Short fixed-length random suffix. 12 characters of [a-z0-9] matches
+// extractEmbeddedFileIds()'s pattern and keeps every id well under 128 characters.
 function shortUniqueId(length = 12): string {
   const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789'
   const bytes    = crypto.randomBytes(length)
@@ -318,154 +439,231 @@ function shortUniqueId(length = 12): string {
   return out
 }
 
-export async function createDirectUploadTicket(
-  prefix:    FilePrefix,
-  customId?: string,
-): Promise<DirectUploadTicket> {
-  const uploaderUserId = process.env.APPWRITE_UPLOADER_USER_ID
-  if (!uploaderUserId) {
-    throw new Error(
-      '[storage] Missing APPWRITE_UPLOADER_USER_ID — see the Appwrite Console ' +
-      'setup notes on createDirectUploadTicket() in storage.ts.',
-    )
-  }
-  const client = getClient() // throws if APPWRITE_ENDPOINT/PROJECT_ID/API_KEY are missing
-  const users  = new sdk.Users(client)
-  const token  = await users.createToken({ userId: uploaderUserId })
-  const fileId = customId ?? `${prefix}_${shortUniqueId()}`
-  // [PRODUCTION FIX] A file created via a real Appwrite user session (as
-  // this "uploader" identity is) defaults to being readable only by its
-  // creator — unlike the old path, where uploadFile() ran under the full-
-  // access API key. Without this, every direct-uploaded public asset
-  // (gallery photos, announcement images, leadership photos) would upload
-  // successfully but then 401/403 the moment getPublicViewUrl()'s raw
-  // Appwrite URL is hit by an anonymous visitor — which is exactly the
-  // "broken image" symptom this fixes. Only the three known-public
-  // prefixes get this; everything else stays creator-only, matching what
-  // the old path effectively enforced through role checks instead.
-  const filePermissions = PUBLIC_FILE_PREFIXES.includes(prefix)
-    ? [sdk.Permission.read(sdk.Role.any())]
-    : []
-  return {
-    secret:    token.secret,
-    userId:    uploaderUserId,
-    endpoint:  process.env.APPWRITE_ENDPOINT!,
-    projectId: process.env.APPWRITE_PROJECT_ID!,
-    bucketId:  SCHOOL_BUCKET,
-    fileId,
-    filePermissions,
+const newFileId = (prefix: FilePrefix) => `${prefix}_${shortUniqueId()}`
+
+// Public objects are immutable (ids are never reused), so browsers/CDNs may cache them for good.
+const PUBLIC_CACHE_CONTROL = 'public, max-age=31536000, immutable'
+
+function encodeFilename(name: string): string {
+  return encodeURIComponent(name.slice(0, 255))
+}
+function decodeFilename(raw: string | undefined, fallback: string): string {
+  if (!raw) return fallback
+  try {
+    return decodeURIComponent(raw)
+  } catch {
+    return fallback
   }
 }
 
-// ─── SIGNED / PRESIGNED VIEW URL ─────────────────────────────────────────────
+// ─── SERVER-SIDE UPLOAD ──────────────────────────────────────────────────────
+
+export interface UploadResult {
+  fileId:   string
+  fileSize: number
+  mimeType: string
+}
+
+/**
+ * Upload a server-held buffer (generated PDFs, spreadsheets, multipart uploads).
+ * @param prefix  - FilePrefix constant; picks the bucket
+ * @param buffer  - File content
+ * @param filename - Original filename (served back as Content-Disposition)
+ * @param mimeType - MIME type of the file
+ * @param customId - Optional full fileId (must start with `${prefix}_`)
+ */
+export async function uploadFile(
+  prefix:    FilePrefix,
+  buffer:    Buffer,
+  filename:  string,
+  mimeType:  string,
+  customId?: string,
+): Promise<UploadResult> {
+  const fileId = customId ?? newFileId(prefix)
+  if (resolvePrefix(fileId) !== prefix) throw new UploadRejectedError('File id does not match its category.')
+  const { bucket, key } = locate(fileId)
+  await getClient().send(new PutObjectCommand({
+    Bucket: bucket,
+    Key: key,
+    Body: buffer,
+    ContentType: mimeType,
+    ContentLength: buffer.length,
+    Metadata: { filename: encodeFilename(filename) },
+    ...(isPublicPrefix(prefix) ? { CacheControl: PUBLIC_CACHE_CONTROL } : {}),
+  }))
+  return { fileId, fileSize: buffer.length, mimeType }
+}
+
+// ─── DIRECT-FROM-BROWSER UPLOAD TICKET ───────────────────────────────────────
+// Lets the browser upload file bytes straight to R2 instead of through this
+// app's own API/Vercel function:
+//   - Vercel Functions cap a request body at 4.5MB, before this app's code runs.
+//   - A single giant request has no retry if the connection drops mid-upload.
+// The server decides everything that matters (bucket, file id, content type,
+// exact size, filename); the browser only gets a presigned PUT URL that is valid
+// for those exact values for DIRECT_UPLOAD_TTL_SECS, for one object key.
+//
+// Callers MUST already have run their own requireRole/verifyAuth checks — this
+// function does no authorization itself, it assumes the caller has already
+// decided this specific request may upload into this prefix.
+
+export const DIRECT_UPLOAD_TTL_SECS = 900
+
+export interface DirectUploadTicket {
+  method:           'PUT'
+  /** Presigned URL — PUT the file bytes here. */
+  uploadUrl:        string
+  /** Headers the browser MUST send unchanged (they are part of the signature). */
+  headers:          Record<string, string>
+  fileId:           string
+  expiresInSeconds: number
+  /** Final public URL for public prefixes (for inline <img>), null for private files. */
+  publicUrl:        string | null
+}
+
+const uploadRequestSchema = z.object({
+  filename:    z.string().trim().min(1).max(255),
+  contentType: z.string().trim().min(1).max(255),
+  size:        z.number().int().positive(),
+})
+
+export async function createDirectUploadTicket(prefix: FilePrefix, request: unknown): Promise<DirectUploadTicket> {
+  if (!isBrowserUploadable(prefix)) throw new UploadRejectedError('Files of this type cannot be uploaded from the browser.')
+  const parsed = uploadRequestSchema.safeParse(request)
+  if (!parsed.success) throw new UploadRejectedError('Upload request must include the file name, type and size.')
+  const { filename, contentType, size } = parsed.data
+  const mimeType = normMime(contentType)
+  assertUploadAllowed(prefix, { name: filename, mimeType, sizeBytes: size })
+
+  const fileId = newFileId(prefix)
+  const { bucket, key } = locate(fileId)
+  const isPublic = isPublicPrefix(prefix)
+  // Resolve (and so validate) the public URL BEFORE issuing the ticket, so a
+  // misconfigured public bucket fails here and not after the file is uploaded.
+  const publicUrl = isPublic ? `${publicBaseUrl()}/${folderFor(prefix)}/${encodeURIComponent(fileId)}` : null
+
+  const headers: Record<string, string> = {
+    'Content-Type': mimeType,
+    'x-amz-meta-filename': encodeFilename(filename),
+  }
+  const signable = new Set(['content-type', 'content-length'])
+  if (isPublic) {
+    headers['Cache-Control'] = PUBLIC_CACHE_CONTROL
+    signable.add('cache-control')
+  }
+
+  const uploadUrl = await getSignedUrl(
+    getClient(),
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      ContentType: mimeType,
+      ContentLength: size,
+      Metadata: { filename: encodeFilename(filename) },
+      ...(isPublic ? { CacheControl: PUBLIC_CACHE_CONTROL } : {}),
+    }),
+    {
+      expiresIn: DIRECT_UPLOAD_TTL_SECS,
+      signableHeaders: signable,
+      // Keep the filename metadata as a signed HEADER (the presigner would otherwise move x-amz-* into the query string).
+      unhoistableHeaders: new Set(['x-amz-meta-filename']),
+    },
+  )
+
+  return { method: 'PUT', uploadUrl, headers, fileId, expiresInSeconds: DIRECT_UPLOAD_TTL_SECS, publicUrl }
+}
+
+// ─── VIEW URLS ───────────────────────────────────────────────────────────────
 
 /**
  * Returns the protected same-origin proxy URL used for viewing a file.
- * All sensitive file access must go through this — never expose raw Appwrite URLs.
+ * All sensitive file access must go through this — private buckets have no
+ * public URL. The browser fetches /api/files/[fileId] with its Firebase Bearer
+ * token; keeping it relative avoids coupling local development to the
+ * production domain and keeps credentials out of the URL.
  */
 export async function getSignedViewUrl(fileId: string): Promise<string> {
-  getClient() // throws if APPWRITE_ENDPOINT/PROJECT_ID/API_KEY are missing
-  // Appwrite Node SDK getFilePreview / getFileView returns a URL object.
-  // Appwrite file URLs are deliberately never exposed for protected documents.
-  // The browser receives only our same-origin proxy URL and must authenticate
-  // the actual byte request with a Firebase Bearer token.
-  // Keep this same-origin and relative. The browser fetches the file through
-  // /api/files/[fileId] with the Firebase Bearer token. This avoids coupling
-  // local development to the production domain and avoids putting auth
-  // credentials in the URL.
   return `/api/files/${encodeURIComponent(fileId)}`
 }
 
 /**
- * Returns a direct Appwrite view URL. Use only for public assets (e.g. school logo).
- * Do NOT use for payslips, report cards, or any protected documents.
+ * The URL prefix every public file of this category starts with, e.g. for
+ * allow-listing embedded <img src> values. Undefined when R2_PUBLIC_URL_MEDIA
+ * is not set.
  */
-export async function getPublicViewUrl(_bucket: string, fileId: string): Promise<string> {
-  // [PRODUCTION FIX] storage.getFileView() no longer returns a URL in
-  // current node-appwrite — it downloads the file's actual bytes instead
-  // (an SDK behavior change; getFileDownload/getFilePreview changed the
-  // same way — see Appwrite's own community reports). Calling .toString()
-  // on that produced something like "[object ArrayBuffer]" instead of a
-  // URL — not a valid absolute URL, so the browser resolved it as a
-  // *relative* path back into our own app, which is why every gallery/
-  // announcement/leadership photo showed as broken, and why opening that
-  // "image" directly landed on our own login page instead of Appwrite.
-  // The file-view REST route itself is stable and documented, so we build
-  // it directly rather than trust a helper whose return type moved under us.
-  const client    = getClient() // throws if APPWRITE_ENDPOINT/PROJECT_ID/API_KEY are missing
-  void client
-  const endpoint  = process.env.APPWRITE_ENDPOINT!
-  const projectId = process.env.APPWRITE_PROJECT_ID!
-  return `${endpoint}/storage/buckets/${SCHOOL_BUCKET}/files/${encodeURIComponent(fileId)}/view?project=${projectId}`
+export function getPublicUrlPrefix(prefix: PublicFilePrefix): string | undefined {
+  try {
+    return `${publicBaseUrl()}/${folderFor(prefix)}/${prefix}_`
+  } catch {
+    return undefined
+  }
 }
 
 /**
- * Returns a direct Appwrite download URL.
- * Internal use only — callers should prefer getSignedViewUrl for client-facing URLs.
+ * Returns the direct public URL of a file in a public bucket (landing-page
+ * assets, school gallery, ...). Refuses every other category: payslips, report
+ * cards and other protected documents must go through getSignedViewUrl().
  */
-export async function getDownloadUrl(_bucket: string, fileId: string): Promise<string> {
-  // [PRODUCTION FIX] Same issue as getPublicViewUrl() above —
-  // storage.getFileDownload() now returns the file's raw bytes, not a
-  // URL, in current node-appwrite. This is what payroll.ts's payslip
-  // download link and reportExportService.ts's financial report link
-  // both depend on, so both were silently broken the same way gallery/
-  // announcement/leadership photos were.
-  const client    = getClient() // throws if APPWRITE_ENDPOINT/PROJECT_ID/API_KEY are missing
-  void client
-  const endpoint  = process.env.APPWRITE_ENDPOINT!
-  const projectId = process.env.APPWRITE_PROJECT_ID!
-  return `${endpoint}/storage/buckets/${SCHOOL_BUCKET}/files/${encodeURIComponent(fileId)}/download?project=${projectId}`
+export async function getPublicViewUrl(fileId: string): Promise<string> {
+  const { prefix } = locate(fileId)
+  if (!isPublicPrefix(prefix)) throw new UploadRejectedError('This file is not public.')
+  return `${publicBaseUrl()}/${folderFor(prefix)}/${encodeURIComponent(fileId)}`
 }
 
-// ─── STREAM FILE (for proxy route) ───────────────────────────────────────────
+// ─── READ ────────────────────────────────────────────────────────────────────
 
 /**
- * Streams raw file bytes from Appwrite.
- * Called by the /api/files/[fileId] proxy route after verifying user permissions.
+ * Reads raw file bytes. Called by the /api/files/[fileId] proxy route after
+ * verifying user permissions, and by document generators that embed images.
  */
 export async function streamFile(fileId: string): Promise<{ buffer: ArrayBuffer; mimeType: string; filename: string }> {
-  const storage  = new sdk.Storage(getClient())
-  const meta     = await storage.getFile(SCHOOL_BUCKET, fileId)
-  const buffer   = await storage.getFileDownload(SCHOOL_BUCKET, fileId)
+  const { bucket, key } = locate(fileId)
+  const res = await getClient().send(new GetObjectCommand({ Bucket: bucket, Key: key }))
+  if (!res.Body) throw new Error(`[storage] Empty response for ${fileId}`)
+  const bytes = await res.Body.transformToByteArray()
+  const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
   return {
-    buffer:   buffer as unknown as ArrayBuffer,
-    mimeType: meta.mimeType,
-    filename: meta.name,
+    buffer,
+    mimeType: res.ContentType ?? 'application/octet-stream',
+    filename: decodeFilename(res.Metadata?.filename, fileId),
+  }
+}
+
+export interface FileMetadata {
+  name:      string
+  mimeType:  string
+  sizeBytes: number
+  createdAt: Date
+}
+
+/** Metadata of the STORED object (not of what a request claimed). Throws if it does not exist. */
+export async function getFileMetadata(fileId: string): Promise<FileMetadata> {
+  const { bucket, key } = locate(fileId)
+  const head = await getClient().send(new HeadObjectCommand({ Bucket: bucket, Key: key }))
+  return {
+    name:      decodeFilename(head.Metadata?.filename, fileId),
+    mimeType:  head.ContentType ?? 'application/octet-stream',
+    sizeBytes: head.ContentLength ?? 0,
+    createdAt: head.LastModified ?? new Date(0),
   }
 }
 
 // ─── DELETE ──────────────────────────────────────────────────────────────────
 
-export async function deleteFile(_bucket: string, fileId: string): Promise<void> {
-  const storage = new sdk.Storage(getClient())
-  await storage.deleteFile(SCHOOL_BUCKET, fileId)
+export async function deleteFile(fileId: string): Promise<void> {
+  const { bucket, key } = locate(fileId)
+  await getClient().send(new DeleteObjectCommand({ Bucket: bucket, Key: key }))
 }
 
-// ─── METADATA ────────────────────────────────────────────────────────────────
+// ─── HEALTH ──────────────────────────────────────────────────────────────────
 
-export async function getFileMetadata(_bucket: string, fileId: string) {
-  const storage = new sdk.Storage(getClient())
-  return storage.getFile(SCHOOL_BUCKET, fileId)
-}
-
-// ─── LIST FILES (admin only) ──────────────────────────────────────────────────
-
-export async function listFiles(prefix?: FilePrefix, limit = 25, offset = 0) {
-  const storage = new sdk.Storage(getClient())
-  const queries: string[] = []
-  if (prefix) queries.push(sdk.Query.startsWith('$id', prefix))
-  queries.push(sdk.Query.limit(limit))
-  queries.push(sdk.Query.offset(offset))
-  return storage.listFiles(SCHOOL_BUCKET, queries)
-}
-
-// ─── STORAGE USAGE ───────────────────────────────────────────────────────────
-
-export async function getStorageUsage(): Promise<{ totalFiles: number; totalSizeBytes: number }> {
-  const storage = new sdk.Storage(getClient())
-  const [bucket, result] = await Promise.all([
-    storage.getBucket(SCHOOL_BUCKET),
-    storage.listFiles(SCHOOL_BUCKET, [sdk.Query.limit(1)]),
-  ])
-  return { totalFiles: result.total, totalSizeBytes: bucket.totalSize ?? 0 }
+/** Probes every bucket with a one-key listing (needs only object-read permission). */
+export async function checkStorageBuckets(): Promise<{ total: number; reachable: number; failed: string[] }> {
+  const client = getClient()
+  const buckets = listBuckets()
+  const results = await Promise.allSettled(
+    buckets.map((b) => client.send(new ListObjectsV2Command({ Bucket: b.bucket, MaxKeys: 1 }))),
+  )
+  const failed = buckets.filter((_, i) => results[i]?.status === 'rejected').map((b) => b.bucket)
+  return { total: buckets.length, reachable: buckets.length - failed.length, failed }
 }

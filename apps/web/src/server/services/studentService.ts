@@ -1351,7 +1351,7 @@ export async function changeStatus(
  * This is a critical one-time operation — logged synchronously.
  */
 // [NEW] Records a student photo the browser has already uploaded directly
-// to Appwrite (see students.ts's POST /:id/photo/upload-ticket and
+// to R2 (see students.ts's POST /:id/photo/upload-ticket and
 // storage.ts's createDirectUploadTicket()) against that student's record.
 export async function attachStudentPhoto(studentId: string, fileId: string): Promise<void> {
   const student = await prisma.student.findUnique({ where: { id: studentId }, select: { id: true } })

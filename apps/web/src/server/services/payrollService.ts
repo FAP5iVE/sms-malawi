@@ -409,7 +409,7 @@ export async function processMonthlyPayroll(
           data: { payrollRunId: run.id, ...ps },
         })
 
-        // Generate payslip PDF → store in Appwrite
+        // Generate payslip PDF → store in R2
         const pdfKey = await generatePayslipPdf(
           payslip.id,
           { ...ps, pensionPercent, earnings: earningsByUid.get(ps.staffUid), runByUid, processedAt: new Date() },

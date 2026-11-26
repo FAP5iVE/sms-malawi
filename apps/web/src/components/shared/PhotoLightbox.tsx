@@ -97,7 +97,7 @@ export function PhotoLightbox({ photos, index, onIndexChange }: PhotoLightboxPro
             </DialogClose>
 
             <div className="flex items-center justify-center bg-black">
-              {/* eslint-disable-next-line @next/next/no-img-element -- Appwrite-hosted photo, not a Next static asset */}
+              {/* eslint-disable-next-line @next/next/no-img-element -- R2-hosted photo, not a Next static asset */}
               <img
                 src={photo.url}
                 alt={photo.alt}

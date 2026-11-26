@@ -3,8 +3,8 @@
  * [FILE]: apps/web/src/server/routes/gallery.ts
  * [PURPOSE]: Real backend for the public landing page's "Life at our
  *   school" gallery, which previously had no live source at all (a
- *   permanent placeholder). Photos are stored in Appwrite under
- *   FILE_PREFIX.SCHOOL_GALLERY (a public-view-URL prefix — see
+ *   permanent placeholder). Photos are stored in the public gallery R2
+ *   bucket under FILE_PREFIX.SCHOOL_GALLERY (a public-view-URL prefix — see
  *   storage.ts's getPublicViewUrl comment) with an ordered/captioned index
  *   in the new GalleryPhoto table. Management (upload/delete/reorder) is
  *   admin/high_rank only; the public GET lives in public.ts (unauthenticated,
@@ -32,7 +32,7 @@ galleryRouter.get('/', verifyAuth, requireRole(['admin', 'high_rank', 'lower_ran
   try {
     const photos = await prisma.galleryPhoto.findMany({ orderBy: [{ displayOrder: 'asc' }, { createdAt: 'desc' }] })
     const withUrls = await Promise.all(
-      photos.map(async (p) => ({ ...p, url: await getPublicViewUrl('', p.fileKey) })),
+      photos.map(async (p) => ({ ...p, url: await getPublicViewUrl(p.fileKey) })),
     )
     res.json(withUrls)
   } catch (err: unknown) {
@@ -40,23 +40,22 @@ galleryRouter.get('/', verifyAuth, requireRole(['admin', 'high_rank', 'lower_ran
   }
 })
 
-// POST /gallery/upload-ticket — mint a one-time Appwrite upload credential.
-// The browser exchanges this for a session (Appwrite Web SDK
-// account.createSession) and uploads the file bytes DIRECTLY to Appwrite —
-// never through this Vercel function. See storage.ts's
-// createDirectUploadTicket() for why: Vercel Functions hard-cap request
-// bodies at 4.5MB, and a single large request has no retry if the
-// connection drops mid-upload ("Request aborted" in production logs for
-// this exact route); neither limit applies to Appwrite's own chunked,
-// retrying client upload.
+// POST /gallery/upload-ticket — mint a presigned R2 upload URL. The body
+// ({ filename, contentType, size }) is validated against the gallery upload
+// policy, and the browser PUTs the file bytes DIRECTLY to R2 — never through
+// this Vercel function. See storage.ts's createDirectUploadTicket() for why:
+// Vercel Functions hard-cap request bodies at 4.5MB, and a single large
+// request has no retry if the connection drops mid-upload ("Request aborted"
+// in production logs for this exact route); neither limit applies to a direct
+// upload, which the client retries itself.
 galleryRouter.post(
   '/upload-ticket',
   verifyAuth,
   requireRole(['admin', 'high_rank', 'lower_rank']),
   rateLimit('upload-ticket'),
-  async (_req, res) => {
+  async (req, res) => {
     try {
-      const ticket = await createDirectUploadTicket(FILE_PREFIX.SCHOOL_GALLERY)
+      const ticket = await createDirectUploadTicket(FILE_PREFIX.SCHOOL_GALLERY, req.body)
       res.json(ticket)
     } catch (err: unknown) {
       return sendError(res, err, { tags: { module: 'gallery', route: 'upload-ticket' } })
@@ -65,7 +64,7 @@ galleryRouter.post(
 )
 
 // POST /gallery — records a photo the browser has ALREADY uploaded directly
-// to Appwrite via /gallery/upload-ticket. Takes the resulting fileId (JSON
+// to R2 via /gallery/upload-ticket. Takes the resulting fileId (JSON
 // body), not the file itself — see the comment on /upload-ticket above for
 // why file bytes no longer come through this route.
 galleryRouter.post(
@@ -95,8 +94,8 @@ galleryRouter.post(
   },
 )
 
-// DELETE /gallery/:id — removes the index row AND the underlying Appwrite
-// file.
+// DELETE /gallery/:id — removes the index row AND the underlying R2
+// object.
 // [PRODUCTION FIX] Previously removed only the Prisma row, on the stated
 // assumption that this matched a codebase-wide convention of leaving
 // storage objects in place on row deletion — checked that against every
@@ -105,7 +104,7 @@ galleryRouter.post(
 // correctly keep the file since the record can still be restored later.
 // This route does a real hard delete with no restore path, so the file
 // should go with it — otherwise every deleted photo permanently wastes
-// space in the single free-tier bucket this whole app shares.
+// space in the gallery bucket.
 // A storage-side failure here (e.g. the file was already removed some
 // other way) doesn't block the response — the row is already gone either
 // way, which is what the UI reflects.
@@ -113,8 +112,8 @@ galleryRouter.delete('/:id', verifyAuth, requireRole(['admin', 'high_rank', 'low
   try {
     const photo = await prisma.galleryPhoto.delete({ where: { id: String(req.params.id) } }).catch(() => null)
     if (photo) {
-      await deleteFile('', photo.fileKey).catch((err: unknown) => {
-        console.error('[gallery] Failed to delete Appwrite file', photo.fileKey, err)
+      await deleteFile(photo.fileKey).catch((err: unknown) => {
+        console.error('[gallery] Failed to delete R2 object', photo.fileKey, err)
       })
     }
     res.json({ ok: true })

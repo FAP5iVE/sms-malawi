@@ -334,16 +334,16 @@ hrRouter.post('/', verifyAuth, requireRole([...HR_ADMIN]),
     return res.status(201).json(await hrService.createStaff(parsed.data, req.user!.uid))
   })
 
-// POST /hr/:id/photo/upload-ticket — mints a one-time Appwrite upload
-// credential for this staff member's photo. Staff photos are private
+// POST /hr/:id/photo/upload-ticket — mints a presigned R2 upload
+// URL for this staff member's photo. Staff photos are private
 // (FILE_PREFIX.STAFF_PHOTO is not one of the public prefixes), so the
-// resulting file gets no public read permission — viewing it still goes
+// staff-photos bucket has no public URL — viewing it still goes
 // through getSignedViewUrl()'s role-checked proxy, same as before.
 hrRouter.post('/:id/photo/upload-ticket', verifyAuth, requireRole([...HR_ADMIN]),
   rateLimit('upload-ticket'),
-  async (_req, res) => {
+  async (req, res) => {
     try {
-      const ticket = await createDirectUploadTicket(FILE_PREFIX.STAFF_PHOTO)
+      const ticket = await createDirectUploadTicket(FILE_PREFIX.STAFF_PHOTO, req.body)
       res.json(ticket)
     } catch (err: unknown) {
       return sendError(res, err, { tags: { module: 'hr', route: 'photo-upload-ticket' } })
@@ -351,7 +351,7 @@ hrRouter.post('/:id/photo/upload-ticket', verifyAuth, requireRole([...HR_ADMIN])
   })
 
 // POST /hr/:id/photo — records a photo the browser has ALREADY uploaded
-// directly to Appwrite via /:id/photo/upload-ticket. Takes the resulting
+// directly to R2 via /:id/photo/upload-ticket. Takes the resulting
 // fileId (JSON body), not the file itself.
 // [PRODUCTION FIX] Was multer-based, going through this app's own Vercel
 // function for the raw file bytes — hitting the same two hard limits as

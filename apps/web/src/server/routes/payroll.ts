@@ -152,8 +152,8 @@ payrollRouter.get('/my-salary', verifyAuth, async (req, res) => {
 // [PRODUCTION FIX] Two bugs, both required for "View Payslip" to actually
 // work for anyone:
 //   1. This previously returned getDownloadUrl(...) — a raw, unauthenticated
-//      Appwrite REST URL. Payslip files are private in Appwrite (not in
-//      PUBLIC_FILE_PREFIXES), so that URL 401'd from Appwrite itself for
+//      storage URL. Payslip files are private (not in
+//      PUBLIC_FILE_PREFIXES), so that URL was refused by storage itself for
 //      every caller, including the payslip's own owner — the "even self
 //      payslips don't work" report. getDownloadUrl's own doc comment says
 //      as much: "Internal use only — callers should prefer getSignedViewUrl

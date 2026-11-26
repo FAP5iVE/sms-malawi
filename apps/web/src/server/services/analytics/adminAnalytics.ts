@@ -388,7 +388,7 @@ export interface OperationsAccess {
 }
 
 /** Probe details that expose storage sizes or raw provider errors. */
-const SIZE_BEARING_SERVICES = new Set(['Neon PostgreSQL', 'Appwrite Storage'])
+const SIZE_BEARING_SERVICES = new Set(['Neon PostgreSQL', 'Cloudflare R2 Storage'])
 
 /**
  * Platform health from persisted operational data and live probes only.

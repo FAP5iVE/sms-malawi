@@ -567,7 +567,7 @@ export interface ApiExpense {
   term: number
   status: string
   incurredAt: string
-  /** Appwrite file ID, set once a receipt has been uploaded — R9. */
+  /** R2 object key, set once a receipt has been uploaded — R9. */
   receiptKey?: string | null
   /** [PRODUCTION FIX 2026-07-27] null on an APPROVED expense = an unpaid
    *  vendor/company debt (posted to ledger 2000 Accounts Payable). Set at

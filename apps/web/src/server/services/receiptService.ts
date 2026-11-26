@@ -80,7 +80,7 @@
  *   (pdfBranding.drawLogoBadge + schoolLogoService.getRasterSchoolLogo) as the
  *   report card and transcript, so they work wherever those work.
  *   generateReceipt()/generatePayslipPdf() keep their signatures and still
- *   return the Appwrite fileId.
+ *   return the stored file's id.
  * [DEPENDS ON]: jspdf, pdfBranding.ts, schoolLogoService.ts
  */
 

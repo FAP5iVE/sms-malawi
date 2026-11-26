@@ -49,7 +49,7 @@ export function HierarchicalPhotoGrid({ photos, onPhotoClick, className }: Hiera
             aria-label={`View ${photo.caption || photo.category || "photo"} full size`}
             className={`group relative aspect-square overflow-hidden rounded-xl border border-base bg-surface ${isHero ? "col-span-2 row-span-2" : ""}`}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element -- Appwrite-hosted photo, not a Next static asset */}
+            {/* eslint-disable-next-line @next/next/no-img-element -- R2-hosted photo, not a Next static asset */}
             <img
               src={photo.url}
               alt={photo.alt}

@@ -111,7 +111,7 @@ import { serializeDecimals } from '@/lib/serialize'
 import * as accountingService from '@/server/services/accountingService'
 import * as forecastService from '@/server/services/forecastService'
 import { generateFinancialReport } from '@/server/services/reportExportService'
-import { getSignedViewUrl, uploadFile, FILE_PREFIX } from '@/lib/storage'
+import { getSignedViewUrl, uploadFile, assertUploadAllowed, FILE_PREFIX } from '@/lib/storage'
 import { prisma } from '@/lib/prisma'
 import { bulkGenerateInvoices } from '@/server/services/bulkInvoiceService'
 import * as Sentry from '@sentry/nextjs'
@@ -607,10 +607,9 @@ financesRouter.post('/expenses', verifyAuth, requireRole(['admin', 'finance']), 
   res.status(201).json(expense)
 })
 
-// [R9] Receipt upload — an Appwrite file ID stored on Expense.receiptKey,
-// matching the field this session's schema.prisma comment fix corrects
-// from a stale "R2 object key" reference. Mirrors assignments.ts's
-// confirmed POST /:id/submit multer + uploadFile() pattern.
+// [R9] Receipt upload — the stored file's id (R2 object key) is saved on
+// Expense.receiptKey. Multer receives the (<=10MB) file and uploadFile()
+// writes it to the expense-receipts bucket.
 financesRouter.post(
   '/expenses/:id/receipt',
   verifyAuth,
@@ -624,6 +623,11 @@ financesRouter.post(
     // hanging the client's fetch indefinitely.
     try {
       if (!req.file) return res.status(400).json({ error: 'No file uploaded' })
+      assertUploadAllowed(FILE_PREFIX.EXPENSE_RECEIPT, {
+        name: req.file.originalname,
+        mimeType: req.file.mimetype,
+        sizeBytes: req.file.size,
+      })
       const uploaded = await uploadFile(
         FILE_PREFIX.EXPENSE_RECEIPT,
         req.file.buffer,

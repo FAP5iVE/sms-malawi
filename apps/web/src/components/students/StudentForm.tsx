@@ -460,7 +460,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
     // was never actually defined anywhere on the backend — every student
     // photo upload has been silently 404ing since this form was written
     // (the failure was swallowed by .catch(console.error) below, never
-    // shown to the user). Built as a direct-to-Appwrite upload against the
+    // shown to the user). Built as a direct-to-R2 upload against the
     // newly-added backend route, matching the rest of the app's upload
     // flows, rather than fixing the old multipart route and having to
     // convert it again later.

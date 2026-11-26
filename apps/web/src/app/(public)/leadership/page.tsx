@@ -57,7 +57,7 @@ export default function LeadershipPage() {
                *  not this member has one set, so the row of cards stays
                *  visually uniform (matches the reference design). */}
               {m.photoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element -- Appwrite-hosted photo, not a local Next asset
+                // eslint-disable-next-line @next/next/no-img-element -- R2-hosted photo, not a local Next asset
                 <img
                   src={m.photoUrl}
                   alt={m.name}

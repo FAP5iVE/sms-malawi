@@ -190,16 +190,16 @@ libraryRouter.get('/digital', verifyAuth, requirePermission('library.viewDigital
     }))
   })
 
-// POST /digital/upload-ticket — mints a one-time Appwrite upload
-// credential. Digital resources (eBooks, past papers, notes) are private —
+// POST /digital/upload-ticket — mints a presigned R2 upload
+// URL. Digital resources (eBooks, past papers, notes) are private —
 // FILE_PREFIX.DIGITAL_RESOURCE is not one of the public prefixes — so the
-// file gets no public read permission; viewing still goes through
+// digital-resources bucket has no public URL; viewing still goes through
 // GET /digital/:id/view's role-checked signed URL, same as before.
 libraryRouter.post('/digital/upload-ticket', verifyAuth, requirePermission('library.uploadDigitalResource'),
   rateLimit('upload-ticket'),
-  async (_req, res) => {
+  async (req, res) => {
     try {
-      const ticket = await createDirectUploadTicket(FILE_PREFIX.DIGITAL_RESOURCE)
+      const ticket = await createDirectUploadTicket(FILE_PREFIX.DIGITAL_RESOURCE, req.body)
       res.json(ticket)
     } catch (err: unknown) {
       return sendError(res, err, { tags: { module: 'library', route: 'digital-upload-ticket' } })
@@ -207,7 +207,7 @@ libraryRouter.post('/digital/upload-ticket', verifyAuth, requirePermission('libr
   })
 
 // POST /digital/upload — records a resource the browser has ALREADY
-// uploaded directly to Appwrite via /digital/upload-ticket. Takes the
+// uploaded directly to R2 via /digital/upload-ticket. Takes the
 // resulting fileId/fileSize/mimeType (JSON body) instead of the file
 // itself.
 // [PRODUCTION FIX] Was multer-based (100MB limit, for eBooks/past papers),

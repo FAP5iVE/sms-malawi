@@ -706,7 +706,7 @@ export async function listDigitalResources(filters: {
 
 // [PRODUCTION FIX] Was uploadDigitalResource(data, buffer, filename,
 // mimeType, fileSize, uploaderUid) — took the raw file bytes and called
-// uploadFile() itself. The route now uploads directly to Appwrite from
+// uploadFile() itself. The route now uploads directly to R2 from
 // the browser (see library.ts's /digital/upload-ticket and storage.ts's
 // createDirectUploadTicket()), so this only needs to record the already-
 // uploaded file's id/size/mimeType against a new DigitalResource row.

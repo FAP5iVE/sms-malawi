@@ -9,8 +9,8 @@
  *   found a second, independent defect on the same causal chain: all
  *   three ownership-lookup branches queried Prisma shapes that don't
  *   exist in schema.prisma —
- *     - prisma.payslip.findFirst({ where: { appwriteFileId } }) — the
- *       real fields are payslipKey and staffUid, not appwriteFileId/
+ *     - prisma.payslip.findFirst({ where: { <old file-id field> } }) — the
+ *       real fields are payslipKey and staffUid, not the old file-id field/
  *       staffId.
  *     - prisma.reportCard.findFirst(...) — there is no ReportCard model;
  *       a report card's key lives on TermResult.reportCardKey, resolved
@@ -186,7 +186,7 @@ export async function GET(
     return new NextResponse(buffer as BodyInit, {
       status: 200,
       headers: {
-        // The stored Appwrite MIME type is authoritative for the browser
+        // The MIME type stored with the object is authoritative for the browser
         // response. PDF.js consumes the bytes through fetch, so it does not
         // depend on Chrome's built-in PDF plugin.
         'Content-Type': mimeType,

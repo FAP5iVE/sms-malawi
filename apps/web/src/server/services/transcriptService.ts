@@ -34,10 +34,10 @@
  *      via calcGrade() (which, given the shape bug, was reading `s.total`
  *      off a non-existent array index and always computing a fallback
  *      grade regardless of the shape fix).
- *   4. Added the same Appwrite permissions treatment
+ *   4. Added the same storage access treatment
  *      reportCardService.uploadReportCard() now has — this file's own
  *      `storageClient`/`BUCKET_ID`/`ID` imports (@/lib/storage,
- *      node-appwrite) referenced exports that never existed at all (a
+ *      the old storage SDK) referenced exports that never existed at all (a
  *      confirmed build-breaking error, not merely an inconsistent
  *      permissions grant). Rewired onto the canonical uploadFile/
  *      getSignedViewUrl/FILE_PREFIX API — FILE_PREFIX.TRANSCRIPT's
@@ -54,7 +54,7 @@
  *
  * Academic transcript generator.
  * Aggregates all term results across a student's academic history into a
- * single multi-page A4 PDF and uploads to Appwrite.
+ * single multi-page A4 PDF and uploads it to the transcripts R2 bucket.
  *
  * Transcript contents (per academic year → per term):
  *   • Student details header (same as report card)

@@ -111,7 +111,7 @@ export const examsRouter = Router()
 
 // ── GET /exams/report-cards/:classId/:term (exam_officer | admin) ─────────────
 // Triggers or re-runs batch PDF generation for all students in a class.
-// Returns per-student generation results with signed Appwrite URLs.
+// Returns per-student generation results with signed proxy URLs.
 // verifyAuth was missing entirely before this phase — req.user was always
 // undefined, so requireRole always rejected with 403 (this route was
 // dead code with zero real callers until ReportCardGenerator.tsx, this

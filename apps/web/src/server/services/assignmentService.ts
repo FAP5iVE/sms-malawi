@@ -53,7 +53,7 @@ import * as notificationFeedService from '@/server/services/notificationFeedServ
 import { sendToUser }    from '@/lib/push'
 import { logger }        from '@/lib/logger'
 import {
-  FILE_PREFIX, SCHOOL_BUCKET, deleteFile, getFileMetadata, getPublicViewUrl, getSignedViewUrl,
+  FILE_PREFIX, deleteFile, getFileMetadata, getPublicUrlPrefix, getPublicViewUrl, getSignedViewUrl,
 } from '@/lib/storage'
 import { sanitizeRichText } from '@/server/lib/sanitizeRichText'
 import {
@@ -234,9 +234,9 @@ function plainTextToHtml(text: string): string {
 }
 
 /** Where pictures embedded in assignment text must be hosted. */
-function imagePrefix(): string | undefined {
-  const endpoint = process.env.APPWRITE_ENDPOINT
-  return endpoint ? `${endpoint}/storage/buckets/${SCHOOL_BUCKET}/files/${FILE_PREFIX.ASSIGNMENT_IMAGE}_` : undefined
+function imagePrefix(): string {
+  // Fails CLOSED: with no public URL configured, the prefix matches nothing, so no picture is allowed.
+  return getPublicUrlPrefix(FILE_PREFIX.ASSIGNMENT_IMAGE) ?? 'storage-public-url-not-configured:'
 }
 
 /**
@@ -279,23 +279,23 @@ async function inspectUpload(
   kind: AssignmentFileKind,
   opts: { requireFresh: boolean },
 ): Promise<VerifiedFile> {
-  let meta: { name: string; mimeType: string; sizeOriginal: number; $createdAt: string }
+  let meta: { name: string; mimeType: string; sizeBytes: number; createdAt: Date }
   try {
-    meta = await getFileMetadata(SCHOOL_BUCKET, fileKey)
+    meta = await getFileMetadata(fileKey)
   } catch {
     throw fail('One of the uploaded files could not be found. Please upload it again.', 400)
   }
-  if (opts.requireFresh && Date.now() - Date.parse(meta.$createdAt) > UPLOAD_CLAIM_WINDOW_MS) {
+  if (opts.requireFresh && Date.now() - meta.createdAt.getTime() > UPLOAD_CLAIM_WINDOW_MS) {
     throw fail(`"${meta.name}" was uploaded too long ago. Please upload it again.`, 400)
   }
-  const info = { name: meta.name, mimeType: meta.mimeType, sizeBytes: meta.sizeOriginal }
+  const info = { name: meta.name, mimeType: meta.mimeType, sizeBytes: meta.sizeBytes }
   const problem = checkFileAgainstRules(info, kind)
   if (problem) {
     // Safe to delete: callers verify the key is unreferenced before inspecting.
-    await deleteFile(SCHOOL_BUCKET, fileKey).catch(() => undefined)
+    await deleteFile(fileKey).catch(() => undefined)
     throw fail(problem, 400)
   }
-  return { fileKey, fileName: meta.name.slice(0, 255), mimeType: meta.mimeType.split(';')[0]?.trim().toLowerCase() ?? '', sizeBytes: meta.sizeOriginal }
+  return { fileKey, fileName: meta.name.slice(0, 255), mimeType: meta.mimeType.split(';')[0]?.trim().toLowerCase() ?? '', sizeBytes: meta.sizeBytes }
 }
 
 /** Verifies teacher attachments the request wants to add (ids not already on THIS assignment). */
@@ -333,7 +333,7 @@ async function deleteIfUnreferenced(fileKeys: string[]): Promise<void> {
       })
       if (used > 0) return
     }
-    await deleteFile(SCHOOL_BUCKET, key)
+    await deleteFile(key)
   }))
 }
 
@@ -424,7 +424,7 @@ async function toAttachment(a: { id: string; fileKey: string; fileName: string; 
   const kind = a.kind === 'IMAGE' ? 'IMAGE' : 'FILE'
   return {
     id: a.id, fileKey: a.fileKey, fileName: a.fileName, mimeType: a.mimeType, sizeBytes: a.sizeBytes, kind,
-    url: kind === 'IMAGE' ? await getPublicViewUrl(SCHOOL_BUCKET, a.fileKey) : await getSignedViewUrl(a.fileKey),
+    url: kind === 'IMAGE' ? await getPublicViewUrl(a.fileKey) : await getSignedViewUrl(a.fileKey),
   }
 }
 

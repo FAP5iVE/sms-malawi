@@ -57,7 +57,7 @@ async function resolveImage(imageKey: string | null | undefined): Promise<string
   if (!imageKey) return null
   try {
     const { getPublicViewUrl } = await import('@/lib/storage')
-    return await getPublicViewUrl('', imageKey)
+    return await getPublicViewUrl(imageKey)
   } catch {
     return null
   }

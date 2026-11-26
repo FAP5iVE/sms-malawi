@@ -151,7 +151,7 @@ views for `/news`, `/notices`, `/events` and `/academic-advertisements`.
 ## Security note about the project zip
 
 The zip contained live credentials (`.env`, `.env.local`, `service-account.json`: database URLs,
-a Firebase private key, Resend, Twilio and Appwrite keys). They are git-ignored, were not
+a Firebase private key, Resend, Twilio and Cloudflare R2 keys). They are git-ignored, were not
 committed here, and were not used: the dev server for the baseline gallery was started with
 every key overridden by a dummy value. If that zip travelled by email or chat, rotate those keys.
 

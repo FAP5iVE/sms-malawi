@@ -9,7 +9,7 @@
  *
  *   Resolution order:
  *     1. SCHOOL_LOGO_URL, when an admin has set one. May be a data: URI, an
- *        /api/files/<id> proxy path or bare Appwrite file id (read straight
+ *        /api/files/<id> proxy path or a bare storage file id (read straight
  *        from storage), or an absolute http(s) URL (fetched, short timeout).
  *     2. The embedded default mark (lib/schoolLogoData.ts) — the same logo the
  *        app shell shows. Always succeeds, so a document NEVER ships without a
@@ -94,7 +94,7 @@ async function loadConfigured(ref: string): Promise<SchoolLogo | null> {
     return mime && bytes.length <= MAX_BYTES ? build(bytes, mime) : null
   }
 
-  // Our own authenticated proxy path, or a bare Appwrite file id
+  // Our own authenticated proxy path, or a bare storage file id
   const proxyMatch = /^\/api\/files\/([^/?#]+)/.exec(value)
   const bareId = !/^https?:\/\//i.test(value) && !value.startsWith('/') ? value : null
   const proxyId = proxyMatch?.[1]

@@ -113,7 +113,7 @@ export interface LeadershipMember {
   name:     string
   title:    string
   bio?:     string
-  photoKey?: string // Appwrite file ID — FILE_PREFIX.LEADERSHIP_PHOTO
+  photoKey?: string // R2 object key — FILE_PREFIX.LEADERSHIP_PHOTO
   order?:   number
 }
 
@@ -131,7 +131,7 @@ export type DiscoverCardKey = 'leadership' | 'academics' | 'student_life' | 'adm
  *  upload-first/attach-photoKey pattern as LeadershipMember.photoKey. */
 export interface DiscoverCardImage {
   cardKey:   DiscoverCardKey
-  photoKey?: string // Appwrite file ID — FILE_PREFIX.DISCOVER_PHOTO
+  photoKey?: string // R2 object key — FILE_PREFIX.DISCOVER_PHOTO
 }
 
 // ─────────────────────────────────────────────────────────
@@ -404,7 +404,7 @@ export interface SettingValueMap {
   readonly [SETTING_KEYS.SCHOOL_EMAIL]:          string
   readonly [SETTING_KEYS.SCHOOL_WEBSITE]:        string
   readonly [SETTING_KEYS.SCHOOL_FOUNDED_YEAR]:   number
-  readonly [SETTING_KEYS.SCHOOL_LOGO_URL]:       string  // Appwrite file view URL, '' if none uploaded
+  readonly [SETTING_KEYS.SCHOOL_LOGO_URL]:       string  // data: URI, /api/files/<id> path or https URL of the logo, '' if none uploaded
 
   // ── Exam and grading
   readonly [SETTING_KEYS.EXAM_PASS_MARK_THRESHOLD]: number  // whole-number percent, default 35
@@ -711,7 +711,7 @@ export const SETTING_META: { readonly [K in SettingKey]: SettingMeta<K> } = {
     key: SETTING_KEYS.SCHOOL_LOGO_URL,
     category: SETTING_CATEGORIES.SCHOOL_IDENTITY,
     isPublic: true,
-    description: 'Signed Appwrite view URL for the school crest/logo, shown on report cards and transcripts. Empty until one is uploaded.',
+    description: 'Logo for the school crest, shown on report cards and transcripts: a data: URI, an /api/files/<id> path or an https URL. Empty until one is set.',
     defaultValue: '',
   },
 

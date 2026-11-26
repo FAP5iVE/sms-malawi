@@ -397,7 +397,7 @@ export function useSubmitAssignment() {
       // file bytes, hitting the same two hard limits as every other
       // upload in this codebase (Vercel's 4.5MB request-body cap, and no
       // retry on a dropped connection mid-upload). The file now goes
-      // straight to Appwrite; this call only sends the resulting fileId.
+      // straight to R2; this call only sends the resulting fileId.
       const fileId = file
         ? await uploadFileDirectly(`/classes/${classId}/assignments/${assignmentId}/submit/upload-ticket`, file)
         : undefined

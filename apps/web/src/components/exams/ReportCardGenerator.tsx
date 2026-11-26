@@ -455,7 +455,7 @@ export function ReportCardGenerator() {
           Report card generator
         </h2>
         <p className="text-sm text-muted mt-0.5">
-          Batch-generate PDF report cards and upload to Appwrite storage.
+          Batch-generate PDF report cards and upload to storage.
         </p>
       </div>
 

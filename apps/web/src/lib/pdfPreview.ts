@@ -37,7 +37,7 @@ const FILE_PROXY_PATH = '/api/files/'
  * File-ID prefixes owned by the Library's protected viewer (storage.ts:
  * FILE_PREFIX.DIGITAL_RESOURCE / EBOOK / PAST_PAPER). Duplicated here as
  * plain strings on purpose — importing storage.ts would pull the server-only
- * Appwrite SDK into the client bundle.
+ * storage layer into the client bundle.
  */
 const LIBRARY_PROTECTED_PREFIXES = ['digital_resource_', 'ebook_', 'past_paper_'] as const
 
@@ -95,7 +95,7 @@ export function buildPdfPreviewUrl(rawUrl: string, token: string, origin: string
  * Downloads a protected file (e.g. a financial report .xlsx) that cannot be
  * shown in the browser's viewer. Same /api/files/<id> proxy and same validation
  * as openPdfPreview(), but sends the ID token in an Authorization header and
- * saves the response as a file — the raw Appwrite URL these exports used to
+ * saves the response as a file — the raw storage URL these exports used to
  * return is refused for private files.
  */
 export async function downloadProtectedFile(rawUrl: string, fallbackName = 'download'): Promise<void> {

@@ -709,7 +709,7 @@ export default function LandingPage() {
                       page (PublicArchiveDetail) via the same imageUrl this
                       list already receives from usePublicNews(). */}
                   {newsItems[0]!.imageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- external Appwrite view URL
+                    // eslint-disable-next-line @next/next/no-img-element -- external R2 public URL
                     <img
                       src={newsItems[0]!.imageUrl}
                       alt=""
@@ -733,7 +733,7 @@ export default function LandingPage() {
                   {newsItems.slice(1, 4).map((a, i) => (
                     <Reveal as="article" key={a.id} delay={staggerDelay(i + 1)} className="grid grid-cols-[110px_1fr] sm:grid-cols-[132px_1fr] gap-4.5 pb-5 border-b border-base last:border-0 last:pb-0">
                       {a.imageUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element -- external Appwrite view URL
+                        // eslint-disable-next-line @next/next/no-img-element -- external R2 public URL
                         <img src={a.imageUrl} alt="" className="h-24 rounded-lg object-cover" />
                       ) : (
                         <ImagePlaceholder className="h-24 rounded-lg" />
@@ -841,7 +841,7 @@ export default function LandingPage() {
                     className={`block text-left rounded-2xl overflow-hidden relative min-h-[290px] card-hover ${cardIndex === 0 ? 'lg:row-span-2' : ''} ${cardIndex === 3 ? 'lg:col-span-2' : ''} ${photoUrl ? '' : 'hills-ph hills-ph--deep'}`}
                   >
                     {photoUrl && (
-                      // eslint-disable-next-line @next/next/no-img-element -- Appwrite-hosted photo, not a local Next asset
+                      // eslint-disable-next-line @next/next/no-img-element -- R2-hosted photo, not a local Next asset
                       <img src={photoUrl} alt={card.title} className="absolute inset-0 h-full w-full object-cover" />
                     )}
                     <div className="absolute inset-0 bg-linear-to-b from-black/5 to-black/70" />
@@ -889,7 +889,7 @@ export default function LandingPage() {
             )}
 
             {/* [PRODUCTION FIX 2026-07-28] Gallery strip now fetches real
-                photos (usePublicGallery, GalleryPhoto table + Appwrite
+                photos (usePublicGallery, GalleryPhoto table + R2
                 FILE_PREFIX.SCHOOL_GALLERY) instead of the permanent
                 placeholder. Shows a plain "no photos yet" note if the
                 gallery is empty, rather than staged filler. */}
@@ -1112,7 +1112,7 @@ export default function LandingPage() {
                       {/* [FIX] Was hardcoded to ImagePlaceholder regardless
                           of whether the event actually had a cover photo. */}
                       {ev.imageUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element -- external Appwrite view URL
+                        // eslint-disable-next-line @next/next/no-img-element -- external R2 public URL
                         <img src={ev.imageUrl} alt="" className="h-[170px] w-full object-cover" />
                       ) : (
                         <ImagePlaceholder className="h-[170px]" />

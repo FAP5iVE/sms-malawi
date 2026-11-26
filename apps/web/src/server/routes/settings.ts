@@ -647,7 +647,7 @@ settingsRouter
     const leadershipTeamWithPhotos = await Promise.all(
       leadershipTeam.map(async (m) => ({
         ...m,
-        photoUrl: m.photoKey ? await getPublicViewUrl('', m.photoKey) : null,
+        photoUrl: m.photoKey ? await getPublicViewUrl(m.photoKey) : null,
       })),
     )
     // [NEW] Same photoKey -> photoUrl resolution, for the Discover Cards
@@ -655,7 +655,7 @@ settingsRouter
     const discoverCardsWithPhotos = await Promise.all(
       discoverCards.map(async (c) => ({
         ...c,
-        photoUrl: c.photoKey ? await getPublicViewUrl('', c.photoKey) : null,
+        photoUrl: c.photoKey ? await getPublicViewUrl(c.photoKey) : null,
       })),
     )
     return res.json({
@@ -700,16 +700,16 @@ settingsRouter
 // every other upload in this codebase (Vercel's 4.5MB request-body cap,
 // and no retry on a dropped connection mid-upload). Same "upload first,
 // get back a fileId, then include that id in the JSON PATCH" pattern as
-// before — the client now uploads straight to Appwrite and only calls
+// before — the client now uploads straight to R2 and only calls
 // this to get authorized first. Same admin/hr/high_rank gating as
 // GET/PATCH /school itself.
 settingsRouter.post(
   '/leadership-photo/upload-ticket',
   requireRole(['admin', 'hr', 'high_rank']),
   rateLimit('upload-ticket'),
-  async (_req, res) => {
+  async (req, res) => {
     try {
-      const ticket = await createDirectUploadTicket(FILE_PREFIX.LEADERSHIP_PHOTO)
+      const ticket = await createDirectUploadTicket(FILE_PREFIX.LEADERSHIP_PHOTO, req.body)
       res.json(ticket)
     } catch (err: unknown) {
       return sendError(res, err, { tags: { module: 'settings', route: 'leadership-photo-ticket' } })
@@ -718,7 +718,7 @@ settingsRouter.post(
 )
 
 // POST /settings/discover-photo/upload-ticket
-// [NEW] Same direct-to-Appwrite ticket pattern as leadership-photo above,
+// [NEW] Same direct-to-R2 ticket pattern as leadership-photo above,
 // for the four Discover-section card preview photos — FILE_PREFIX.DISCOVER_PHOTO
 // instead of LEADERSHIP_PHOTO, same admin/hr/high_rank gating as GET/PATCH
 // /school (this is a School Identity field, not a separate permission).
@@ -726,9 +726,9 @@ settingsRouter.post(
   '/discover-photo/upload-ticket',
   requireRole(['admin', 'hr', 'high_rank']),
   rateLimit('upload-ticket'),
-  async (_req, res) => {
+  async (req, res) => {
     try {
-      const ticket = await createDirectUploadTicket(FILE_PREFIX.DISCOVER_PHOTO)
+      const ticket = await createDirectUploadTicket(FILE_PREFIX.DISCOVER_PHOTO, req.body)
       res.json(ticket)
     } catch (err: unknown) {
       return sendError(res, err, { tags: { module: 'settings', route: 'discover-photo-ticket' } })

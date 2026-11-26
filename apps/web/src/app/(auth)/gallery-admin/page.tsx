@@ -268,7 +268,7 @@ function GalleryContent() {
                 aria-label={`View ${p.caption ?? 'photo'} full size`}
                 className="block w-full"
               >
-                {/* eslint-disable-next-line @next/next/no-img-element -- remote Appwrite view URL, not a local/optimizable asset */}
+                {/* eslint-disable-next-line @next/next/no-img-element -- remote R2 public URL, not a local/optimizable asset */}
                 <img src={p.url} alt={p.caption ?? 'Gallery photo'} className="w-full aspect-square object-cover" />
               </button>
               <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-3">

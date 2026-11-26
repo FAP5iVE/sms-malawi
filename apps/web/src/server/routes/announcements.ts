@@ -222,9 +222,8 @@ announcementsRouter.patch(
   }
 )
 
-// POST /announcements/image/upload-ticket — mints a one-time Appwrite
-// upload credential. AnnouncementForm.tsx exchanges this for a session
-// (Appwrite Web SDK) and uploads the image bytes DIRECTLY to Appwrite,
+// POST /announcements/image/upload-ticket — mints a presigned R2 upload
+// URL. AnnouncementForm.tsx PUTs the image bytes DIRECTLY to R2 with it,
 // then writes the announcement document to Firestore itself with the
 // resulting fileId (see that form's own header comment) — there's no
 // second call into this API the way gallery's flow needs, since nothing
@@ -233,7 +232,7 @@ announcementsRouter.patch(
 // app's own Vercel function for the raw file bytes, which hits two hard
 // limits no server config can move: Vercel Functions cap a request body
 // at 4.5MB, and a single large request has no retry if the connection
-// drops mid-upload. Neither applies once the browser talks to Appwrite
+// drops mid-upload. Neither applies once the browser talks to R2
 // directly — see storage.ts's createDirectUploadTicket() for the full
 // explanation.
 announcementsRouter.post(
@@ -241,9 +240,9 @@ announcementsRouter.post(
   verifyAuth,
   requireAnyPermission(['announcement.create', 'announcement.createWithApproval']),
   rateLimit('upload-ticket'),
-  async (_req, res) => {
+  async (req, res) => {
     try {
-      const ticket = await createDirectUploadTicket(FILE_PREFIX.ANNOUNCEMENT_IMAGE)
+      const ticket = await createDirectUploadTicket(FILE_PREFIX.ANNOUNCEMENT_IMAGE, req.body)
       res.json(ticket)
     } catch (err: unknown) {
       return sendError(res, err, { tags: { module: 'announcements', route: 'image-upload-ticket' } })

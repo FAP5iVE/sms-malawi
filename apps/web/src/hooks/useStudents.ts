@@ -180,7 +180,7 @@ export function useArchiveStudent() {
 }
 
 // Fetches the signed view URL for a student's profile photo
-// URL is valid until Appwrite revokes it — refetch every 50 minutes
+// The proxy URL itself never expires; refetch every 50 minutes anyway
 export function useStudentPhotoUrl(studentId: string, hasPhoto: boolean) {
   return useQuery({
     queryKey: queryKeys.students.photo(studentId),

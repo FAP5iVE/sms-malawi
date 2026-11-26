@@ -80,9 +80,9 @@ export async function generateFinancialReport(
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
   )
 
-  // [PRODUCTION FIX] Returned getDownloadUrl() — a raw Appwrite REST URL. The
+  // [PRODUCTION FIX] Returned getDownloadUrl() — a raw storage URL. The
   // financial_report files are private (not in PUBLIC_FILE_PREFIXES), so that
-  // URL is refused by Appwrite for every caller and the export "worked" but the
+  // URL is refused by storage for every caller and the export "worked" but the
   // download never did. Return this app's auth-checked /api/files/<id> proxy
   // URL instead (READ_ROLES.financial_report = admin/finance/high_rank); the
   // client downloads it with the caller's ID token (downloadProtectedFile).

@@ -120,7 +120,7 @@ export interface CreateAnnouncementInput {
   // with no way to opt out. Submitter now explicitly opts an announcement
   // into public visibility.
   publicWebsite?: boolean
-  // Appwrite file ID (FILE_PREFIX.ANNOUNCEMENT_IMAGE) — optional cover
+  // R2 object key (FILE_PREFIX.ANNOUNCEMENT_IMAGE) — optional cover
   // image, primarily for the public News section.
   imageKey?: string
   // [FIX] Byline — see AnnouncementSchema's authorName comment.

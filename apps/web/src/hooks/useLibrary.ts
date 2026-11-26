@@ -90,7 +90,7 @@ export function useUploadDigitalResource() {
       // app's own Vercel function for the raw file bytes, which hits a
       // hard 4.5MB cap far below what this route was meant to allow, and
       // has no retry if the connection drops mid-upload. The file now
-      // goes straight to Appwrite; this call only sends the small
+      // goes straight to R2; this call only sends the small
       // metadata + the resulting fileId.
       const fileId = await uploadFileDirectly('/library/digital/upload-ticket', file)
       return apiFetch('/library/digital/upload', {

@@ -23,10 +23,10 @@ const mocks = vi.hoisted(() => ({
       ASSIGNMENT_IMAGE: 'assignment_image',
       ASSIGNMENT_SUBMISSION: 'assignment_submission',
     },
-    SCHOOL_BUCKET: 'school',
+    getPublicUrlPrefix: vi.fn(() => 'https://cdn.example/assignment_image_'),
     deleteFile: vi.fn(async () => undefined),
     getFileMetadata: vi.fn(),
-    getPublicViewUrl: vi.fn(async (_b: string, id: string) => `https://cdn.example/${id}`),
+    getPublicViewUrl: vi.fn(async (id: string) => `https://cdn.example/${id}`),
     getSignedViewUrl: vi.fn(async (id: string) => `/api/files/${id}`),
   },
 }))
@@ -645,8 +645,8 @@ describe('student hand-in', () => {
   const goodMeta = () => ({
     name: 'work.pdf',
     mimeType: 'application/pdf',
-    sizeOriginal: 1000,
-    $createdAt: new Date().toISOString(),
+    sizeBytes: 1000,
+    createdAt: new Date(),
   })
   const FILE = 'assignment_submission_AbCdEf123456'
   beforeEach(() => {
@@ -689,7 +689,7 @@ describe('student hand-in', () => {
     const { db } = use()
     await svc.submitAssignment('A', 'a_math', STUDENT_A, { fileId: FILE })
     expect(db.submissions![0]).toMatchObject({ fileKey: FILE, fileName: 'work.pdf' })
-    expect(mocks.storage.getFileMetadata).toHaveBeenCalledWith('school', FILE)
+    expect(mocks.storage.getFileMetadata).toHaveBeenCalledWith(FILE)
   })
   it('rejects ids that were not minted by the hand-in upload route', async () => {
     await expect(
@@ -772,9 +772,9 @@ describe('student hand-in', () => {
     await reject({ name: 'page.html', mimeType: 'text/html' }, 400, true)
     await reject({ name: 'logo.svg', mimeType: 'image/svg+xml' }, 400, true)
     await reject({ name: 'evil.pdf', mimeType: 'text/html' }, 400, true)
-    await reject({ sizeOriginal: 21 * 1024 * 1024 }, 400, true)
-    await reject({ sizeOriginal: 0 }, 400, true)
-    await reject({ $createdAt: new Date(Date.now() - 25 * 3_600_000).toISOString() }, 400, false) // stale: refused, not deleted
+    await reject({ sizeBytes: 21 * 1024 * 1024 }, 400, true)
+    await reject({ sizeBytes: 0 }, 400, true)
+    await reject({ createdAt: new Date(Date.now() - 25 * 3_600_000) }, 400, false) // stale: refused, not deleted
     await reject(new Error('not found'), 400, false)
   })
   it('a marked or teacher-recorded hand-in is locked; a "not submitted" marker is NOT', async () => {
@@ -885,10 +885,7 @@ describe('student hand-in', () => {
       ],
     })
     await svc.submitAssignment('A', 'a_math', STUDENT_A, { fileId: FILE })
-    expect(mocks.storage.deleteFile).toHaveBeenCalledWith(
-      'school',
-      'assignment_submission_OldOldOld111'
-    )
+    expect(mocks.storage.deleteFile).toHaveBeenCalledWith('assignment_submission_OldOldOld111')
   })
   it('a concurrent claim of the same file surfaces as 409, not a 500', async () => {
     const { prisma } = use()
@@ -908,17 +905,17 @@ describe('creating an assignment', () => {
       ? {
           name: 'diagram.png',
           mimeType: 'image/png',
-          sizeOriginal: 5000,
-          $createdAt: new Date().toISOString(),
+          sizeBytes: 5000,
+          createdAt: new Date(),
         }
       : {
           name: 'sheet.pdf',
           mimeType: 'application/pdf',
-          sizeOriginal: 9000,
-          $createdAt: new Date().toISOString(),
+          sizeBytes: 9000,
+          createdAt: new Date(),
         }
   beforeEach(() => {
-    mocks.storage.getFileMetadata.mockImplementation(async (_b: string, id: string) => metaFor(id))
+    mocks.storage.getFileMetadata.mockImplementation(async (id: string) => metaFor(id))
   })
   const payload = (over: Partial<CreateAssignmentInput> = {}): CreateAssignmentInput => ({
     title: 'New work',
@@ -1057,8 +1054,8 @@ describe('creating an assignment', () => {
     mocks.storage.getFileMetadata.mockImplementation(async () => ({
       name: 'run.exe',
       mimeType: 'application/x-msdownload',
-      sizeOriginal: 10,
-      $createdAt: new Date().toISOString(),
+      sizeBytes: 10,
+      createdAt: new Date(),
     }))
     await expect(
       svc.createAssignment(
@@ -1086,8 +1083,8 @@ describe('creating an assignment', () => {
     mocks.storage.getFileMetadata.mockImplementation(async () => ({
       name: 'page.html',
       mimeType: 'text/html',
-      sizeOriginal: 10,
-      $createdAt: new Date().toISOString(),
+      sizeBytes: 10,
+      createdAt: new Date(),
     }))
     await expect(
       svc.createAssignment(
@@ -1104,8 +1101,8 @@ describe('creating an assignment', () => {
     mocks.storage.getFileMetadata.mockImplementation(async () => ({
       name: 'doc.pdf',
       mimeType: 'application/pdf',
-      sizeOriginal: 10,
-      $createdAt: new Date().toISOString(),
+      sizeBytes: 10,
+      createdAt: new Date(),
     }))
     const img = (id: string) =>
       `<img src="https://cdn.example/storage/buckets/school/files/${id}/view">`
@@ -1143,8 +1140,8 @@ describe('editing and deleting', () => {
     mocks.storage.getFileMetadata.mockImplementation(async () => ({
       name: 'new.pdf',
       mimeType: 'application/pdf',
-      sizeOriginal: 100,
-      $createdAt: new Date().toISOString(),
+      sizeBytes: 100,
+      createdAt: new Date(),
     }))
   })
 
@@ -1243,7 +1240,7 @@ describe('editing and deleting', () => {
     )
     expect(db.attachments!.map((a) => a.fileKey)).toEqual(['assignment_file_New000000001'])
     expect(db.attachments![0]!.uploadedByUid).toBe('t_math')
-    expect(mocks.storage.deleteFile).toHaveBeenCalledWith('school', 'assignment_file_Old000000001')
+    expect(mocks.storage.deleteFile).toHaveBeenCalledWith('assignment_file_Old000000001')
   })
   it('keeping an attachment is not a new claim (no storage lookup, no duplicate row)', async () => {
     const { db } = use({ attachments: [attRow('assignment_file_Old000000001')] })
@@ -1274,7 +1271,7 @@ describe('editing and deleting', () => {
     expect(mocks.storage.deleteFile).not.toHaveBeenCalled()
     use({ assignments: mk('<p>B</p>') }) // nobody else uses it
     await svc.updateAssignment('A', 'a_math', { description: '<p>no picture now</p>' }, T)
-    expect(mocks.storage.deleteFile).toHaveBeenCalledWith('school', IMG)
+    expect(mocks.storage.deleteFile).toHaveBeenCalledWith(IMG)
   })
 
   it('delete is refused once real work exists (nothing is removed)', async () => {
@@ -1310,7 +1307,7 @@ describe('editing and deleting', () => {
     await expect(svc.deleteAssignment('A', 'a_math', T)).resolves.toEqual({ success: true })
     expect(db.assignments.some((a) => a.id === 'a_math')).toBe(false)
     expect(db.submissions!.length).toBe(0)
-    expect(mocks.storage.deleteFile).toHaveBeenCalledWith('school', 'assignment_file_Old000000001')
+    expect(mocks.storage.deleteFile).toHaveBeenCalledWith('assignment_file_Old000000001')
     expect(mocks.audit.log.mock.calls.at(-1)![0]).toMatchObject({ action: 'assignment.deleted' })
   })
 })

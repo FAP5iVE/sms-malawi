@@ -74,7 +74,7 @@ publicRouter.get('/school-info', async (_req, res) => {
   const discoverCards = await Promise.all(
     discoverCardsRaw.map(async (c) => ({
       cardKey:  c.cardKey,
-      photoUrl: c.photoKey ? await getPublicViewUrl('', c.photoKey) : null,
+      photoUrl: c.photoKey ? await getPublicViewUrl(c.photoKey) : null,
     })),
   )
 
@@ -197,9 +197,9 @@ async function mapPublicPost(id: string, data: PublicPostData) {
     eventDate: data.eventDate ?? null,
     // Resolve to a real, directly-usable view URL here (same
     // getPublicViewUrl() pattern as /public/gallery) rather than handing
-    // back the raw Appwrite file ID and leaving the frontend with no way
+    // back the raw file ID and leaving the frontend with no way
     // to turn it into an <img src>.
-    imageUrl: data.imageKey ? await getPublicViewUrl('', data.imageKey) : null,
+    imageUrl: data.imageKey ? await getPublicViewUrl(data.imageKey) : null,
     // [FIX] Byline — "Written by: <name>" on the public detail page. null
     // when the author left it blank.
     authorName: data.authorName ?? null,
@@ -507,9 +507,9 @@ publicRouter.get('/placement-stats', async (req, res) => {
 // GET /public/gallery?limit=5&page=1
 // [PRODUCTION FIX 2026-07-28] "Life at our school" had no live source at
 // all (permanent placeholder icons). Real photos, managed via
-// gallery.ts (admin/high_rank upload), served here as direct Appwrite view
+// gallery.ts (admin/high_rank upload), served here as direct R2 public
 // URLs — getPublicViewUrl() is the storage layer's existing, documented
-// pattern for public assets, same one used for the school logo.
+// pattern for public assets, the same pattern as the other public assets.
 
 publicRouter.get('/gallery', async (req, res) => {
   const pageSize = Math.min(Number(req.query.limit ?? 5), 60)
@@ -527,7 +527,7 @@ publicRouter.get('/gallery', async (req, res) => {
   const photos = await Promise.all(
     rows.map(async (p) => ({
       id: p.id,
-      url: await getPublicViewUrl('', p.fileKey),
+      url: await getPublicViewUrl(p.fileKey),
       caption: p.caption,
       category: p.category,
     })),
@@ -552,14 +552,14 @@ publicRouter.get('/leadership', async (_req, res) => {
     order?: number
   }>
 
-  // [PRODUCTION FIX] Previously returned the raw photoKey (an Appwrite file
+  // [PRODUCTION FIX] Previously returned the raw photoKey (a file
   // ID) with no way for the public page to turn it into an <img src> — same
   // getPublicViewUrl() resolution as announcements/gallery/adverts above,
   // so the client only ever deals in ready-to-use URLs.
   const resolved = await Promise.all(
     team.map(async (member) => ({
       ...member,
-      photoUrl: member.photoKey ? await getPublicViewUrl('', member.photoKey) : null,
+      photoUrl: member.photoKey ? await getPublicViewUrl(member.photoKey) : null,
     })),
   )
 

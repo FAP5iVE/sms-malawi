@@ -72,7 +72,7 @@ export default function EventsPage() {
                       page), now shown alongside the date badge when one
                       exists. */}
                   {ev.imageUrl && (
-                    // eslint-disable-next-line @next/next/no-img-element -- external Appwrite view URL
+                    // eslint-disable-next-line @next/next/no-img-element -- external R2 public URL
                     <img src={ev.imageUrl} alt="" className="shrink-0 w-20 h-20 rounded-xl object-cover hidden sm:block" />
                   )}
                   <div className="shrink-0 w-16 h-16 rounded-xl bg-brand-deep text-white flex flex-col items-center justify-center">

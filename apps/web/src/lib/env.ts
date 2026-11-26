@@ -28,9 +28,18 @@ const serverSchema = z.object({
       (v) => v.includes('-----BEGIN') || v.includes('\\n'),
       'FIREBASE_PRIVATE_KEY does not look like a valid PEM key'
     ),
-  APPWRITE_ENDPOINT: z.string().url('APPWRITE_ENDPOINT must be a valid URL'),
-  APPWRITE_PROJECT_ID: z.string().min(1, 'APPWRITE_PROJECT_ID is required'),
-  APPWRITE_API_KEY: z.string().min(1, 'APPWRITE_API_KEY is required'),
+  // Cloudflare R2 file storage (lib/storage.ts). Files are grouped into a few
+  // buckets by security domain (named `${R2_BUCKET_PREFIX}-<domain>`); only the
+  // public-media bucket has a public URL.
+  R2_ACCOUNT_ID: z.string().min(1, 'R2_ACCOUNT_ID is required'),
+  R2_ACCESS_KEY_ID: z.string().min(1, 'R2_ACCESS_KEY_ID is required'),
+  R2_SECRET_ACCESS_KEY: z.string().min(1, 'R2_SECRET_ACCESS_KEY is required'),
+  R2_BUCKET_PREFIX: z
+    .string()
+    .regex(/^[a-z0-9][a-z0-9-]{0,30}$/, 'R2_BUCKET_PREFIX must be lowercase letters, digits and hyphens')
+    .default('sms-malawi'),
+  R2_ENDPOINT: z.string().url('R2_ENDPOINT must be a valid URL').optional(),
+  R2_PUBLIC_URL_MEDIA: z.string().url('R2_PUBLIC_URL_MEDIA must be a valid URL'),
   CRON_SECRET: z
     .string()
     .min(32, 'CRON_SECRET must be at least 32 characters for security'),
@@ -148,10 +157,13 @@ export const env = {
     return key ? key.replace(/\\n/g, '\n') : key
   },
 
-  // ── Appwrite
-  get APPWRITE_ENDPOINT()   { return getServerEnv().APPWRITE_ENDPOINT },
-  get APPWRITE_PROJECT_ID() { return getServerEnv().APPWRITE_PROJECT_ID },
-  get APPWRITE_API_KEY()    { return getServerEnv().APPWRITE_API_KEY },
+  // ── Cloudflare R2 storage
+  get R2_ACCOUNT_ID()        { return getServerEnv().R2_ACCOUNT_ID },
+  get R2_ACCESS_KEY_ID()     { return getServerEnv().R2_ACCESS_KEY_ID },
+  get R2_SECRET_ACCESS_KEY() { return getServerEnv().R2_SECRET_ACCESS_KEY },
+  get R2_BUCKET_PREFIX()     { return getServerEnv().R2_BUCKET_PREFIX },
+  get R2_ENDPOINT()          { return getServerEnv().R2_ENDPOINT },
+  get R2_PUBLIC_URL_MEDIA()  { return getServerEnv().R2_PUBLIC_URL_MEDIA },
 
   // ── Cron
   get CRON_SECRET() { return getServerEnv().CRON_SECRET },

@@ -59,7 +59,7 @@ interface SendErrorOptions {
  * user — i.e. a deliberate 4xx carrying an explicit `.status` (404 "Not
  * found", 409 "already approved", RequestCostError, SelfReviewError, …).
  * Everything else is an unexpected failure whose text can contain SQL / table
- * and column names (Prisma), provider response bodies (Appwrite, Algolia,
+ * and column names (Prisma), provider response bodies (Cloudflare R2, Algolia,
  * Resend, Firebase) or internal paths, so it is replaced by a fixed message.
  * The real error still goes to Sentry and the (redacted) server log.
  */
@@ -71,7 +71,10 @@ function isInfrastructureError(err: unknown): boolean {
   const name = (err as { name?: unknown }).name
   const code = (err as { code?: unknown }).code
   return (
-    (typeof name === 'string' && /^(PrismaClient|FirebaseError|AppwriteException|ResendError)/.test(name)) ||
+    (typeof name === 'string' && /^(PrismaClient|FirebaseError|ResendError)/.test(name)) ||
+    // AWS SDK (Cloudflare R2) service errors: named after the S3 error code (NoSuchKey, AccessDenied, ...)
+    // and always carrying a `$metadata` block.
+    (typeof (err as { $metadata?: unknown }).$metadata === 'object') ||
     // firebase-admin / google-gax style codes, e.g. "auth/…", "app/…"
     (typeof code === 'string' && /^(auth|app|messaging|storage)\//.test(code))
   )

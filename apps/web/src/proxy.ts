@@ -67,7 +67,7 @@ const SECURITY_HEADERS: Record<string, string> = {
   // puts the app in front of members of the public on shared devices, so an XSS
   // would now reach a much larger audience. This policy cannot block anything: it
   // only makes the browser log what WOULD be blocked, so it can be tuned against
-  // real traffic (shadcn/Recharts inline scripts, Firebase, Appwrite) and then
+  // real traffic (shadcn/Recharts inline scripts, Firebase, Cloudflare R2) and then
   // promoted to `Content-Security-Policy`. Do not enforce it before reviewing
   // the console reports for /login, /parent and a staff dashboard.
   'Content-Security-Policy-Report-Only': [

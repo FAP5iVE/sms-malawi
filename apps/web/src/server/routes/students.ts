@@ -390,20 +390,20 @@ studentsRouter.post(
 //  photo upload has been silently 404ing (the client swallows the
 //  failure with only a console.error, never shown to the user — see
 //  StudentForm.tsx's uploadPhotoIfNeeded()). Built directly as a
-//  direct-to-Appwrite upload (matching the rest of the app's upload
+//  direct-to-R2 upload (matching the rest of the app's upload
 //  routes) rather than as a multer route that would need fixing again
 //  later. Student photos are private (FILE_PREFIX.STUDENT_PHOTO is not
-//  one of the public prefixes), so the file gets no public read
-//  permission — same gating as creating/editing this student.
+//  one of the public prefixes), so its bucket has no public URL
+//  — same gating as creating/editing this student.
 // ─────────────────────────────────────────────────────────
 
 studentsRouter.post(
   '/:id/photo/upload-ticket',
   requirePermission('student.edit'),
   rateLimit('upload-ticket'),
-  async (_req: Request, res: Response) => {
+  async (req: Request, res: Response) => {
     try {
-      const ticket = await createDirectUploadTicket(FILE_PREFIX.STUDENT_PHOTO)
+      const ticket = await createDirectUploadTicket(FILE_PREFIX.STUDENT_PHOTO, req.body)
       res.json(ticket)
     } catch (err: unknown) {
       return sendError(res, err, { tags: { module: 'students', route: 'photo-upload-ticket' } })

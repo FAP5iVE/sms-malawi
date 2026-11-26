@@ -76,7 +76,7 @@ export interface PublicAnnouncement {
   createdAt: string
   eventDate: string | null
   /** Direct, ready-to-use view URL — resolved server-side via
-   *  getPublicViewUrl(), not a raw Appwrite file ID. Present only if a
+   *  getPublicViewUrl(), not a raw file ID. Present only if a
    *  cover image was attached when the announcement was written. */
   imageUrl:  string | null
   /** [NEW] Byline — rendered as "Written by: <name>" on the detail page.
@@ -251,7 +251,7 @@ export interface PublicGalleryPage {
 }
 
 /** GET /public/gallery — real gallery photos (GalleryPhoto table, files in
- *  Appwrite under FILE_PREFIX.SCHOOL_GALLERY). Homepage passes limit=5;
+ *  R2 under FILE_PREFIX.SCHOOL_GALLERY). Homepage passes limit=5;
  *  the /gallery page paginates through everything. */
 export function usePublicGallery(limit = 5, page = 1) {
   return useQuery({
