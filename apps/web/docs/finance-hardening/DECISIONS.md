@@ -8,7 +8,7 @@ this file is corrected.
 Update the **Status** column (never the wording) when the owner or accountant answers, and add a line to
 `IMPLEMENTATION-LOG.md` saying what changed and when.
 
-Last reviewed: 2026-11-26 (P0 gate re-checked; P1-01 to P1-04 done; I-07 to I-09 confirmed; I-10 to I-14 proposed).
+Last reviewed: 2026-11-27 (P1-05 code done; I-07 to I-09 confirmed; I-10 to I-26 proposed).
 
 ## 1. Decisions (D-xx)
 
@@ -100,3 +100,22 @@ Not specified by the plan. **I-07 to I-09 confirmed by the owner on 2026-11-25**
 | I-12 | `accountingService` signals ledger rule breaks with `LedgerError` (`ALREADY_POSTED` 409, `UNBALANCED` 422, `NOT_FOUND` 404) so routes can answer with the plan's codes; messages are unchanged. The claim uses `isPosted` until P1-05 adds `status`. | `accountingService.ts` |
 | I-13 | Reversal semantics for P1-04: each posted entry can be reversed at most once (INV-07), **including a reversal entry** (reversing a reversal restores the original effect, once). Reason mandatory, 1 to 500 characters. Existing reversals are **not** back-linked (reference is not unique); that is the P9 repair. The mirror is dated now until period rules exist. | `accountingService.ts` |
 | I-14 | The plan's single "M02" is delivered as separate migration folders: `20261126090000_journal_reversal_columns` (P1-04: reversal columns and UQ-02) now, and the remaining journal columns, CHK-01 and triggers with P1-05. Smaller steps are easier to test and to roll back. | `prisma/migrations` |
+
+## 5. Implementer choices made in P1-05
+
+Proposed, **not yet confirmed by the owner**. Each states the default taken so it can be reversed.
+
+| ID | Choice | Where it applies |
+|---|---|---|
+| I-15 | `sequence_counters` (planned in M01) is created by P1-05, because entry numbers need it. A database trigger assigns `entryNumber` (`JE-{year}-{000000}`, Malawi year, gapless) and the migration numbers existing entries in date order (RA-4 for `JE`). P1-06 must not create the table again; P2-07 reuses it. The year's counter row stays locked until the transaction commits (R-03), so a transaction that posts one entry and then creates another could deadlock with a concurrent one. | migration, `schema.prisma` |
+| I-16 | A caller cannot supply or change an entry number. P2-07 must change the trigger function if it wants the application to allocate numbers. | migration |
+| I-17 | In the schema, `entryNumber` `""` and `lineNumber` `0` mean "not assigned yet"; the database replaces them on insert. | `schema.prisma`, migration |
+| I-18 | Temporary compatibility with the previous application version: setting only `isPosted` moves a draft to POSTED, and setting only `reversedAt` moves a posted entry to REVERSED. The old version can no longer write a zero-amount line or a one-line entry. Remove once no old deployment can run. | migration |
+| I-19 | An entry must be inserted as a draft, then given lines, then posted (needed for TRG-03). Scripts that insert posted entries fail, and so does a script that deletes posted journal rows (for example a demo-data reset). | migration, seed scripts |
+| I-20 | A posted row allows exactly one change, the reversal (`status`, `reversedAt`, `reversedByUid`, `reversalReason`). A reversed row allows none. A later task that links old entries (`financialTransactionId`, `periodId`, RA-5) has to replace the trigger function in its own migration. | migration |
+| I-21 | `TRUNCATE` is not blocked (used to reset throwaway and demo databases), and the table owner can disable triggers. The triggers guard against application and ordinary SQL writes, not against the database owner. | migration, integration test, fixture |
+| I-22 | `FinancialSourceType` holds only the values the specification names (PAYMENT, INVOICE, EXPENSE, EXPENSE_PAYMENT, PAYROLL_RUN, LIBRARY_FINE). | migration |
+| I-23 | Claims use `status`; reports still read `isPosted`, which a check keeps equal to `status <> DRAFT`. | `accountingService.ts` |
+| I-24 | The backfill writes only what follows from stored flags. It does not guess sources, creators or reversal links. | migration |
+| I-25 | `createJournalEntry` rejects fewer than two lines or a CHK-01 breach with `VALIDATION_ERROR` 400. In payroll lock a zero amount gets no line, a negative net pay is a debit on salaries payable (the payroll calculation does not stop net pay going below zero), and a run with zero gross and net books no entry. The baseline check PR-01 would list such a run. | `accountingService.ts`, `payrollApprovalService.ts` |
+| I-26 | A line write first updates its draft entry, so posting and line edits are serialised at every isolation level. Two transactions editing the lines of one draft may deadlock; the loser can retry. CHK-01 also rejects `NaN`. | migration |

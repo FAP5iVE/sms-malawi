@@ -68,7 +68,7 @@ import * as auditService from '@/server/services/auditService'
 import { assertNotSelfReview } from '@/server/lib/selfReview'
 import { createJournalEntry, postEntry, voidEntry } from '@/server/services/accountingService'
 // [P1-03] Exact deductions: the journal now balances to the cent with no tolerance.
-import { sub, gt, toNumber, ZERO } from '@/lib/money'
+import { sub, gt, lt, isZero, toNumber, ZERO } from '@/lib/money'
 import type { UserRole } from '@shared/types/roles'
 import type { PayrollRun, PayrollStatus } from '@prisma/client'
 
@@ -81,6 +81,11 @@ import type { PayrollRun, PayrollStatus } from '@prisma/client'
  *  journalEntryId column exists on PayrollRun. */
 function journalReference(month: number, year: number): string {
   return `PAY-${year}-${String(month).padStart(2, '0')}`
+}
+
+/** [P1-05] A run with zero gross and zero net pay has no journal line that could be written (CHK-01). */
+function hasNothingToBook(run: PayrollRun): boolean {
+  return isZero(run.totalGross) && isZero(run.totalNet)
 }
 
 function assertStatus(run: PayrollRun, expected: PayrollStatus, action: string) {
@@ -193,7 +198,7 @@ export async function returnToFinance(
  * finance locks an approved run — no further edits are possible after
  * this point. Posts the payroll journal entry:
  *   DR 5000 Staff Salaries Expense   (gross payroll)
- *   CR 2100 Salaries Payable         (net payroll)
+ *   CR 2100 Salaries Payable         (net payroll; a DR when net pay is negative)
  *   CR 2000 Accounts Payable         (deductions — PAYE, pension, loans)
  */
 export async function lock(
@@ -212,20 +217,35 @@ export async function lock(
   const deductionsExact = sub(run.totalGross, run.totalNet)
   const deductions      = toNumber(deductionsExact)
 
-  const entryId = await createJournalEntry({
-    reference:   journalReference(run.month, run.year),
-    description: `Payroll run — ${run.month}/${run.year}`,
-    entryDate:   new Date(),
-    actorUid,
-    lines: [
-      { accountCode: '5000', debit: grossPayroll, description: 'Gross staff salaries' },
-      { accountCode: '2100', credit: netPayroll, description: 'Net payroll payable' },
-      ...(gt(deductionsExact, ZERO)
-        ? [{ accountCode: '2000', credit: deductions, description: 'PAYE tax, pension, loans' }]
-        : []),
-    ],
-  })
-  await postEntry(entryId, actorUid)
+  // [P1-05] A journal line cannot be zero or negative (CHK-01): a zero amount gets no line, negative net pay (staff
+  // owe more than they earned) is the same amount DEBITED to 2100, and a run with nothing to pay books no entry.
+  let entryId: string | null = null
+  if (hasNothingToBook(run)) {
+    logger.warn({ event: 'payroll.lock_nothing_to_book', runId })
+  } else {
+    entryId = await createJournalEntry({
+      reference:   journalReference(run.month, run.year),
+      description: `Payroll run — ${run.month}/${run.year}`,
+      entryDate:   new Date(),
+      actorUid,
+      lines: [
+        ...(isZero(run.totalGross)
+          ? []
+          : [{ accountCode: '5000', debit: grossPayroll, description: 'Gross staff salaries' }]),
+        ...(isZero(run.totalNet)
+          ? []
+          : [{
+              accountCode: '2100',
+              ...(lt(run.totalNet, ZERO) ? { debit: -netPayroll } : { credit: netPayroll }),
+              description: 'Net payroll payable',
+            }]),
+        ...(gt(deductionsExact, ZERO)
+          ? [{ accountCode: '2000', credit: deductions, description: 'PAYE tax, pension, loans' }]
+          : []),
+      ],
+    })
+    await postEntry(entryId, actorUid)
+  }
 
   const updated = await prisma.payrollRun.update({
     where: { id: runId },
@@ -260,10 +280,14 @@ export async function rollback(
   assertStatus(run, 'LOCKED', 'roll back')
 
   const reference = journalReference(run.month, run.year)
-  const entry = await prisma.journalEntry.findFirst({
-    where:   { reference, isPosted: true },
-    orderBy: { createdAt: 'desc' },
-  })
+  // [P1-05] A run with nothing to book posted no entry, so there is none to look for (an older entry with the same
+  // reference belongs to an earlier lock of this month).
+  const entry = hasNothingToBook(run)
+    ? null
+    : await prisma.journalEntry.findFirst({
+        where:   { reference, isPosted: true },
+        orderBy: { createdAt: 'desc' },
+      })
   if (entry) {
     await voidEntry(entry.id, actorUid, reason)
   } else {

@@ -12,6 +12,13 @@
  *   it: it inserts rows. (The baseline checks themselves never write.)
  *   Ids are alphanumeric so the "last 8 characters" journal references the
  *   code builds can be reproduced exactly. Nothing here is real personal data.
+ *
+ * [P1-05] The database now refuses to insert a posted entry, to post one that
+ *   does not balance or has fewer than two lines, and to change a posted one.
+ *   Entries are therefore built as drafts, given their lines and then posted.
+ *   The two planted defects the database can no longer produce (LG-01, LG-02)
+ *   stand for records written before the rule, and are posted with the entry
+ *   guard switched off for that one statement.
  */
 
 const q = (v: string | number | null): string =>
@@ -38,14 +45,16 @@ for (const [code, type, name] of ACCOUNTS) {
 
 type Line = [code: string, debit: number, credit: number]
 
-/** One journal entry with its lines. */
-function entry(reference: string, lines: Line[], opts: { posted?: boolean; ageDays?: number } = {}): void {
+/**
+ * One journal entry with its lines, built the way the ledger allows: a draft, its lines, then posted.
+ * `preGuard` marks a defective record from before P1-05, which only exists with the entry guard off.
+ */
+function entry(reference: string, lines: Line[], opts: { posted?: boolean; ageDays?: number; preGuard?: boolean } = {}): void {
   const id = uid('je')
-  const posted = opts.posted ?? true
   const created = opts.ageDays ? `now() - interval '${opts.ageDays} days'` : 'now()'
   S.push(
-    `INSERT INTO journal_entries (id, reference, description, "entryDate", "isPosted", "postedAt", "createdAt") ` +
-    `VALUES ('${id}', ${q(reference)}, 'fixture', now(), ${posted}, ${posted ? 'now()' : 'NULL'}, ${created})`,
+    `INSERT INTO journal_entries (id, reference, description, "entryDate", "createdAt") ` +
+    `VALUES ('${id}', ${q(reference)}, 'fixture', now(), ${created})`,
   )
   lines.forEach(([code, debit, credit], i) => {
     S.push(
@@ -53,6 +62,10 @@ function entry(reference: string, lines: Line[], opts: { posted?: boolean; ageDa
       `VALUES ('${id}l${i}', '${id}', 'acc${code}', ${debit}, ${credit})`,
     )
   })
+  if (opts.posted === false) return
+  if (opts.preGuard) S.push('ALTER TABLE journal_entries DISABLE TRIGGER journal_entries_guard_trg')
+  S.push(`UPDATE journal_entries SET status = 'POSTED', "isPosted" = true, "postedAt" = now() WHERE id = '${id}'`)
+  if (opts.preGuard) S.push('ALTER TABLE journal_entries ENABLE TRIGGER journal_entries_guard_trg')
 }
 
 function student(id: string): void {
@@ -293,8 +306,8 @@ loan('loanopen01', 'spthree001', 'PENDING', 100, 0, 100)              // PR-09 (
 loan('loanopen02', 'spthree001', 'APPROVED', 100, 0, 100)
 
 // ── ledger integrity and references ─────────────────────────────────────────
-entry('ADJ-UNB', [['5900', 100, 0], ['1000', 0, 90]])                 // LG-01
-entry('ADJ-EMPTY', [])                                                // LG-02
+entry('ADJ-UNB', [['5900', 100, 0], ['1000', 0, 90]], { preGuard: true }) // LG-01
+entry('ADJ-EMPTY', [], { preGuard: true })                            // LG-02
 entry('DRAFT-OLD', [['5900', 70, 0], ['1000', 0, 70]], { posted: false, ageDays: 2 })   // LG-03
 entry('DRAFT-NEW', [['5900', 10, 0], ['1000', 0, 10]], { posted: false })               // not flagged (recent)
 entry('ADJ-NEG', [['5900', 20, 0], ['1100', 0, 20]])                  // LG-05 (receivables below zero)

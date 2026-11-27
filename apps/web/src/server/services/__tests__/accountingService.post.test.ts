@@ -2,6 +2,7 @@
  * accountingService.post.test.ts
  * [CHANGE TYPE]: NEW FILE. Finance Hardening Plan P1-03 (A1-F1, A2-F2, X-10): posting is an atomic
  * claim, balancing is exact, and balances move once per account in ascending id.
+ * [P1-05] The claim is on `status` (DRAFT to POSTED), and a draft needs at least two lines.
  *
  * Prisma is mocked, so this proves the SHAPE of the writes (what is claimed, in which order, with
  * what condition). That two real concurrent posts yield exactly one winner is T-03, the real-Postgres
@@ -37,7 +38,7 @@ import { LedgerError } from '../accountingService'
 const dec = (v: string | number) => new Decimal(v)
 const line = (accountId: string, type: string, debit: string, credit: string) =>
   ({ accountId, debit: dec(debit), credit: dec(credit), account: { type } })
-const draft = (lines: ReturnType<typeof line>[]) => ({ id: 'je1', isPosted: false, lines })
+const draft = (lines: ReturnType<typeof line>[]) => ({ id: 'je1', status: 'DRAFT', isPosted: false, lines })
 const balanced = () => draft([line('a-1000', 'ASSET', '100', '0'), line('a-4000', 'REVENUE', '0', '100')])
 
 const updatedIds = () =>
@@ -57,8 +58,9 @@ describe('the claim (A1-F1, A2-F2)', () => {
     await accounting.postEntry('je1', 'u1')
     expect(h.db.journalEntry.updateMany).toHaveBeenCalledTimes(1)
     const arg = h.db.journalEntry.updateMany.mock.calls[0]![0]
-    expect(arg.where).toEqual({ id: 'je1', isPosted: false })
-    expect(arg.data).toMatchObject({ isPosted: true, postedByUid: 'u1' })
+    expect(arg.where).toEqual({ id: 'je1', status: 'DRAFT' })
+    expect(arg.data).toMatchObject({ status: 'POSTED', isPosted: true, postedByUid: 'u1' })
+    expect(arg.data.postedAt).toBeInstanceOf(Date)
   })
 
   it('the loser of a race (claim count 0) gets ALREADY_POSTED 409 and moves NO balance', async () => {
@@ -77,9 +79,22 @@ describe('the claim (A1-F1, A2-F2)', () => {
   })
 
   it('an entry already marked posted when read is refused without attempting a claim', async () => {
-    h.db.journalEntry.findUnique.mockResolvedValue({ ...balanced(), isPosted: true })
+    h.db.journalEntry.findUnique.mockResolvedValue({ ...balanced(), status: 'POSTED', isPosted: true })
     await expect(accounting.postEntry('je1', 'u1')).rejects.toMatchObject({ code: 'ALREADY_POSTED', status: 409 })
     expect(h.db.journalEntry.updateMany).not.toHaveBeenCalled()
+  })
+
+  it('a reversed entry cannot be posted again (P1-05)', async () => {
+    h.db.journalEntry.findUnique.mockResolvedValue({ ...balanced(), status: 'REVERSED', isPosted: true })
+    await expect(accounting.postEntry('je1', 'u1')).rejects.toMatchObject({ code: 'ALREADY_POSTED', status: 409 })
+    expect(h.db.journalEntry.updateMany).not.toHaveBeenCalled()
+  })
+
+  it.each([['no lines', 0], ['one line', 1]])('a draft with %s is refused before the claim (P1-05)', async (_n, count) => {
+    h.db.journalEntry.findUnique.mockResolvedValue(draft(Array.from({ length: count }, () => line('a-1000', 'ASSET', '0', '0'))))
+    await expect(accounting.postEntry('je1', 'u1')).rejects.toMatchObject({ code: 'VALIDATION_ERROR', status: 400 })
+    expect(h.db.journalEntry.updateMany).not.toHaveBeenCalled()
+    expect(h.db.chartOfAccount.update).not.toHaveBeenCalled()
   })
 
   it('an unknown entry is NOT_FOUND 404, not a generic failure', async () => {
@@ -118,7 +133,7 @@ describe('exact balancing (X-10)', () => {
 
   it('voidEntry still works: the mirror image of a balanced entry is exactly balanced', async () => {
     h.db.journalEntry.findUniqueOrThrow.mockResolvedValue({
-      id: 'je1', reference: 'R', description: 'orig', isPosted: true,
+      id: 'je1', reference: 'R', description: 'orig', status: 'POSTED', isPosted: true,
       lines: [
         { accountId: 'a-1000', debit: dec('33.33'), credit: dec('0'),     description: 'c', account: { code: '1000', type: 'ASSET' } },
         { accountId: 'a-4000', debit: dec('0'),     credit: dec('33.33'), description: 'r', account: { code: '4000', type: 'REVENUE' } },

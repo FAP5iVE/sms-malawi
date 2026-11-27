@@ -16,6 +16,9 @@
  *
  * [P1-03] Adds T-03 (concurrent post: exactly one success) and the deadlock and exact-balance tests below.
  * [P1-04] Adds T-04 (a second and a concurrent reversal are rejected, by the claim and by the unique index).
+ * [P1-05] Adds the immutability tests: direct SQL against posted entries and lines, posting an unbalanced draft,
+ *   entry numbers, creator and line numbers. The ledger is now emptied with TRUNCATE (in the throwaway database
+ *   only), because posted rows can no longer be deleted.
  *
  * STATUS: written against the schema and harness API by reading them; NOT yet run on a database
  * (the build environment that wrote it cannot reach the Prisma engine download or Postgres).
@@ -87,10 +90,10 @@ describe.skipIf(!integrationEnabled())('accountingService: caller transactions (
     await db.teardown()
   })
 
-  // Each test starts from an empty ledger with every balance at zero.
+  // Each test starts from an empty ledger with every balance at zero. Posted rows refuse DELETE (P1-05), so the
+  // two journal tables are truncated. `db.prisma` is bound to the throwaway `it_…` database this file created.
   beforeEach(async () => {
-    await db.prisma.journalLine.deleteMany()
-    await db.prisma.journalEntry.deleteMany()
+    await db.prisma.$executeRawUnsafe('TRUNCATE TABLE "journal_lines", "journal_entries"')
     await db.prisma.chartOfAccount.updateMany({ data: { balance: 0 } })
     await db.prisma.systemSettings.deleteMany({ where: { key: { startsWith: 'itest.biz.' } } })
   })
@@ -389,5 +392,140 @@ describe.skipIf(!integrationEnabled())('accountingService: caller transactions (
     await expect(voidEntry(id, 'user-A', '   ')).rejects.toMatchObject({ code: 'REASON_REQUIRED', status: 422 })
     expect(await counts()).toEqual(before)
     expect((await db.prisma.journalEntry.findUniqueOrThrow({ where: { id } })).reversedAt).toBeNull()
+  })
+
+  // ── P1-05 ────────────────────────────────────────────────────────────────────────────────────
+
+  const sql = (statement: string, ...values: unknown[]) => db.prisma.$executeRawUnsafe(statement, ...values)
+  const stored = (id: string) =>
+    db.prisma.journalEntry.findUniqueOrThrow({ where: { id }, include: { lines: { orderBy: { lineNumber: 'asc' } } } })
+
+  it('direct SQL cannot change or delete a posted entry or its lines, and nothing moves', async () => {
+    const id = await postedOriginal('ITEST-P105-FROZEN')
+    const before = await stored(id)
+    const lineId = before.lines[0]!.id
+    const accountId = before.lines[0]!.accountId
+
+    const attempts: Array<[string, unknown[]]> = [
+      [`UPDATE "journal_entries" SET "description" = 'edited' WHERE "id" = $1`, [id]],
+      [`UPDATE "journal_entries" SET "status" = 'DRAFT', "isPosted" = false WHERE "id" = $1`, [id]],
+      [`UPDATE "journal_entries" SET "entryDate" = now() WHERE "id" = $1`, [id]],
+      [`DELETE FROM "journal_entries" WHERE "id" = $1`, [id]],
+      [`UPDATE "journal_lines" SET "debit" = "debit" + 1 WHERE "id" = $1`, [lineId]],
+      [`UPDATE "journal_lines" SET "memo" = 'edited' WHERE "id" = $1`, [lineId]],
+      [`DELETE FROM "journal_lines" WHERE "id" = $1`, [lineId]],
+      [`INSERT INTO "journal_lines" ("id", "journalEntryId", "accountId", "debit", "credit") VALUES ('itest-p105-extra', $1, $2, 5, 0)`, [id, accountId]],
+    ]
+    for (const [statement, values] of attempts) {
+      await expect(sql(statement, ...values), statement).rejects.toThrow(/LEDGER_IMMUTABLE/)
+    }
+    expect(await stored(id)).toEqual(before)
+  })
+
+  it('a reversed entry is frozen too, and the ORM is refused the same way as raw SQL', async () => {
+    const id = await postedOriginal('ITEST-P105-REVERSED')
+    const reversalId = await voidEntry(id, 'user-A', 'itest')
+    const original = await stored(id)
+    expect(original.status).toBe('REVERSED')
+    expect(original.isPosted).toBe(true)
+    expect((await stored(reversalId))).toMatchObject({ status: 'POSTED', entryKind: 'REVERSAL', reversalOfId: id })
+
+    await expect(db.prisma.journalEntry.update({ where: { id }, data: { reversalReason: 'rewritten' } }))
+      .rejects.toThrow(/LEDGER_IMMUTABLE/)
+    await expect(db.prisma.journalLine.deleteMany({ where: { journalEntryId: id } })).rejects.toThrow(/LEDGER_IMMUTABLE/)
+    expect(await stored(id)).toEqual(original)
+  })
+
+  it('the database itself refuses to post an unbalanced or one-line draft (the service bypassed)', async () => {
+    const unbalanced = await createJournalEntry(entry('ITEST-P105-UNBAL', 100))
+    await sql(`UPDATE "journal_lines" SET "debit" = 100.01 WHERE "journalEntryId" = $1 AND "debit" > 0`, unbalanced)
+    const post = `UPDATE "journal_entries" SET "status" = 'POSTED', "isPosted" = true, "postedAt" = now() WHERE "id" = $1`
+    await expect(sql(post, unbalanced)).rejects.toThrow(/LEDGER_UNBALANCED/)
+
+    const oneLine = await createJournalEntry(entry('ITEST-P105-ONELINE', 100))
+    await sql(`DELETE FROM "journal_lines" WHERE "journalEntryId" = $1 AND "credit" > 0`, oneLine) // a draft can still be edited
+    await expect(sql(post, oneLine)).rejects.toThrow(/LEDGER_TOO_FEW_LINES/)
+
+    for (const id of [unbalanced, oneLine]) expect((await stored(id)).status).toBe('DRAFT')
+  })
+
+  it('an entry cannot be inserted already posted, and a line cannot be zero or two-sided', async () => {
+    await expect(
+      db.prisma.journalEntry.create({
+        data: { reference: 'ITEST-P105-BORN', description: 'x', entryDate: new Date(), status: 'POSTED', isPosted: true },
+      }),
+    ).rejects.toThrow(/LEDGER_IMMUTABLE/)
+
+    const id = await createJournalEntry(entry('ITEST-P105-CHK', 100))
+    const accountId = (await stored(id)).lines[0]!.accountId
+    for (const [debit, credit] of [[0, 0], [5, 5], [-5, 0]]) {
+      await expect(
+        db.prisma.journalLine.create({ data: { journalEntryId: id, accountId, debit, credit } }),
+      ).rejects.toThrow(/journal_lines_debit_credit_check/)
+    }
+    expect((await stored(id)).lines).toHaveLength(2)
+  })
+
+  it('entries carry their creator, a JE-year number without gaps, and numbered lines', async () => {
+    const number = async (reference: string) => (await stored(await createJournalEntry(entry(reference, 10)))).entryNumber
+
+    const first = await number('ITEST-P105-N1')
+    expect(first).toMatch(/^JE-2026-\d{6}$/)
+    const next = (n: number) => `JE-2026-${String(Number(first.slice(-6)) + n).padStart(6, '0')}`
+
+    // A rolled-back entry gives its number back.
+    await expect(
+      db.prisma.$transaction(async (tx) => {
+        await createJournalEntry(entry('ITEST-P105-GONE', 10), tx)
+        throw new Rollback()
+      }),
+    ).rejects.toThrow(Rollback)
+
+    const concurrent = await Promise.all(Array.from({ length: 5 }, (_, i) => number(`ITEST-P105-C${i}`)))
+    expect([...concurrent].sort()).toEqual([1, 2, 3, 4, 5].map(next))
+
+    const e = await stored((await db.prisma.journalEntry.findFirstOrThrow({ where: { entryNumber: first } })).id)
+    expect(e).toMatchObject({ status: 'DRAFT', isPosted: false, entryKind: 'NORMAL', createdByUid: 'itest-user' })
+    expect(e.lines.map((l) => l.lineNumber)).toEqual([1, 2])
+  })
+
+  it.each(['RepeatableRead', 'Serializable'] as const)(
+    'a %s poster with a stale snapshot cannot post lines it has not seen',
+    async (isolationLevel) => {
+      const id = await createJournalEntry(entry(`ITEST-P105-ISO-${isolationLevel}`, 100))
+      const accountId = (await stored(id)).lines[0]!.accountId
+      const other = db.newClient()
+
+      await expect(
+        db.prisma.$transaction(async (tx) => {
+          await tx.journalLine.count({ where: { journalEntryId: id } }) // takes the snapshot
+          await other.journalLine.create({ data: { journalEntryId: id, accountId, debit: 7, credit: 0 } })
+          await tx.$executeRawUnsafe(
+            `UPDATE "journal_entries" SET "status" = 'POSTED', "isPosted" = true, "postedAt" = now() WHERE "id" = $1`, id)
+        }, { isolationLevel }),
+      ).rejects.toThrow(/could not serialize|write conflict|40001/i)
+
+      expect((await stored(id)).status).toBe('DRAFT')
+    },
+  )
+
+  it('an entry number is assigned by the database and cannot be supplied or changed', async () => {
+    await expect(
+      db.prisma.journalEntry.create({
+        data: { reference: 'ITEST-P105-NUM', description: 'x', entryDate: new Date(), entryNumber: 'JE-2026-999999' },
+      }),
+    ).rejects.toThrow(/LEDGER_IMMUTABLE/)
+    const id = await createJournalEntry(entry('ITEST-P105-NUM2', 10))
+    await expect(db.prisma.journalEntry.update({ where: { id }, data: { entryNumber: 'JE-2026-999999' } }))
+      .rejects.toThrow(/LEDGER_IMMUTABLE/)
+  })
+
+  it('a writer that only knows isPosted (the previous app version) still leaves a consistent status', async () => {
+    const id = await createJournalEntry(entry('ITEST-P105-OLDWRITER', 100))
+    await db.prisma.$executeRawUnsafe(
+      `UPDATE "journal_entries" SET "isPosted" = true, "postedAt" = now() WHERE "id" = $1`, id)
+    expect((await stored(id)).status).toBe('POSTED')
+    await db.prisma.$executeRawUnsafe(`UPDATE "journal_entries" SET "reversedAt" = now(), "reversedByUid" = 'old', "reversalReason" = 'old' WHERE "id" = $1`, id)
+    expect((await stored(id)).status).toBe('REVERSED')
   })
 })

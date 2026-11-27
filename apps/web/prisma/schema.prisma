@@ -1091,6 +1091,46 @@ model ChartOfAccount {
   @@map("chart_of_accounts")
 }
 
+// [P1-05] Journal model (plan A1-DEL, D-12; spec Part 3 §3). The database enforces what this schema cannot say:
+// CHK-01 on lines, `isPosted` = (status != DRAFT), and the triggers TRG-01/02/03 (posted entries and their lines
+// are immutable; only a balanced entry with two or more lines can be posted). See the migration
+// 20261126130000_journal_model_immutability.
+enum JournalStatus {
+  DRAFT
+  POSTED
+  REVERSED
+}
+
+enum JournalEntryKind {
+  NORMAL
+  REVERSAL
+  ADJUSTMENT
+  OPENING
+  RECLASSIFICATION
+  TRANSITION
+  BACKFILL
+  MANUAL
+}
+
+// The kind of record an entry came from. Later phases add values, each in its own migration.
+enum FinancialSourceType {
+  PAYMENT
+  INVOICE
+  EXPENSE
+  EXPENSE_PAYMENT
+  PAYROLL_RUN
+  LIBRARY_FINE
+}
+
+enum PartyType {
+  STUDENT
+  STAFF
+  SUPPLIER
+  SPONSOR
+  GUARDIAN
+  OTHER
+}
+
 model JournalEntry {
   id           String        @id @default(cuid())
   reference    String        // e.g. "INV-2025-001"
@@ -1112,8 +1152,22 @@ model JournalEntry {
   reversedByUid  String?
   reversalReason String?
 
+  // [P1-05] `entryNumber` is JE-{year}-{000000}, assigned by the database on insert ("" means "assign one").
+  // `status` replaces `isPosted` as the state of an entry; `isPosted` stays and is kept equal by a check.
+  entryNumber            String               @unique @default("")
+  status                 JournalStatus        @default(DRAFT)
+  entryKind              JournalEntryKind     @default(NORMAL)
+  createdByUid           String?              // null on entries written before P1-05
+  sourceType             FinancialSourceType?
+  sourceId               String?
+  financialTransactionId String?              @unique // relation arrives with the financial register (P1-06)
+  periodId               String?              // relation arrives with financial periods (P2-05)
+
   @@index([entryDate])
   @@index([isPosted])
+  @@index([status])
+  @@index([sourceType, sourceId])
+  @@index([periodId])
   @@map("journal_entries")
 }
 
@@ -1127,9 +1181,30 @@ model JournalLine {
   credit         Decimal        @db.Decimal(14, 2) @default(0)
   description    String?
 
+  // [P1-05] `lineNumber` is assigned by the database when it is 0. The rest are dimensions later phases fill in.
+  lineNumber         Int        @default(0)
+  memo               String?
+  financialAccountId String?
+  partyType          PartyType?
+  partyId            String?
+  budgetId           String?
+  departmentId       String?
+
   @@index([journalEntryId])
   @@index([accountId])
+  @@index([accountId, partyType, partyId])
   @@map("journal_lines")
+}
+
+// [P1-05] Numbering counters (spec Part 3 §2.2). A number is taken inside the transaction that uses it, so a
+// rollback returns it. Used so far only by the journal entry trigger (key "JE", scope = year).
+model SequenceCounter {
+  key       String
+  scope     String
+  nextValue Int
+
+  @@unique([key, scope])
+  @@map("sequence_counters")
 }
 
 // ─── LIBRARY WORKFLOWS (Phase D12) ───────────────────────

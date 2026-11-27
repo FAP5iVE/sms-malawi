@@ -89,7 +89,7 @@ describe('createJournalEntry', () => {
 describe('postEntry', () => {
   it('moves each balance by an exact Decimal delta, by the account type (one write per account)', async () => {
     h.prisma.journalEntry.findUnique.mockResolvedValue({
-      id: 'je1', isPosted: false,
+      id: 'je1', status: 'DRAFT', isPosted: false,
       lines: [
         { accountId: 'a1000', debit: dec('0.10'), credit: dec('0'),    account: { type: 'ASSET' } },
         { accountId: 'a1000', debit: dec('0.20'), credit: dec('0'),    account: { type: 'ASSET' } },
@@ -110,7 +110,7 @@ describe('postEntry', () => {
   })
 
   it('refuses an entry that is already posted', async () => {
-    h.prisma.journalEntry.findUnique.mockResolvedValue({ id: 'je1', isPosted: true, lines: [] })
+    h.prisma.journalEntry.findUnique.mockResolvedValue({ id: 'je1', status: 'POSTED', isPosted: true, lines: [] })
     await expect(accounting.postEntry('je1', 'u1')).rejects.toThrow(/already posted/)
   })
 })

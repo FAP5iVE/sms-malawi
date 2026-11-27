@@ -37,6 +37,25 @@ the previous version of the code keeps working. Even so, before each one:
 5. Run the baseline report (`pnpm finance:baseline`) against the **branch copy of the result** and compare it with the previous baseline: counts must not increase.
 6. Keep the branch until the phase gate (§4 below) has passed and at least one full week has run cleanly, then ask the owner before deleting it.
 
+## 2a. Merging P1-05 (`20261126130000_journal_model_immutability`)
+
+Before the merge:
+1. The integration suite has passed on the test branch.
+2. Take a Neon branch of production named `pre-P1-05-<date>`. The free plan allows 10 branches and previews use them too, so check there is room.
+3. Run on production (read-only). It must return 0, or the migration fails and rolls back:
+   `SELECT count(*) FROM journal_lines WHERE NOT (debit >= 0 AND credit >= 0 AND debit <> 'NaN' AND credit <> 'NaN' AND (debit = 0 OR credit = 0) AND (debit > 0 OR credit > 0));`
+4. Confirm `DIRECT_URL` is set for the Vercel production environment. If it is missing, the build only warns and skips the migration, and the new code
+   cannot post any journal entry. Several routes only log that failure.
+5. Merge when nobody is recording money.
+
+After the merge:
+- Check that `_prisma_migrations` shows the migration with `finished_at` set, then record one test posting and confirm it has an entry number.
+- If the build failed on this migration, fix the cause, run `prisma migrate resolve --rolled-back 20261126130000_journal_model_immutability` against
+  production (`DIRECT_URL`), and redeploy.
+- The previous code keeps working against the new schema (I-18), except that a zero-amount line or a one-line entry is now refused. Redeploying
+  it needs no database change.
+- A script that deletes posted journal rows (for example a demo-data reset) is now refused (I-19).
+
 ## 3. Rolling a migration back
 
 Because migrations are additive, the first response to a problem is **to switch the module's flag off**

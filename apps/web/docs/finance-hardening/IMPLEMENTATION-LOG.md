@@ -325,6 +325,12 @@ ledger behaviour failed. Fix (test code only): test clients get `transactionOpti
 and the deterministic T-03 test now waits until `pg_stat_activity` shows a session blocked on a lock instead of sleeping.
 **P1-02 and P1-03 remain unproven until the next run shows those 11 tests green.**
 
+### Type-check fix: accountingService.money.test.ts  (2026-11-25)
+Status: **done**. `pnpm --filter web exec tsc --noEmit` reported TS7006 (implicit `any`) twice in `postEntry > moves each balance by an exact Decimal delta`.
+Cause: `h.prisma` is deliberately `any` (a mock), so `mock.calls.map((c) => ...)` had an untyped parameter and returned `any`, which left the next `.map((u) => ...)` untyped too.
+Fix: a local `BalanceUpdate` type, `(c: unknown[])` on the first callback, and the result annotated as `BalanceUpdate[]`. Test logic and assertions are unchanged.
+File: `src/server/services/__tests__/accountingService.money.test.ts`.
+
 ### P1-04 One-time reversal  (2026-11-26)
 Status: **code done; unit-tested; the real-database proof (T-04) is written but NOT yet run.** Branch `finance-hardening/p1-04-one-time-reversal`,
 stacked on the P1-03 branch. **Needs `prisma generate`** after pulling (the schema gained fields).
@@ -351,20 +357,56 @@ claims use `isPosted` and `reversedAt`. The mirror is still dated now (caller-ch
 **Merging a P1 branch to `main` applies its migrations to production.** The runbook is corrected. Take the pre-migration Neon branch before merging this one.
 Preview builds skip migrations, so a preview of this branch lacks the new columns until a migration is run against it.
 
-### Next in order
-<<<<<<< HEAD
-<<<<<<< HEAD
-P1-03 Atomic post claim, exact balancing, atomic balance updates (A1-F1, A2-F2, X-10; test **T-03**, concurrent post: exactly one success).
-Before P1-03 is called proven the harness must have run once on a real database, because T-03 is a concurrency test and cannot be proved with mocks.
+### P1-05 Journal model columns and immutability triggers  (2026-11-27)
+Status: **code done; unit-tested; the SQL proven on local Postgres 16 and on a Neon test branch; the integration suite is written but NOT yet run.**
+Branch `finance-hardening/p1-05-journal-immutability`, on `main` at `ac77473`. Not merged, so production is unchanged. **Needs `prisma generate`.**
+What was done:
+- **Migration `20261126130000_journal_model_immutability`** (rest of M02; one transaction, additive, safe to run twice):
+  - four enum types; eight new columns on `journal_entries`, seven on `journal_lines`; table `sequence_counters`; indexes;
+  - backfill of the new columns only: `status` from `isPosted`/`reversedAt`, `entryKind` REVERSAL where `reversalOfId` is set, `entryNumber`
+    `JE-{year}-{000000}` in date order by Malawi year (counters initialised), `lineNumber`;
+  - check `isPosted` ⇔ `status` ≠ DRAFT; **CHK-01** (one side only, above zero, not NaN);
+  - **TRG-01** posted rows allow only the one POSTED → REVERSED change, reversed rows none, neither can be deleted; **TRG-02** no line can be added,
+    changed or removed unless its entry is a draft; **TRG-03** posting needs at least two lines and exact debits = credits;
+  - the database assigns entry numbers and line numbers.
+- `accountingService`: `createJournalEntry` refuses fewer than two lines and any CHK-01 breach (`VALIDATION_ERROR` 400), stores `createdByUid` (X-09),
+  `entryKind`, `lineNumber`, source and line dimensions; `postEntry` claims on `status = DRAFT`; `voidEntry` claims on `status = POSTED`, sets
+  REVERSED, and the mirror is `entryKind = REVERSAL` with the original's source and dimensions.
+- `payrollApprovalService`: because zero lines are now refused, a zero gross or net gets no line, a negative net pay is booked as a debit on
+  salaries payable, and a run with nothing to book locks without a journal entry (a warning is logged); `rollback` matches (I-25).
+- `tools/finance-baseline/fixture.mts` builds entries as draft, lines, post. Its two deliberately broken entries switch the entry trigger off for that one step.
+Independent review before commit found five defects, all fixed and tested: negative net pay left a payroll run unable to lock; a REPEATABLE READ or
+SERIALIZABLE poster with an old snapshot could post lines it had not seen; a caller-supplied entry number could block numbering for a year;
+concurrent line inserts could get the same line number; `NaN` passed CHK-01.
+Integration tests: 9 new cases in `accountingService.itest.ts`; the ledger is now emptied with `TRUNCATE` between tests (throwaway database only). **Not run.**
+Verification:
+- Unit: 33 failed, 2032 passed (2065), run with a throwaway config without the setup file. The failing test names are the same as on `main` at
+  `dd3282a` without this work. 19 new unit tests.
+- eslint clean on the changed files. `tsc`: 1005 errors against 994 at `dd3282a`; 5 come from `tools/r2/migrate-appwrite-to-r2.ts` (already on
+  `main`), 6 from this work, all caused by the Prisma client not being generated here (3 enum imports, 3 implicit `any` in the integration test).
+- `finance:baseline:test`, `hills:test`, `hills:contrast` pass. `hills:inventory:check` and `hills:ratchets` fail for files this task does not touch.
+  `hills:logic-diff` flags the finance files as frozen or undeclared changes (expected for a finance task; no allowlist entry added).
+- Local Postgres 16: backfill of old-shaped data left old columns unchanged; second run changes nothing; 84 of 84 trigger checks; 48 of 48 two-session
+  checks (including REPEATABLE READ and SERIALIZABLE); data holding a zero line makes the whole migration roll back; all 34 migrations apply to an
+  empty database; the baseline checks give the same results on the old and new fixture (46 of 46).
+- **V-03, Neon branch `itest-harness`, 2026-11-27:** the P1-04 and P1-05 statements plus checks, inside one transaction that was rolled back.
+  1,013 entries and 2,062 lines; entry, line and balance fingerprints unchanged; 1,012 POSTED and 1 DRAFT; no duplicate or missing numbers; ten forbidden
+  operations refused; schema fingerprints equal to the local ones; the branch was read afterwards and is unchanged. This ran the SQL through the Neon API,
+  **not** through `prisma migrate deploy`; the first integration-harness run covers that.
+Production, read-only, 2026-11-27 (nothing written):
+- The P1-04 migration is applied (finished 2026-11-26 08:30:07 UTC). P1-05 is not. 1,013 entries, 2,062 lines, **0 CHK-01 violations**.
+- Payments `cmwwtsqgj0001jp07bhd9jid1` (97,900) and `cmwwuwtub0001jn07eekpslkv` (200,000) have **no journal entry**; the latest entry is dated
+  2026-11-25 11:19 UTC. The cause is not confirmed (possibly posting failed while the code was ahead of the schema). For the owner to check; P9 repair covers it.
+Files: the migration folder; `prisma/schema.prisma`; `accountingService.ts`; `payrollApprovalService.ts`; six service test files;
+`accountingService.itest.ts`; `tools/finance-baseline/fixture.mts`; these documents.
+Decisions (I-xx in DECISIONS.md): I-15 to I-26.
+Not done by design: the check that an account is active and postable (P2-01); callers filling `sourceType`/`sourceId` (P1-06); foreign keys for
+`financialTransactionId` and `periodId` (P1-06, P2-05); reports still read `isPosted`; linking old reversals to originals (P9).
+Remains / open questions:
+- **Run the integration suite** against the `itest-harness` branch and record the result here. It covers P1-02 to P1-05, none yet shown fully green.
+- Before merging, follow the runbook (§2 and §2a): merging applies the migration to production.
+- `postEntry` computes balance changes from the lines read before its claim. Nothing edits draft lines today; manual journals must re-read after the claim.
 
-### Type-check fix: accountingService.money.test.ts  (2026-11-25)
-Status: **done**. `pnpm --filter web exec tsc --noEmit` reported TS7006 (implicit `any`) twice in `postEntry > moves each balance by an exact Decimal delta`.
-Cause: `h.prisma` is deliberately `any` (a mock), so `mock.calls.map((c) => ...)` had an untyped parameter and returned `any`, which left the next `.map((u) => ...)` untyped too.
-Fix: a local `BalanceUpdate` type, `(c: unknown[])` on the first callback, and the result annotated as `BalanceUpdate[]`. Test logic and assertions are unchanged.
-File: `src/server/services/__tests__/accountingService.money.test.ts`.
-=======
-P1-04 One-time reversal (A1-F2, A2-F3; test **T-04**). It needs migration M02 (reversal columns and a unique constraint), so it must not be applied anywhere until the runbook §1 answers are in and the harness has run.
->>>>>>> origin/finance-hardening/p1-03-atomic-posting
-=======
-P1-05 Journal model columns and immutability triggers (A1-DEL, D-12): the rest of M02 (`entryNumber`, `status`, `entryKind`, `createdByUid`, source and period links, line dimensions, CHK-01, TRG-01/02/03), tested on a Neon branch first. Real triggers, so it needs the harness green first.
->>>>>>> origin/finance-hardening/p1-04-one-time-reversal
+### Next in order
+P1-06 Financial register, idempotency, unit of work (D-09, C-02, X-16; test **T-02**). Its migration M01 must **not** create `sequence_counters`,
+which P1-05 already created (I-15). Start only after the integration suite is green and P1-05 has been reviewed.

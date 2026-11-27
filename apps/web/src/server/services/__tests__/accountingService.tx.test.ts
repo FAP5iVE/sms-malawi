@@ -46,7 +46,7 @@ function wire(db: FakeClient) {
   db.journalEntry.create.mockResolvedValue({ id: 'je1' })
   db.journalEntry.updateMany.mockResolvedValue({ count: 1 })
   db.journalEntry.findUniqueOrThrow.mockResolvedValue({
-    id: 'je1', reference: 'R-1', description: 'orig', isPosted: true,
+    id: 'je1', reference: 'R-1', description: 'orig', status: 'POSTED', isPosted: true,
     lines: [
       { accountId: 'a1000', debit: dec('100'), credit: dec('0'),   description: 'Cash', account: { code: '1000', type: 'ASSET' } },
       { accountId: 'a4000', debit: dec('0'),   credit: dec('100'), description: 'Rev',  account: { code: '4000', type: 'REVENUE' } },
@@ -64,7 +64,7 @@ beforeEach(() => {
 })
 
 const unpostedEntry = () => ({
-  id: 'je1', isPosted: false,
+  id: 'je1', status: 'DRAFT', isPosted: false,
   lines: [
     { accountId: 'a1000', debit: dec('100'), credit: dec('0'),   account: { type: 'ASSET' } },
     { accountId: 'a4000', debit: dec('0'),   credit: dec('100'), account: { type: 'REVENUE' } },
@@ -93,7 +93,7 @@ describe('with a caller transaction: everything runs on it, nothing else is touc
     // First read = the posted original; the nested postEntry then reads the (unposted) reversal.
     callerTx.journalEntry.findUniqueOrThrow
       .mockResolvedValueOnce({
-        id: 'je1', reference: 'R-1', description: 'orig', isPosted: true,
+        id: 'je1', reference: 'R-1', description: 'orig', status: 'POSTED', isPosted: true,
         lines: [
           { accountId: 'a1000', debit: dec('100'), credit: dec('0'),   description: 'Cash', account: { code: '1000', type: 'ASSET' } },
           { accountId: 'a4000', debit: dec('0'),   credit: dec('100'), description: 'Rev',  account: { code: '4000', type: 'REVENUE' } },
@@ -125,7 +125,7 @@ describe('with a caller transaction: everything runs on it, nothing else is touc
   })
 
   it('an error inside is thrown to the caller, who decides to roll back', async () => {
-    callerTx.journalEntry.findUnique.mockResolvedValue({ ...unpostedEntry(), isPosted: true })
+    callerTx.journalEntry.findUnique.mockResolvedValue({ ...unpostedEntry(), status: 'POSTED', isPosted: true })
     await expect(accounting.postEntry('je1', 'u1', asTx(callerTx))).rejects.toThrow(/already posted/)
     expect(callerTx.journalEntry.updateMany).not.toHaveBeenCalled()
   })
@@ -165,7 +165,7 @@ describe('without a caller transaction: one transaction of its own', () => {
   it('voidEntry runs the whole reversal inside one transaction', async () => {
     h.own.journalEntry.findUniqueOrThrow
       .mockResolvedValueOnce({
-        id: 'je1', reference: 'R-1', description: 'orig', isPosted: true,
+        id: 'je1', reference: 'R-1', description: 'orig', status: 'POSTED', isPosted: true,
         lines: [
           { accountId: 'a1000', debit: dec('100'), credit: dec('0'),   description: 'Cash', account: { code: '1000', type: 'ASSET' } },
           { accountId: 'a4000', debit: dec('0'),   credit: dec('100'), description: 'Rev',  account: { code: '4000', type: 'REVENUE' } },
@@ -187,7 +187,7 @@ describe('without a caller transaction: one transaction of its own', () => {
 
 describe('message compatibility', () => {
   it('an already-posted entry is still refused with the same message', async () => {
-    h.own.journalEntry.findUnique.mockResolvedValue({ ...unpostedEntry(), isPosted: true })
+    h.own.journalEntry.findUnique.mockResolvedValue({ ...unpostedEntry(), status: 'POSTED', isPosted: true })
     await expect(accounting.postEntry('je1', 'u1')).rejects.toThrow('Entry je1 is already posted.')
   })
 })

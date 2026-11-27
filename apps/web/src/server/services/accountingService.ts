@@ -4,7 +4,7 @@
  * Double-entry accounting engine for SMS Malawi.
  *
  * Core operations:
- *   createJournalEntry()  — draft a balanced journal entry (debits = credits)
+ *   createJournalEntry()  — draft a balanced journal entry (two or more lines, debits = credits)
  *   postEntry()           — mark entry as posted, update account balances
  *   voidEntry()           — reverse a posted entry via counter-entry
  *
@@ -33,12 +33,12 @@
  */
 
 import 'server-only'
-import type { Prisma } from '@prisma/client'
+import type { Prisma, JournalEntryKind, FinancialSourceType, PartyType } from '@prisma/client'
 import { prisma }     from '@/lib/prisma'
 import { logger }     from '@/lib/logger'
 // [P1-01] All arithmetic below uses the shared money utility (Decimal, half-up, 2 dp) instead of
 // JavaScript floats (plan X-11). Amounts still leave this module as numbers where they did before.
-import { add, sub, sum, round2, toNumber, eq, ZERO } from '@/lib/money'
+import { add, sub, sum, round2, toNumber, eq, gt, lt, isZero, ZERO } from '@/lib/money'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TRANSACTION AWARENESS  [P1-02]  (plan C-11; root cause of A1-F3)
@@ -55,7 +55,7 @@ import { add, sub, sum, round2, toNumber, eq, ZERO } from '@/lib/money'
 // `tx` is the LAST parameter so no existing call site changes.
 //
 // ATOMIC POSTING  [P1-03]  (plan A1-F1, A2-F2, X-10; spec Part 3 §4)
-//   - postEntry CLAIMS the entry with one conditional write (`updateMany … WHERE id AND isPosted = false`)
+//   - postEntry CLAIMS the entry with one conditional write (`updateMany … WHERE id AND status = 'DRAFT'`)
 //     and requires a row count of exactly 1. Two concurrent posts cannot both win: the second waits on
 //     the first's row lock, re-evaluates the condition when it commits, finds 0 rows and gets
 //     ALREADY_POSTED (409). The old read-then-update let both through and moved every balance twice.
@@ -67,10 +67,17 @@ import { add, sub, sum, round2, toNumber, eq, ZERO } from '@/lib/money'
 //     ascending account id, so two postings that touch the same accounts always lock them in the same
 //     order and cannot deadlock each other.
 //
-// ONE-TIME REVERSAL  [P1-04]  (plan A1-F2, A2-F3; UQ-02): voidEntry claims the original (`reversedAt IS NULL`, row count 1),
-// creates the mirror with a unique `reversalOfId`, and posts it, all in one transaction; a reason is mandatory.
-// Still open here, by design: the `status` column that the plan names in the claims (POSTED, REVERSED) arrives with
-// P1-05, so the claims use `isPosted` and `reversedAt` until then.
+// ONE-TIME REVERSAL  [P1-04]  (plan A1-F2, A2-F3; UQ-02): voidEntry claims the original (`status` POSTED -> REVERSED,
+// row count 1), creates the mirror with a unique `reversalOfId`, and posts it, all in one transaction; a reason is
+// mandatory.
+//
+// IMMUTABLE LEDGER  [P1-05]  (plan A1-DEL, D-12, X-09; migration 20261126130000_journal_model_immutability)
+//   - An entry's state is `status`: DRAFT -> POSTED -> REVERSED, each step once. `isPosted` is kept equal to
+//     "not DRAFT" (the database checks it) because the reports and the baseline checks still read it.
+//   - The DATABASE refuses to change or delete a posted entry or its lines, to post an unbalanced entry or one with
+//     fewer than two lines, and to store a line that is not exactly a debit or a credit (CHK-01, TRG-01/02/03).
+//     The checks here exist to answer with a clear code before the database has to.
+//   - `createdByUid` records who created an entry. `entryNumber` (JE-year-000000) is assigned by the database.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -82,8 +89,9 @@ export class LedgerError extends Error {
   constructor(
     public readonly code:
       | 'ALREADY_POSTED' | 'UNBALANCED' | 'NOT_FOUND'
-      | 'NOT_POSTED' | 'ALREADY_REVERSED' | 'REASON_REQUIRED',
-    public readonly status: 404 | 409 | 422,
+      | 'NOT_POSTED' | 'ALREADY_REVERSED' | 'REASON_REQUIRED'
+      | 'VALIDATION_ERROR',
+    public readonly status: 400 | 404 | 409 | 422,
     message: string,
   ) {
     super(message)
@@ -112,6 +120,13 @@ export interface JournalLineInput {
   debit?:      number
   credit?:     number
   description?: string
+  // [P1-05] Dimensions (spec Part 3 §3.2). Nothing fills them yet; a reversal copies them from its original.
+  memo?:               string
+  financialAccountId?: string
+  partyType?:          PartyType
+  partyId?:            string
+  budgetId?:           string
+  departmentId?:       string
 }
 
 export interface CreateJournalEntryInput {
@@ -122,6 +137,11 @@ export interface CreateJournalEntryInput {
   actorUid:    string
   /** [P1-04] Set only by voidEntry: the original this entry reverses (unique in the database, UQ-02). */
   reversalOfId?: string
+  /** [P1-05] Defaults to REVERSAL when `reversalOfId` is set, otherwise NORMAL. */
+  entryKind?:    JournalEntryKind
+  /** [P1-05] The record the entry came from. Filled by the financial register (P1-06); a reversal copies it. */
+  sourceType?:   FinancialSourceType
+  sourceId?:     string
 }
 
 export interface IncomeStatement {
@@ -195,6 +215,11 @@ export async function createJournalEntry(
   tx?: LedgerTx,
 ): Promise<string> {
   const db: LedgerTx = tx ?? prisma
+  // [P1-05] A journal entry has at least two lines.
+  if (input.lines.length < 2) {
+    throw new LedgerError('VALIDATION_ERROR', 400, 'A journal entry needs at least two lines.')
+  }
+
   // Validate balanced entry (sum debits == sum credits)
   // [P1-01] Each line is rounded half-up to the cent first, exactly as the database column would
   // store it, so the balance test runs on the amounts that will really be written.
@@ -211,6 +236,18 @@ export async function createJournalEntry(
     )
   }
 
+  // [P1-05] CHK-01: each line is a debit or a credit, never both, never neither, never negative.
+  input.lines.forEach((l, i) => {
+    const debit  = lineDebits[i]!
+    const credit = lineCredits[i]!
+    if (lt(debit, ZERO) || lt(credit, ZERO) || (gt(debit, ZERO) && gt(credit, ZERO)) || (isZero(debit) && isZero(credit))) {
+      throw new LedgerError(
+        'VALIDATION_ERROR', 400,
+        `Journal line ${i + 1} (account ${l.accountCode}) must have an amount above zero on exactly one side: debit ${debit.toFixed(2)}, credit ${credit.toFixed(2)}`,
+      )
+    }
+  })
+
   // Resolve account codes to IDs
   const codes    = input.lines.map((l) => l.accountCode)
   const accounts = await db.chartOfAccount.findMany({ where: { code: { in: codes } } })
@@ -226,20 +263,32 @@ export async function createJournalEntry(
       reference:   input.reference,
       description: input.description,
       entryDate:   input.entryDate,
-      isPosted:    false,
+      status:       'DRAFT',
+      isPosted:     false,
+      entryKind:    input.entryKind ?? (input.reversalOfId ? 'REVERSAL' : 'NORMAL'),
+      createdByUid: input.actorUid,
+      sourceType:   input.sourceType,
+      sourceId:     input.sourceId,
       reversalOfId: input.reversalOfId,
       lines: {
         create: input.lines.map((l, i) => ({
-          accountId:   accountMap.get(l.accountCode)!,
-          debit:       lineDebits[i],
-          credit:      lineCredits[i],
-          description: l.description,
+          lineNumber:         i + 1,
+          accountId:          accountMap.get(l.accountCode)!,
+          debit:              lineDebits[i],
+          credit:             lineCredits[i],
+          description:        l.description,
+          memo:               l.memo,
+          financialAccountId: l.financialAccountId,
+          partyType:          l.partyType,
+          partyId:            l.partyId,
+          budgetId:           l.budgetId,
+          departmentId:       l.departmentId,
         })),
       },
     },
   })
 
-  logger.info({ event: 'journal.created', entryId: entry.id, reference: input.reference })
+  logger.info({ event: 'journal.created', entryId: entry.id, entryNumber: entry.entryNumber, reference: input.reference })
   return entry.id
 }
 
@@ -258,13 +307,17 @@ export async function postEntry(
   const normalDebitTypes  = new Set(['ASSET', 'EXPENSE'])
 
   await inTransaction(tx, async (db) => {
-    // 1. Read and validate BEFORE claiming (read-only; a draft's lines are never edited).
+    // 1. Read and validate BEFORE claiming (read-only). The database repeats the line checks at the moment of
+    //    posting, under a row lock, so a draft changed in between cannot be posted unbalanced (TRG-03).
     const entry = await db.journalEntry.findUnique({
       where:   { id: entryId },
       include: { lines: { include: { account: true } } },
     })
     if (!entry) throw new LedgerError('NOT_FOUND', 404, `Journal entry ${entryId} not found.`)
-    if (entry.isPosted) throw new LedgerError('ALREADY_POSTED', 409, `Entry ${entryId} is already posted.`)
+    if (entry.status !== 'DRAFT') throw new LedgerError('ALREADY_POSTED', 409, `Entry ${entryId} is already posted.`)
+    if (entry.lines.length < 2) {
+      throw new LedgerError('VALIDATION_ERROR', 400, 'A journal entry needs at least two lines.')
+    }
 
     // Exact balance of the stored lines (covers drafts written before the tolerance was removed).
     const debits  = sum(entry.lines.map((l) => l.debit))
@@ -286,10 +339,10 @@ export async function postEntry(
     }
     const ordered = [...deltaByAccount.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
 
-    // 3. CLAIM: one conditional write; exactly one concurrent caller can change isPosted false → true.
+    // 3. CLAIM: one conditional write; exactly one concurrent caller can change status DRAFT → POSTED.
     const claim = await db.journalEntry.updateMany({
-      where: { id: entryId, isPosted: false },
-      data:  { isPosted: true, postedAt: new Date(), postedByUid: actorUid },
+      where: { id: entryId, status: 'DRAFT' },
+      data:  { status: 'POSTED', isPosted: true, postedAt: new Date(), postedByUid: actorUid },
     })
     if (claim.count !== 1) {
       throw new LedgerError('ALREADY_POSTED', 409, `Entry ${entryId} is already posted.`)
@@ -440,10 +493,11 @@ const REVERSAL_REASON_MAX = 500
 /**
  * Reverses a posted entry with an exact mirror entry, AT MOST ONCE  [P1-04] (plan A1-F2, A2-F3, UQ-02).
  *
- * 1. Claim the original with one conditional write (`reversedAt IS NULL`, row count must be 1). The loser of a race,
- *    or a second attempt, gets ALREADY_REVERSED (409) and nothing is created.
- * 2. Create the mirror with `reversalOfId = original` (unique in the database: even a path that skipped the claim
- *    cannot make a second reversal) and post it. All in one transaction (the caller's `tx`, or its own).
+ * 1. Claim the original with one conditional write (`status` POSTED → REVERSED, row count must be 1). The loser of a
+ *    race, or a second attempt, gets ALREADY_REVERSED (409) and nothing is created.
+ * 2. Create the mirror (`entryKind` REVERSAL) with `reversalOfId = original` (unique in the database: even a path that
+ *    skipped the claim cannot make a second reversal) and post it. All in one transaction (the caller's `tx`, or its
+ *    own). The mirror is the exact negation of the original, including every line dimension (INV-07).
  * A reason is mandatory and is stored on the original (`reversalReason`, with `reversedAt` and `reversedByUid`).
  * The mirror is dated now, as before; caller-chosen dates arrive with the period rules.
  */
@@ -465,8 +519,8 @@ export async function voidEntry(
       include: { lines: { include: { account: true } } },
     })
 
-    if (!original.isPosted) throw new LedgerError('NOT_POSTED', 409, 'Cannot void an unposted entry.')
-    if (original.reversedAt) throw new LedgerError('ALREADY_REVERSED', 409, `Entry ${entryId} is already reversed.`)
+    if (original.status === 'DRAFT') throw new LedgerError('NOT_POSTED', 409, 'Cannot void an unposted entry.')
+    if (original.status === 'REVERSED') throw new LedgerError('ALREADY_REVERSED', 409, `Entry ${entryId} is already reversed.`)
 
     // Validate BEFORE claiming, so nothing after the claim can fail in JavaScript (same rule as postEntry).
     const debits  = sum(original.lines.map((l) => l.debit))
@@ -478,10 +532,10 @@ export async function voidEntry(
       )
     }
 
-    // CLAIM: exactly one concurrent caller can set reversedAt on a posted, not-yet-reversed entry.
+    // CLAIM: exactly one concurrent caller can move a posted entry to REVERSED.
     const claim = await db.journalEntry.updateMany({
-      where: { id: entryId, isPosted: true, reversedAt: null },
-      data:  { reversedAt: new Date(), reversedByUid: actorUid, reversalReason: why },
+      where: { id: entryId, status: 'POSTED' },
+      data:  { status: 'REVERSED', reversedAt: new Date(), reversedByUid: actorUid, reversalReason: why },
     })
     if (claim.count !== 1) {
       throw new LedgerError('ALREADY_REVERSED', 409, `Entry ${entryId} is already reversed.`)
@@ -495,11 +549,20 @@ export async function voidEntry(
         entryDate:    new Date(),
         actorUid,
         reversalOfId: entryId,
+        entryKind:    'REVERSAL',
+        sourceType:   original.sourceType ?? undefined,
+        sourceId:     original.sourceId ?? undefined,
         lines: original.lines.map((l) => ({
-          accountCode: l.account.code,
-          debit:       toNumber(l.credit),
-          credit:      toNumber(l.debit),
-          description: `Reversal — ${l.description ?? ''}`,
+          accountCode:        l.account.code,
+          debit:              toNumber(l.credit),
+          credit:             toNumber(l.debit),
+          description:        `Reversal — ${l.description ?? ''}`,
+          memo:               l.memo ?? undefined,
+          financialAccountId: l.financialAccountId ?? undefined,
+          partyType:          l.partyType ?? undefined,
+          partyId:            l.partyId ?? undefined,
+          budgetId:           l.budgetId ?? undefined,
+          departmentId:       l.departmentId ?? undefined,
         })),
       }, db)
     } catch (err) {
