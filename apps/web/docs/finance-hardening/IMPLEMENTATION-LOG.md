@@ -439,6 +439,7 @@ Verification:
   data upgraded from the old shape the P1-05 checks still pass (84 of 84 trigger, 48 of 48 two-session) and 39 of 39 new register checks pass,
   including the key lock and 40 concurrent transaction numbers without a gap; `schema.prisma` against the database: 22 comparisons, no difference.
 - Production, read-only, 2026-11-28: the latest applied migration is P1-04's; accounts `1000` and `4000` exist and are active; nothing written.
+- Vercel preview build of commit `6baf467`: success (it generates the Prisma client and builds with type errors enforced; it does not migrate).
 Integration tests: `financialRegister.itest.ts` (new, 10 cases, including **T-02**); `accountingService.itest.ts` now also empties the register between
 tests. **Not run.**
 Files: the migration folder; `prisma/schema.prisma`; `server/lib/financialUnitOfWork.ts`; `server/services/financialRegisterService.ts`;

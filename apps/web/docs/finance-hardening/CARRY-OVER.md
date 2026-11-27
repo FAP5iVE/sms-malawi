@@ -23,6 +23,7 @@ Read it all before touching code. `IMPLEMENTATION-LOG.md` and `DECISIONS.md` are
 | Neon trial (rolled back) | Done for P1-05 only. |
 | Independent review | Done for P1-05. **Not done for P1-06.** |
 | Screens in a browser | Not tried for P1-06. |
+| Preview build | Success for P1-05 and for P1-06 (`6baf467`). |
 
 Next numbers: implementer decision **I-37**; migration folder timestamps after `20261127090000`.
 
@@ -142,7 +143,7 @@ pnpm --filter web test:integration
 - Production is read-only for this work. Run no SQL that changes data or structure unless the owner's own message asks for it and names the target. Delete no
   branch unless asked.
 - The P1-05 trial ran the migration SQL on `itest-harness` inside one transaction that was rolled back, with before and after fingerprints. History retention is 6 hours.
-- The free plan allows 10 branches and each preview takes one (3 in use on 2026-11-28). If a preview cannot get a database, count the branches.
+- The free plan allows 10 branches and each preview takes one (4 in use on 2026-11-28, after the P1-06 preview). If a preview cannot get a database, count the branches.
 - Read-only facts, production: 1,013 journal entries and 2,062 lines on 2026-11-27, 0 lines violating CHK-01; accounts `1000` and `4000` active; payments
   `cmwwtsqgj0001jp07bhd9jid1` (97,900) and `cmwwuwtub0001jn07eekpslkv` (200,000) have **no journal entry** (P1-07 should list them, P9 repairs them).
 - Push: `git -c push.negotiate=true push -u origin <branch>`, then confirm with `git ls-remote origin`. Never push `main`.
