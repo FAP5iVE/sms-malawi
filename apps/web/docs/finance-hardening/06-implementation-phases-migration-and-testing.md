@@ -19,18 +19,18 @@
 
 ## 2. Phase overview
 
-| Phase | Theme | Depends on | Ships independently? | Closes (main) |
-|---|---|---|---|---|
-| **P0** | Baseline, harness, flags | — | yes (no behaviour change) | X-45; measures real data |
-| **P1** | Ledger core + immediate safeguards + permissions | P0 | yes | A1-F1/F2/F3/F9/F10/F11/F14, A2-F2/F3, X-01..X-17 |
-| **P2** | Accounts registry, chart v2, mappings, periods, numbering | P1 | yes | A2-F6 (part), A2-MC-03, A2-§5 opening balances |
-| **P3** | Receivables (accrual), payments v2, credits, refunds, sponsors | P2 | yes | A1-F4/F5, A2-F1/F5, X-18..X-26 |
-| **P4** | Expenses, budgets, procurement, supplier invoices, advances | P2 (P3 not required) | yes | A1-F6/F7/F8, A2-F4, X-27..X-34, X-43 |
-| **P5** | Payroll, statutory, loans | P2 | yes | A1-F12/F13, X-35..X-42 |
-| **P6** | Library fines (students and staff) | P2 (P1 safeguards already live) | yes | A1-F10/F11, X-02..X-07 |
-| **P7** | Cash control: transfers, reconciliation, cashbook | P2, P3 | yes | A1-§10F, A2-F6, A2-MC-01/02 |
-| **P8** | Reporting, period close, control centre, (gated) assets/inventory | P3–P7 | yes | A2-MC-09/10/11, A2-§9 |
-| **P9** | Historical repair, accrual cutover, go-live | P1–P8 | final | D-05, D-01a |
+| Phase  | Theme                                                             | Depends on                      | Ships independently?      | Closes (main)                                    |
+| ------ | ----------------------------------------------------------------- | ------------------------------- | ------------------------- | ------------------------------------------------ |
+| **P0** | Baseline, harness, flags                                          | —                               | yes (no behaviour change) | X-45; measures real data                         |
+| **P1** | Ledger core + immediate safeguards + permissions                  | P0                              | yes                       | A1-F1/F2/F3/F9/F10/F11/F14, A2-F2/F3, X-01..X-17 |
+| **P2** | Accounts registry, chart v2, mappings, periods, numbering         | P1                              | yes                       | A2-F6 (part), A2-MC-03, A2-§5 opening balances   |
+| **P3** | Receivables (accrual), payments v2, credits, refunds, sponsors    | P2                              | yes                       | A1-F4/F5, A2-F1/F5, X-18..X-26                   |
+| **P4** | Expenses, budgets, procurement, supplier invoices, advances       | P2 (P3 not required)            | yes                       | A1-F6/F7/F8, A2-F4, X-27..X-34, X-43             |
+| **P5** | Payroll, statutory, loans                                         | P2                              | yes                       | A1-F12/F13, X-35..X-42                           |
+| **P6** | Library fines (students and staff)                                | P2 (P1 safeguards already live) | yes                       | A1-F10/F11, X-02..X-07                           |
+| **P7** | Cash control: transfers, reconciliation, cashbook                 | P2, P3                          | yes                       | A1-§10F, A2-F6, A2-MC-01/02                      |
+| **P8** | Reporting, period close, control centre, (gated) assets/inventory | P3–P7                           | yes                       | A2-MC-09/10/11, A2-§9                            |
+| **P9** | Historical repair, accrual cutover, go-live                       | P1–P8                           | final                     | D-05, D-01a                                      |
 
 Order rationale: stop the bleeding first (P1), then give the money a place to land (P2), then correct each flow, then prove it with reconciliation and reporting, and only then repair history using the finished machinery (so repairs use the same engine and are themselves auditable). P6 may be pulled earlier if the owner wants fines fixed sooner; its safeguards (P1-08/09) are already in P1.
 
