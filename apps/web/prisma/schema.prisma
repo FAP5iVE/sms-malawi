@@ -1160,7 +1160,9 @@ model JournalEntry {
   createdByUid           String?              // null on entries written before P1-05
   sourceType             FinancialSourceType?
   sourceId               String?
-  financialTransactionId String?              @unique // relation arrives with the financial register (P1-06)
+  financialTransactionId String?              @unique // the register row this entry was written for (UQ-03)
+  financialTransaction   FinancialTransaction? @relation("EntryOfTransaction", fields: [financialTransactionId], references: [id], onDelete: Restrict)
+  postedForTransaction   FinancialTransaction? @relation("TransactionJournal")
   periodId               String?              // relation arrives with financial periods (P2-05)
 
   @@index([entryDate])
@@ -1194,6 +1196,181 @@ model JournalLine {
   @@index([accountId])
   @@index([accountId, partyType, partyId])
   @@map("journal_lines")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FINANCIAL REGISTER AND IDEMPOTENCY  [P1-06]  (finance hardening; migration 20261127090000_financial_register)
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum FinancialTransactionType {
+  STUDENT_INVOICE_RECOGNITION
+  DEFERRED_INCOME_RELEASE
+  LATE_PENALTY
+  INVOICE_ADJUSTMENT
+  INVOICE_VOID
+  STUDENT_PAYMENT
+  STUDENT_PAYMENT_REVERSAL
+  CREDIT_APPLICATION
+  STUDENT_REFUND
+  SPONSOR_PAYMENT
+  EXPENSE_RECOGNITION
+  EXPENSE_PAYMENT
+  EXPENSE_REVERSAL
+  ADVANCE_PAYMENT
+  ADVANCE_RECONCILIATION
+  ADVANCE_RETURN
+  ADVANCE_WRITE_OFF
+  PAYROLL_RECOGNITION
+  PAYROLL_REVERSAL
+  PAYROLL_DISBURSEMENT
+  STATUTORY_REMITTANCE
+  LOAN_DISBURSEMENT
+  LOAN_REPAYMENT
+  LOAN_WRITE_OFF
+  LIBRARY_FINE_ASSESSMENT
+  LIBRARY_FINE_PAYMENT
+  LIBRARY_FINE_WAIVER
+  LIBRARY_FINE_CANCEL
+  ACCOUNT_TRANSFER
+  RECONCILIATION_ADJUSTMENT
+  OPENING_BALANCE
+  RECLASSIFICATION
+  MANUAL_JOURNAL
+  ACCRUAL_TRANSITION
+  ASSET_CAPITALISATION
+  ASSET_DEPRECIATION
+  ASSET_DISPOSAL
+  INVENTORY_ADJUSTMENT
+  HISTORICAL_CORRECTION
+}
+
+enum FinancialDirection {
+  IN
+  OUT
+  INTERNAL
+  NONE
+}
+
+enum FinancialTransactionStatus {
+  PENDING_POSTING
+  POSTED
+  POSTING_FAILED
+  REVERSED
+}
+
+enum IdempotencyStatus {
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+enum FinancialEvidenceKind {
+  RECEIPT
+  BANK_SLIP
+  MOBILE_MONEY_SMS
+  SUPPLIER_INVOICE
+  DELIVERY_NOTE
+  APPROVAL_DOC
+  SPONSOR_AGREEMENT
+  STATEMENT
+  OTHER
+}
+
+// One row per money event. (sourceType, sourceId, eventKey) can exist once (UQ-04): the master duplicate guard.
+// A POSTED row always has a journal entry (CHK-17, in the database). `transactionNumber` ("TXN-year-000000") is
+// assigned by the database: leave it empty on insert.
+model FinancialTransaction {
+  id                 String                     @id @default(cuid())
+  transactionNumber  String                     @unique @default("")
+  type               FinancialTransactionType
+  sourceType         FinancialSourceType
+  sourceId           String
+  eventKey           String
+  direction          FinancialDirection
+  amount             Decimal                    @db.Decimal(14, 2)
+  currency           String                     @default("MWK")
+  financialAccountId String? // registry account (P2)
+  partyType          PartyType?
+  partyId            String?
+  occurredAt         DateTime
+  recordedAt         DateTime                   @default(now())
+  status             FinancialTransactionStatus @default(PENDING_POSTING)
+  journalEntryId     String?                    @unique
+  journalEntry       JournalEntry?              @relation("TransactionJournal", fields: [journalEntryId], references: [id], onDelete: Restrict)
+  entries            JournalEntry?              @relation("EntryOfTransaction")
+  reversalOfId       String?                    @unique
+  reversalOf         FinancialTransaction?      @relation("TransactionReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
+  reversedBy         FinancialTransaction?      @relation("TransactionReversal")
+  idempotencyKey     String?
+  requestFingerprint String?
+  actorUid           String
+  actorRole          String?
+  approvedByUid      String?
+  postingPlan        Json? // what to post, for rows still waiting (recovery worker)
+  postingAttempts    Int                        @default(0)
+  lastError          String?
+  nextRetryAt        DateTime?
+  postedAt           DateTime?
+
+  @@unique([sourceType, sourceId, eventKey])
+  @@index([status, nextRetryAt])
+  @@index([occurredAt])
+  @@map("financial_transactions")
+}
+
+// Durable, fail-closed idempotency (UQ-06). Written only inside the money transaction it protects.
+model IdempotencyRecord {
+  id                     String            @id @default(cuid())
+  scope                  String
+  key                    String
+  actorUid               String
+  requestHash            String
+  status                 IdempotencyStatus @default(IN_PROGRESS)
+  responseStatus         Int?
+  responseBody           Json?
+  financialTransactionId String?
+  createdAt              DateTime          @default(now())
+  completedAt            DateTime?
+  expiresAt              DateTime
+
+  @@unique([scope, key])
+  @@index([expiresAt])
+  @@map("idempotency_records")
+}
+
+// A scheduled job claims its window by creating the row; the same window cannot be claimed twice.
+model JobRun {
+  id         String    @id @default(cuid())
+  jobName    String
+  windowKey  String
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  summary    Json?
+
+  @@unique([jobName, windowKey])
+  @@map("job_runs")
+}
+
+// Append-only in the database (TRG-06): the only change ever allowed is setting `supersededById` once.
+model FinancialEvidence {
+  id             String                @id @default(cuid())
+  ownerType      String
+  ownerId        String
+  kind           FinancialEvidenceKind
+  fileKey        String
+  fileName       String
+  mimeType       String
+  sizeBytes      Int
+  sha256         String
+  uploadedByUid  String
+  uploadedAt     DateTime              @default(now())
+  supersededById String?
+  supersededBy   FinancialEvidence?    @relation("EvidenceSupersede", fields: [supersededById], references: [id], onDelete: Restrict)
+  supersedes     FinancialEvidence[]   @relation("EvidenceSupersede")
+
+  @@index([ownerType, ownerId])
+  @@index([supersededById])
+  @@map("financial_evidence")
 }
 
 // [P1-05] Numbering counters (spec Part 3 §2.2). A number is taken inside the transaction that uses it, so a

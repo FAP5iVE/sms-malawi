@@ -232,13 +232,13 @@ export function createIdempotencyMiddleware(deps: IdempotencyDeps, opts: Idempot
 
     if (begun.state === 'mismatch') {
       res.status(422)
-      res.json({ error: 'This Idempotency-Key was already used with a different request.' })
+      res.json({ error: 'This Idempotency-Key was already used with a different request.', code: 'IDEMPOTENCY_KEY_REUSED' })
       return
     }
     if (begun.state === 'in-progress') {
       res.setHeader('Retry-After', '5')
       res.status(409)
-      res.json({ error: 'An identical request is already being processed. Please wait for it to finish.' })
+      res.json({ error: 'An identical request is already being processed. Please wait for it to finish.', code: 'IN_PROGRESS' })
       return
     }
     if (begun.state === 'done') {

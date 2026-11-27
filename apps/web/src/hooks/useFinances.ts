@@ -27,7 +27,7 @@ import type {
   UpdateStudentFeeCommitmentInput, BulkGenerateInvoicesInput,
 } from '@shared/schemas/finance'
 import { toast } from 'sonner'
-import { apiFetch, ApiError, newIdempotencyKey, queryKeys } from '@/lib/api-client'
+import { apiFetch, ApiError, actionKeyFor, isKeyReuseError, newIdempotencyKey, queryKeys, releaseActionKey } from '@/lib/api-client'
 import { openPdfPreview, PdfPreviewError } from '@/lib/pdfPreview'
 
 export function useFinanceSummary(academicYear: string, term: number) {
@@ -146,11 +146,29 @@ export function useRecordPayment() {
   const qc = useQueryClient()
   return useMutation({
     meta: { successMessage: 'Payment recorded', failureTitle: 'Could not record payment', affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
-    mutationFn: (data: RecordPaymentInput) =>
-      apiFetch<{ payment: unknown; invoice: ApiInvoice }>('/finances/payments', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }),
+    // [P1-06] One idempotency key per payment attempt, kept until the server confirms it: sending the same payment
+    // again (lost connection, double click, reload) returns the first result instead of recording a second one.
+    mutationFn: async (data: RecordPaymentInput) => {
+      const slot = `payment:${data.invoiceId}`
+      try {
+        const result = await apiFetch<{ payment: unknown; invoice: ApiInvoice }>('/finances/payments', {
+          method: 'POST',
+          headers: { 'Idempotency-Key': actionKeyFor(slot) },
+          body: JSON.stringify(data),
+        })
+        releaseActionKey(slot)
+        return result
+      } catch (err) {
+        if (!isKeyReuseError(err)) throw err
+        // An earlier attempt with different details DID go through. Show it before anything else is recorded.
+        releaseActionKey(slot)
+        await qc.invalidateQueries({ queryKey: queryKeys.finances.all() })
+        throw new ApiError(
+          'An earlier attempt on this invoice was already recorded with different details. Check its payments before recording another.',
+          422,
+        )
+      }
+    },
     // [FIXED 2026-10-22] These invalidations used to be fire-and-forget, so
     // mutateAsync() resolved while the invoice refetch was still in flight and
     // Invoice Entry & Allocation rebuilt its ledger from the PRE-payment

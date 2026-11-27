@@ -8,7 +8,7 @@ this file is corrected.
 Update the **Status** column (never the wording) when the owner or accountant answers, and add a line to
 `IMPLEMENTATION-LOG.md` saying what changed and when.
 
-Last reviewed: 2026-11-27 (P1-05 code done; I-07 to I-09 confirmed; I-10 to I-26 proposed).
+Last reviewed: 2026-11-28 (P1-06 code done; I-07 to I-09 confirmed; I-10 to I-36 proposed).
 
 ## 1. Decisions (D-xx)
 
@@ -119,3 +119,20 @@ Proposed, **not yet confirmed by the owner**. Each states the default taken so i
 | I-24 | The backfill writes only what follows from stored flags. It does not guess sources, creators or reversal links. | migration |
 | I-25 | `createJournalEntry` rejects fewer than two lines or a CHK-01 breach with `VALIDATION_ERROR` 400. In payroll lock a zero amount gets no line, a negative net pay is a debit on salaries payable (the payroll calculation does not stop net pay going below zero), and a run with zero gross and net books no entry. The baseline check PR-01 would list such a run. | `accountingService.ts`, `payrollApprovalService.ts` |
 | I-26 | A line write first updates its draft entry, so posting and line edits are serialised at every isolation level. Two transactions editing the lines of one draft may deadlock; the loser can retry. CHK-01 also rejects `NaN`. | migration |
+
+## 6. Implementer choices made in P1-06
+
+Proposed, **not yet confirmed by the owner**. Each states the default taken so it can be reversed.
+
+| ID | Choice | Where it applies |
+|---|---|---|
+| I-27 | M01 is delivered as one migration folder per task (as I-14): `20261127090000_financial_register` now (register, idempotency, job runs, evidence); `posting_exceptions` with P1-07, UQ-16 with P1-08, `financial_audit_log` and TRG-05 with P1-11. | `prisma/migrations` |
+| I-28 | A payment and its journal entry now commit together (D-08). If posting fails, for example because account `1000` or `4000` is missing, the payment is refused instead of being saved without an entry. The posting rule is unchanged (DR 1000, CR 4000); P3-03 replaces it. | `feeService.ts`, `accountingService.ts` |
+| I-29 | Only payment recording uses the register in P1-06. Expense approve and mark-paid, library fine pay and payroll lock and rollback move to it in P1-08. `recordPaymentEntry` is kept, now used only by the integration test. | services |
+| I-30 | A second request with a key that is being processed gets 409 `IN_PROGRESS` at once (no waiting). The same key with a different request, or from another person, gets 422. Only finished operations are stored: a failed one leaves nothing, so the same key can be sent again (status `FAILED` is unused). Records expire after 90 days; no job removes them yet. | `financialUnitOfWork.ts` |
+| I-31 | The key is honoured whenever it is sent and required (400 `IDEMPOTENCY_KEY_REQUIRED`) only while `finance.v2.ledgerEngine` is on, so older screens keep working. A replay from the database answers 200 with `Idempotent-Replay: true` and the stored body, without receipt, log or search update. | `financialUnitOfWork.ts`, route |
+| I-32 | The Redis `idempotent()` filter on the payment route stays in front: for 24 hours it repeats a successful answer with its first status and header `Idempotent-Replayed: true`. It stores successes only. The database record is the guarantee when Redis is unavailable or has forgotten. | `middleware/idempotency.ts`, `routes/finances.ts` |
+| I-33 | Transaction numbers `TXN-{year}-{000000}` are assigned by a database trigger from the business date in Malawi time, gapless, and cannot be supplied or changed (as I-15, I-16). The year's counter row stays locked until commit. | migration |
+| I-34 | The register's `occurredAt` becomes the journal entry date (X-14). A payment uses its `paidAt`, which is still the time of recording; business dates entered by people arrive with the P3 and P4 posting rules. | `financialRegisterService.ts` |
+| I-35 | A reversal of an entry made before the register existed is registered without `reversalOfId`; the journal's own once-only rule (UQ-02) still applies. | `financialRegisterService.ts` |
+| I-36 | The screen keeps one key per invoice in the browser session until the server confirms the payment. If the key turns out to be used by an earlier, different payment, the screen reloads finance data and asks the user to check before recording again. | `api-client.ts`, `useFinances.ts` |

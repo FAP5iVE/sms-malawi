@@ -142,6 +142,8 @@ export interface CreateJournalEntryInput {
   /** [P1-05] The record the entry came from. Filled by the financial register (P1-06); a reversal copies it. */
   sourceType?:   FinancialSourceType
   sourceId?:     string
+  /** [P1-06] The register row this entry is written for (unique, UQ-03). A posted entry cannot gain one later. */
+  financialTransactionId?: string
 }
 
 export interface IncomeStatement {
@@ -269,6 +271,7 @@ export async function createJournalEntry(
       createdByUid: input.actorUid,
       sourceType:   input.sourceType,
       sourceId:     input.sourceId,
+      financialTransactionId: input.financialTransactionId,
       reversalOfId: input.reversalOfId,
       lines: {
         create: input.lines.map((l, i) => ({
@@ -506,6 +509,8 @@ export async function voidEntry(
   actorUid: string,
   reason:   string,
   tx?:      LedgerTx,
+  // [P1-06] The reversal's register row, and its source for an original that carries none (older entries).
+  link?:    { financialTransactionId?: string; sourceType?: FinancialSourceType; sourceId?: string },
 ): Promise<string> {
   const why = (reason ?? '').trim()
   if (!why) throw new LedgerError('REASON_REQUIRED', 422, 'A reason is required to reverse a journal entry.')
@@ -550,8 +555,9 @@ export async function voidEntry(
         actorUid,
         reversalOfId: entryId,
         entryKind:    'REVERSAL',
-        sourceType:   original.sourceType ?? undefined,
-        sourceId:     original.sourceId ?? undefined,
+        sourceType:   original.sourceType ?? link?.sourceType,
+        sourceId:     original.sourceId ?? link?.sourceId,
+        financialTransactionId: link?.financialTransactionId,
         lines: original.lines.map((l) => ({
           accountCode:        l.account.code,
           debit:              toNumber(l.credit),
@@ -586,6 +592,27 @@ export async function voidEntry(
 // Called by feeService when a payment is recorded.
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * [P1-06] The posting rule for a fee payment, as data. feeService passes it to the financial register so the payment,
+ * its register row and its journal entry are written together. The rule itself is unchanged (DR 1000 / CR 4000);
+ * the receivable-based rule arrives with P3.
+ */
+export function paymentPostingPlan(opts: {
+  invoiceId:    string
+  studentName:  string
+  amount:       number
+  paymentRef:   string
+}): { reference: string; description: string; lines: JournalLineInput[] } {
+  return {
+    reference:   `PAY-${opts.invoiceId.slice(-8).toUpperCase()}`,
+    description: `Fee payment — ${opts.studentName} (ref: ${opts.paymentRef})`,
+    lines: [
+      { accountCode: '1000', debit: opts.amount, description: 'Cash received' },
+      { accountCode: '4000', credit: opts.amount, description: 'Tuition fee revenue' },
+    ],
+  }
+}
+
 export async function recordPaymentEntry(opts: {
   invoiceId:    string
   studentName:  string
@@ -597,14 +624,9 @@ export async function recordPaymentEntry(opts: {
   // they still commit or fail together, so no orphan draft entry (check LG-03) is left behind.
   await inTransaction(tx, async (db) => {
     const entryId = await createJournalEntry({
-      reference:   `PAY-${opts.invoiceId.slice(-8).toUpperCase()}`,
-      description: `Fee payment — ${opts.studentName} (ref: ${opts.paymentRef})`,
+      ...paymentPostingPlan(opts),
       entryDate:   new Date(),
       actorUid:    opts.actorUid,
-      lines: [
-        { accountCode: '1000', debit: opts.amount, description: 'Cash received' },
-        { accountCode: '4000', credit: opts.amount, description: 'Tuition fee revenue' },
-      ],
     }, db)
     await postEntry(entryId, opts.actorUid, db)
   })

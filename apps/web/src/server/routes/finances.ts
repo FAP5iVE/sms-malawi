@@ -119,6 +119,7 @@ import { logger } from '@/lib/logger'
 import * as budgetWindowService from '@/server/services/budgetWindowService'
 import { CreateBudgetWindowSchema, SetBudgetWindowStatusSchema } from '@shared/schemas/assetsInventoryProcurement'
 import { sendError } from '@/server/lib/sendError'
+import { financialIdempotency, replayAwareStatus } from '@/server/lib/financialUnitOfWork'
 import { isStaffRole } from '@shared/types/roles'
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }) // 10MB
@@ -522,12 +523,15 @@ financesRouter.post(
   '/payments',
   verifyAuth,
   requireRole(['admin', 'finance']),
+  // [P1-06] Redis front filter; the durable guarantee is the idempotency record written with the payment.
+  idempotent(),
   async (req, res) => {
     const parsed = RecordPaymentSchema.safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
     try {
-      const result = await feeService.recordPayment(parsed.data, req.user!.uid, req.user!.role)
-      return res.status(201).json(serializeDecimals(result))
+      const idempotency = await financialIdempotency(req, 'payment.record', serializeDecimals)
+      const result = await feeService.recordPayment(parsed.data, req.user!.uid, req.user!.role, { idempotency })
+      return res.status(replayAwareStatus(res, idempotency, 201)).json(serializeDecimals(result))
     } catch (err: unknown) {
       // [PRODUCTION FIX] Distinguish "needs a confirmation the client
       // hasn't given yet" (409 — a normal, expected step in the flow, not

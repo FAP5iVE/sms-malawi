@@ -407,6 +407,53 @@ Remains / open questions:
 - Before merging, follow the runbook (§2 and §2a): merging applies the migration to production.
 - `postEntry` computes balance changes from the lines read before its claim. Nothing edits draft lines today; manual journals must re-read after the claim.
 
+### P1-06 Financial register, idempotency, unit of work  (2026-11-28)
+Status: **code done; unit-tested; the SQL proven on local Postgres 16; the integration suite is written but NOT yet run; no Neon trial; no independent review.**
+Branch `finance-hardening/p1-06-to-p1-13`, on top of the P1-05 commit `0607c6e`. Not merged, so production is unchanged. **Needs `prisma generate`.**
+What was done:
+- **Migration `20261127090000_financial_register`** (first part of M01; one transaction, additive, safe to run twice): tables `financial_transactions`
+  (the register), `idempotency_records`, `job_runs`, `financial_evidence`; five enum types; **UQ-04** (source type, source id, event), **UQ-05**
+  (transaction number), **UQ-06** (scope, key), one job run per name and window; **CHK-17** (a posted row names its journal entry); amount not
+  negative and not NaN; foreign keys, including `journal_entries.financialTransactionId`; the database assigns `TXN-{year}-{000000}`; **TRG-06**
+  makes evidence append-only. No existing row is written. `sequence_counters` is reused from P1-05, not created again.
+- **`server/lib/financialUnitOfWork.ts`** (new): `runFinancialTransaction` (claim the idempotency key, do the work, store the answer, in one
+  transaction), `FinancialError` with codes, `financialIdempotency` and `replayAwareStatus` for routes. Database connection failures answer
+  503 `RETRYABLE`; nothing is retried by the server.
+- **`services/financialRegisterService.ts`** (new): `record`, `markPosted`, `postRegistered`, `recordAndPost`, `reverseAndPost`.
+- `accountingService`: entries can carry `financialTransactionId`; `voidEntry` accepts the reversal's register link; the payment posting rule is now
+  `paymentPostingPlan` (same lines as before).
+- **Payment recording** (`feeService.recordPayment`, `POST /finances/payments`) now writes the payment, allocations, credit, invoice balances, register
+  row, journal entry and account balances as **one transaction** (closes A1-F3 for payments). A repeat with the same key returns the first answer, with
+  no second receipt or log. The route also has the existing Redis `idempotent()` filter.
+- `sendError` returns `code` and `details` for finance and ledger errors; `idempotency-core` answers carry `code` too.
+- Screen side: the record-payment action keeps one key per invoice until the server confirms it, and explains a key reused with different details
+  (`lib/api-client.ts`, `hooks/useFinances.ts`). No visual change.
+Verification:
+- Unit: 33 failed, 2071 passed (2104), run with a throwaway config without the setup file. The failing test names are the same as on `main` at
+  `dd3282a` without this work. 39 new unit tests.
+- eslint clean on the changed files. `tsc`: 1011 errors against 1005 after P1-05 (7 new, 1 gone); the new ones are all caused by the Prisma client not
+  being generated here.
+- `finance:baseline:test`, `hills:test`, `hills:contrast` pass. `hills:inventory:check` and `hills:ratchets` fail with the same output as before this
+  task. `hills:logic-diff` flags the finance files (expected; no allowlist entry added).
+- Local Postgres 16: all 35 migrations apply to an empty database; this migration runs a second time without error and leaves data unchanged; on
+  data upgraded from the old shape the P1-05 checks still pass (84 of 84 trigger, 48 of 48 two-session) and 39 of 39 new register checks pass,
+  including the key lock and 40 concurrent transaction numbers without a gap; `schema.prisma` against the database: 22 comparisons, no difference.
+- Production, read-only, 2026-11-28: the latest applied migration is P1-04's; accounts `1000` and `4000` exist and are active; nothing written.
+Integration tests: `financialRegister.itest.ts` (new, 10 cases, including **T-02**); `accountingService.itest.ts` now also empties the register between
+tests. **Not run.**
+Files: the migration folder; `prisma/schema.prisma`; `server/lib/financialUnitOfWork.ts`; `server/services/financialRegisterService.ts`;
+`accountingService.ts`; `feeService.ts`; `server/routes/finances.ts`; `server/lib/sendError.ts`; `lib/idempotency-core.ts`; `lib/api-client.ts`;
+`hooks/useFinances.ts`; tests `financialUnitOfWork.test.ts`, `financialRegisterService.test.ts`, `actionKeys.test.ts`, `feeService.money.test.ts`,
+`financialRegister.itest.ts`, `accountingService.itest.ts`; these documents.
+Decisions (I-xx in DECISIONS.md): I-27 to I-36.
+Not done by design: other money actions still post the old way (expense approve and mark-paid, library fine pay, payroll lock and rollback move to the
+register in P1-08); the retry queue for entries that could not be posted (P1-07); no job deletes expired idempotency records; nothing uploads
+financial evidence yet.
+Remains / open questions:
+- **Run the integration suite** on the `itest-harness` branch (it covers P1-02 to P1-06) and record the result here.
+- Neon rolled-back trial of this migration, as done for P1-05.
+- Before merging, follow the runbook (§2, §2a, §2b): merging applies the migrations to production.
+
 ### Next in order
-P1-06 Financial register, idempotency, unit of work (D-09, C-02, X-16; test **T-02**). Its migration M01 must **not** create `sequence_counters`,
-which P1-05 already created (I-15). Start only after the integration suite is green and P1-05 has been reviewed.
+P1-07 Posting exceptions and recovery worker, then P1-08 to P1-13, on the same branch (see `CARRY-OVER.md`). By the owner's instruction of
+2026-11-27, the rest of P1 is implemented first and tested thoroughly together at the end of P1; P1-05 and P1-06 have not passed the integration suite.

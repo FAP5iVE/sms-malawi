@@ -72,6 +72,8 @@ import type {
 } from '@shared/schemas/finance'
 import { generateReceipt } from '@/server/services/receiptService'
 import * as accountingService from '@/server/services/accountingService'
+import * as financialRegister from '@/server/services/financialRegisterService'
+import { runFinancialTransaction, type IdempotencyContext } from '@/server/lib/financialUnitOfWork'
 import * as algolia from '@/server/services/algoliaService'
 import { resolveStudentFromUid } from '@/server/services/studentService'
 import { getSchoolBranding } from '@/server/services/notificationService'
@@ -419,7 +421,16 @@ const DUPLICATE_PAYMENT_WINDOW_MS = 2 * 60 * 1000
 //      request; the first submission without it throws
 //      OverpaymentConfirmationRequiredError so the client can warn and
 //      get explicit confirmation first, exactly as requested.
-export async function recordPayment(data: RecordPaymentInput, actorUid: string, actorRole: string) {
+//
+// [P1-06] The payment, its allocations and credit, the invoice balances, the register row and the journal entry are
+// ONE transaction (D-08; closes A1-F3): either the payment exists with its entry or neither does. With an
+// idempotency key, sending the same request again returns the first answer and records nothing.
+export async function recordPayment(
+  data: RecordPaymentInput,
+  actorUid: string,
+  actorRole: string,
+  opts: { idempotency?: IdempotencyContext } = {},
+) {
   // [FIXED 2026-10-22] The invoice (balances, existing payments) used to be read
   // OUTSIDE the transaction that wrote the payment. Two requests for the same
   // invoice -- a double-click, a retry, two cashiers -- could both read the
@@ -427,7 +438,7 @@ export async function recordPayment(data: RecordPaymentInput, actorUid: string, 
   // happens inside one transaction that first takes a row lock on the invoice:
   // the second request waits, re-reads the committed state (including the
   // first payment) and is validated against that.
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await runFinancialTransaction({ actorUid, idempotency: opts.idempotency }, async (tx) => {
     await tx.$queryRaw`SELECT "id" FROM "invoices" WHERE "id" = ${data.invoiceId} FOR UPDATE`
 
     const invoice = await tx.invoice.findUniqueOrThrow({
@@ -539,34 +550,41 @@ export async function recordPayment(data: RecordPaymentInput, actorUid: string, 
       where: { id: data.invoiceId },
       data: { paidAmount: newPaid, balance: newBalance, status: newStatus },
     })
-    return { invoice, payment: p, updatedInvoice: inv }
-  })
-  const { invoice, payment, updatedInvoice } = result
-
-  const student = await prisma.student.findUnique({
-    where: { id: invoice.studentId },
-    select: { firstName: true, lastName: true, registrationNo: true },
-  })
-
-  // [R9] HEADLINE FIX — reconnect real tuition revenue to the double-entry
-  // accounting ledger. accountingService.recordPaymentEntry() already
-  // existed, fully correct, but nothing ever called it — every
-  // AccountingLedgerTab.tsx view showed near-zero revenue regardless of
-  // how much tuition had actually been collected. A posting failure here
-  // must not roll back an already-committed, real payment — logged for
-  // reconciliation instead, matching the receipt-generation pattern
-  // immediately below.
-  try {
-    await accountingService.recordPaymentEntry({
-      invoiceId:   data.invoiceId,
-      studentName: student ? `${student.firstName} ${student.lastName}` : invoice.studentId,
-      amount:      data.amount,
-      paymentRef:  payment.reference ?? payment.id,
-      actorUid,
+    // [R9, moved inside the transaction by P1-06] The money event: register row, journal entry, balances. A posting
+    // failure now cancels the whole payment instead of leaving a payment the ledger never saw.
+    const student = await tx.student.findUnique({
+      where: { id: invoice.studentId },
+      select: { firstName: true, lastName: true },
     })
-  } catch (err) {
-    logger.error({ event: 'accounting.payment_posting_failed', paymentId: payment.id, invoiceId: data.invoiceId, err })
-  }
+    await financialRegister.recordAndPost(
+      tx,
+      {
+        type: 'STUDENT_PAYMENT',
+        sourceType: 'PAYMENT',
+        sourceId: p.id,
+        eventKey: 'RECEIPT',
+        direction: 'IN',
+        amount: data.amount,
+        occurredAt: p.paidAt,
+        actorUid,
+        actorRole,
+        partyType: 'STUDENT',
+        partyId: invoice.studentId,
+        idempotency: opts.idempotency,
+      },
+      accountingService.paymentPostingPlan({
+        invoiceId: data.invoiceId,
+        studentName: student ? `${student.firstName} ${student.lastName}` : invoice.studentId,
+        amount: data.amount,
+        paymentRef: p.reference ?? p.id,
+      }),
+    )
+    return { payment: p, invoice: inv }
+  })
+
+  // A repeat of a request that already succeeded: answer as the first time, with no second receipt or log.
+  if (opts.idempotency?.replayed) return result
+  const { payment, invoice: updatedInvoice } = result
 
   // Receipt generation must never roll back a committed payment — a failure is
   // logged and the receipt is regenerated on demand the first time someone

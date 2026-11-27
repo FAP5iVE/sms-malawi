@@ -238,6 +238,51 @@ export function newIdempotencyKey(): string {
   return `k-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`
 }
 
+/**
+ * [P1-06] The idempotency key of a money action that may have to be sent again (finance plan Part 4 §1.1).
+ * `slot` names the action ("payment:<invoiceId>"). The same key comes back until `releaseActionKey(slot)`, so a
+ * double click, a retry after a lost connection or a page reload cannot record the money twice. Release it when the
+ * action succeeds or the person cancels it. Kept in sessionStorage when available, else in memory.
+ */
+const actionKeys = new Map<string, string>()
+const actionKeySlot = (slot: string) => `idempotency:${slot}`
+
+export function actionKeyFor(slot: string): string {
+  let key = actionKeys.get(slot)
+  if (!key) {
+    try {
+      key = globalThis.sessionStorage?.getItem(actionKeySlot(slot)) ?? undefined
+    } catch {
+      // storage blocked: memory only
+    }
+  }
+  key ??= newIdempotencyKey()
+  actionKeys.set(slot, key)
+  try {
+    globalThis.sessionStorage?.setItem(actionKeySlot(slot), key)
+  } catch {
+    // storage blocked: memory only
+  }
+  return key
+}
+
+export function releaseActionKey(slot: string): void {
+  actionKeys.delete(slot)
+  try {
+    globalThis.sessionStorage?.removeItem(actionKeySlot(slot))
+  } catch {
+    // storage blocked: nothing stored
+  }
+}
+
+/** True when the server refused a key because it already belongs to a different, completed request. */
+export function isKeyReuseError(error: unknown): boolean {
+  return (
+    error instanceof ApiError &&
+    (error.details as { code?: unknown } | undefined)?.code === 'IDEMPOTENCY_KEY_REUSED'
+  )
+}
+
 // ─── TYPED API ERROR ──────────────────────────────────────
 
 // [PRODUCTION FIX] `details` carries the full parsed response body, not

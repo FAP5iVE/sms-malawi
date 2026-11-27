@@ -93,7 +93,8 @@ describe.skipIf(!integrationEnabled())('accountingService: caller transactions (
   // Each test starts from an empty ledger with every balance at zero. Posted rows refuse DELETE (P1-05), so the
   // two journal tables are truncated. `db.prisma` is bound to the throwaway `it_…` database this file created.
   beforeEach(async () => {
-    await db.prisma.$executeRawUnsafe('TRUNCATE TABLE "journal_lines", "journal_entries"')
+    // [P1-06] The register references the journal and the journal references it, so they are emptied together.
+    await db.prisma.$executeRawUnsafe('TRUNCATE TABLE "journal_lines", "journal_entries", "financial_transactions"')
     await db.prisma.chartOfAccount.updateMany({ data: { balance: 0 } })
     await db.prisma.systemSettings.deleteMany({ where: { key: { startsWith: 'itest.biz.' } } })
   })

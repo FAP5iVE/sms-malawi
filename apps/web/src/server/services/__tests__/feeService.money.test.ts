@@ -22,6 +22,7 @@ const h = vi.hoisted(() => {
     paymentAllocation: { create: vi.fn() },
     invoiceLineItem: { update: vi.fn(), create: vi.fn() },
     studentCredit: { create: vi.fn() },
+    student: { findUnique: vi.fn() },
     invoiceNumber: undefined as unknown,
   }
   const prisma = {
@@ -40,7 +41,11 @@ const h = vi.hoisted(() => {
 vi.mock('@/lib/prisma', () => ({ prisma: h.prisma }))
 vi.mock('@/lib/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }))
 vi.mock('@/server/services/receiptService', () => ({ generateReceipt: vi.fn() }))
-vi.mock('@/server/services/accountingService', () => ({ recordPaymentEntry: vi.fn().mockResolvedValue(undefined) }))
+// [P1-06] The money event is registered and posted inside the payment transaction.
+vi.mock('@/server/services/accountingService', () => ({
+  paymentPostingPlan: vi.fn((o: { amount: number }) => ({ reference: 'PAY-X', description: 'd', lines: [{ accountCode: '1000', debit: o.amount }] })),
+}))
+vi.mock('@/server/services/financialRegisterService', () => ({ recordAndPost: vi.fn() }))
 vi.mock('@/server/services/algoliaService', () => ({ updateInvoice: vi.fn() }))
 vi.mock('@/server/services/studentService', () => ({ resolveStudentFromUid: vi.fn() }))
 vi.mock('@/server/services/notificationService', () => ({ getSchoolBranding: vi.fn() }))
@@ -50,6 +55,7 @@ vi.mock('@/server/services/analytics/financeLogic', () => ({ summariseInvoices: 
 vi.mock('@/server/services/reporting/kpi', () => ({ daysBetween: vi.fn() }))
 
 import * as accountingService from '@/server/services/accountingService'
+import * as financialRegister from '@/server/services/financialRegisterService'
 import {
   computeInvoiceCharges, recordPayment, applyLatePenalties,
   OverpaymentConfirmationRequiredError, DuplicatePaymentError,
@@ -62,6 +68,7 @@ beforeEach(() => {
   h.prisma.scholarship.findFirst.mockResolvedValue(null)
   h.prisma.studentCredit.findMany.mockResolvedValue([])
   h.prisma.student.findUnique.mockResolvedValue({ firstName: 'A', lastName: 'B', registrationNo: 'R1' })
+  h.tx.student.findUnique.mockResolvedValue({ firstName: 'A', lastName: 'B' })
   h.tx.payment.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
     id: 'pay1', reference: null, paidAt: new Date(), ...data,
   }))
@@ -260,12 +267,26 @@ describe('recordPayment', () => {
     await expect(recordPayment(input() as never, 'uid1', 'finance')).resolves.toBeDefined()
   })
 
-  it('the ledger entry is posted with the payment amount after the transaction', async () => {
+  it('the payment is registered and posted on the same transaction as the payment itself', async () => {
     setInvoice(invoice())
     await recordPayment(input() as never, 'uid1', 'finance')
-    expect(accountingService.recordPaymentEntry).toHaveBeenCalledWith(
-      expect.objectContaining({ invoiceId: 'inv1', amount: 500 }),
+    expect(accountingService.paymentPostingPlan).toHaveBeenCalledWith(
+      expect.objectContaining({ invoiceId: 'inv1', amount: 500, studentName: 'A B' }),
     )
+    expect(financialRegister.recordAndPost).toHaveBeenCalledWith(
+      h.tx,
+      expect.objectContaining({
+        type: 'STUDENT_PAYMENT', sourceType: 'PAYMENT', sourceId: 'pay1', eventKey: 'RECEIPT', direction: 'IN',
+        amount: 500, actorUid: 'uid1', partyType: 'STUDENT',
+      }),
+      expect.objectContaining({ reference: 'PAY-X' }),
+    )
+  })
+
+  it('a posting failure fails the payment (D-08): nothing is reported as recorded', async () => {
+    setInvoice(invoice())
+    vi.mocked(financialRegister.recordAndPost).mockRejectedValueOnce(new Error('no such account'))
+    await expect(recordPayment(input() as never, 'uid1', 'finance')).rejects.toThrow('no such account')
   })
 })
 

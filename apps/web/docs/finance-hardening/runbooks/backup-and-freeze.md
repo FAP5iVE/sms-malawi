@@ -56,6 +56,23 @@ After the merge:
   it needs no database change.
 - A script that deletes posted journal rows (for example a demo-data reset) is now refused (I-19).
 
+## 2b. Merging P1-06 (`20261127090000_financial_register`)
+
+P1-06 sits on top of P1-05: merging it also applies the P1-05 migration, so do §2a as well.
+
+Before the merge:
+1. The integration suite has passed on the test branch.
+2. Run on production (read-only). Both accounts must be listed, or every payment will be refused (I-28); they should also be active:
+   `SELECT code, "isActive" FROM chart_of_accounts WHERE code IN ('1000','4000');`
+
+After the merge:
+- `_prisma_migrations` shows both migrations with `finished_at` set.
+- Record one small real payment. It must have a row in `financial_transactions` with a `TXN-` number, status `POSTED`, and a journal entry.
+- If the build failed on this migration, fix the cause, run `prisma migrate resolve --rolled-back 20261127090000_financial_register` against production
+  (`DIRECT_URL`), and redeploy.
+- The previous code keeps working against the new tables. Redeploying it needs no database change; payments it records have no register row.
+- A script that empties the journal with `TRUNCATE` must now empty `financial_transactions` in the same statement, because of the new foreign key.
+
 ## 3. Rolling a migration back
 
 Because migrations are additive, the first response to a problem is **to switch the module's flag off**

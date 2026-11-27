@@ -88,6 +88,8 @@ export function clientMessageFor(
   if (opts.publicMessage) return opts.publicMessage
   if (!(err instanceof Error)) return opts.fallbackMessage ?? 'Unexpected error.'
   if (isInfrastructureError(err)) return status >= 500 ? GENERIC_SERVER_MESSAGE : GENERIC_REQUEST_MESSAGE
+  // [P1-06] A finance rule error is always written for the person, including 503 RETRYABLE.
+  if (err.name === 'FinancialError') return err.message
   // 4xx errors (explicit `.status`, or the route's own `defaultStatus` for
   // validation-style catch-alls) were written to be shown. A 5xx never is,
   // outside local development.
@@ -111,5 +113,13 @@ export function sendError(res: Response, err: unknown, opts: SendErrorOptions = 
   // outcomes, not incidents — deliberately NOT sent to Sentry. Sending
   // every client validation error to Sentry would flood Issues with noise
   // instead of signal.
-  return res.status(status).json({ error: message, ...opts.extraFields })
+  return res.status(status).json({ error: message, ...ruleFields(err), ...opts.extraFields })
+}
+
+// [P1-06] Finance rule errors also carry a code the client can act on (plan Part 4 §1.4: { error, code, details }).
+// Only these two classes: other errors' `code` values (Prisma's, a provider's) are not for the client.
+function ruleFields(err: unknown): { code?: string; details?: unknown } {
+  if (!(err instanceof Error) || (err.name !== 'FinancialError' && err.name !== 'LedgerError')) return {}
+  const { code, details } = err as Error & { code?: string; details?: unknown }
+  return details === undefined ? { code } : { code, details }
 }
